@@ -1,5 +1,5 @@
 @echo off
-title Commander Deck App
+title The Grimoire
 cd /d "%~dp0"
 
 rem Find Node (it is not on PATH on this machine)
@@ -27,7 +27,7 @@ if not exist "node_modules\vite\bin\vite.js" (
   )
 )
 
-echo Starting Commander Deck App...
+echo Starting The Grimoire...
 echo The app will open in your browser. Close this window to stop it.
 echo.
 "%NODE%" node_modules\vite\bin\vite.js --open

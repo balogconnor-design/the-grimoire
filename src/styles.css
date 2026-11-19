@@ -842,3 +842,4 @@ button.alert-row:hover { background: var(--panel-2); }
 .import-missing { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 240px; overflow: auto; }
 .import-missing li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .app-footer { max-width: 760px; margin-left: auto; margin-right: auto; line-height: 1.5; padding: 16px; text-align: center; border-top: 1px solid var(--border, rgba(127,127,127,0.25)); margin-top: 24px; }
+.app-footer .footer-data { margin: 0 0 8px; }

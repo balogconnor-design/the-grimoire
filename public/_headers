@@ -1,0 +1,13 @@
+# Cloudflare Pages response headers (https://developers.cloudflare.com/pages/configuration/headers/).
+# Only the hosted web version uses this file; the portable build removes it.
+# The app talks to Scryfall only: api.scryfall.com for data, *.scryfall.io for card images and mana symbols.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.scryfall.io; connect-src 'self' https://api.scryfall.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Content-Type-Options: nosniff
+  X-Frame-Options: DENY
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+
+# Vite gives built files content-hashed names, so they can be cached forever.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

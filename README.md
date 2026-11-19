@@ -11,23 +11,52 @@ npm install      # first time only
 npm run dev      # opens http://localhost:5173
 ```
 
-On Windows you can also double-click `Start Commander Deck.bat`, which installs dependencies if needed and opens the app.
+On Windows you can also double-click `Start The Grimoire.bat`, which installs dependencies if needed and opens the app.
 
 | Command | What it does |
 |---|---|
 | `npm run dev` | Development server with live reload |
 | `npm run build` | Static build in `dist/` |
+| `npm run build:web` | Tests, then the static build (what Cloudflare Pages runs) |
 | `npm run typecheck` | TypeScript check |
 | `npm test` | Vitest suite (unit, storage and import tests; no network needed) |
 
 > Internal names: the IndexedDB database and the backup file's `app` key are still `deckforge` (the project's old name). They must not be renamed, or existing data and old backups stop loading.
 
+## Web version (Cloudflare Pages)
+
+The same static build is hosted free on Cloudflare Pages at **https://the-grimoire.app**. There's no server: the browser
+calls Scryfall directly and saves everything in that browser, as in the other versions.
+
+- **Addresses:** `the-grimoire.app` is the only production address. The Pages project is `the-grimoire-mtg`, and
+  `the-grimoire-mtg.pages.dev` and `www.the-grimoire.app` both redirect to it (Cloudflare Bulk Redirects and a DNS redirect rule),
+  so nobody ends up saving data on a second address. The domain's DNS is on Cloudflare.
+- **Deploys:** Cloudflare builds from GitHub on every push. `main` is production; every other branch gets its own preview URL
+  (`<branch>.the-grimoire-mtg.pages.dev`, not redirected). Preview URLs keep their own data, separate from production.
+- **Build settings:** build command `npm run build:web` (a failing test blocks the deploy), output directory `dist`, Node version
+  from `.node-version`.
+- **Headers:** `public/_headers` sets the security headers (the Content-Security-Policy allows only `api.scryfall.com` and
+  `*.scryfall.io`, so a new outside source must be added there or it will be blocked) and long caching for `assets/`. The portable
+  build leaves this file out. To test it locally, run `npx wrangler pages dev dist` after a build.
+- **The address must never change.** Like the portable port, saved data is tied to `https://the-grimoire.app`; moving to another
+  address (including switching to `www.` or letting the domain lapse) leaves every user's data behind unless they back up and
+  restore. Keep the domain on auto-renew.
+- The web version, the portable app and the dev server each keep separate data; use **Export & backup** to move it between them.
+
 ## Portable (flash drive) build
 
-Double-click `Build Portable.bat`. It produces `Portable Build\Commander Deck\`. Copy that folder to a drive and
-run `Commander Deck.exe`. The launcher (`portable/Launcher.cs`, compiled with the csc.exe built into Windows) serves the app on
-`http://localhost:47823` and opens it in an Edge/Chrome app window. That window's browser profile lives in the folder's `data\`, so
-saved data travels with the drive. Re-run the build after code changes; the `data\` folder on the drive is left alone.
+The portable build is the release distribution. Double-click `Build Portable.bat` (needs `npm install` once). It type-checks,
+runs the tests, builds the app and produces:
+
+- `Portable Build\The Grimoire\`: copy this folder to a drive and run `The Grimoire.exe`.
+- `Portable Build\The-Grimoire-<version>-portable.zip`: the same folder zipped for sharing (never includes a `data\` folder).
+
+The launcher (`portable/Launcher.cs`, compiled with the csc.exe built into Windows) serves the app on `http://localhost:47823` and
+opens it in an Edge/Chrome app window. That window's browser profile lives in the folder's `data\`, so saved data travels with the
+drive. The port must never change, because the browser ties saved data to it. The portable app and the dev server (port 5173)
+keep separate data; use **Backup** to move data between them. The `.exe` icon is made from `src/assets/grimoire-logo.png`, and its
+version comes from `package.json`. Re-run the build after code changes; the `data\` folder is left alone. To update a copy on a
+drive, replace the `.exe` and `app\` and keep `data\`.
 
 ## Features
 

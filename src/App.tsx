@@ -68,6 +68,7 @@ export function App() {
         {deckMatch ? <DeckPage key={deckMatch[1]} id={deckMatch[1]} /> : collMatch ? <CollectionPage tab={collTab} /> : <Library />}
       </main>
       <footer className="app-footer muted small">
+        <p className="footer-data">Your decks and collection are saved only in this browser on this device. Use <strong>Collection → Export &amp; backup</strong> to keep a copy or move them elsewhere.</p>
         The Grimoire is unofficial fan content. It is not affiliated with, endorsed by, or sponsored by Wizards of the Coast. Magic: The Gathering, card names, text, symbols and artwork are the property of Wizards of the Coast LLC and the artists. Card images and data are provided by Scryfall.
       </footer>
     </div>
