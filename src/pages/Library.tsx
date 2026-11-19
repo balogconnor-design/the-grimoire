@@ -12,6 +12,7 @@ import { useToast } from '../components/Toast';
 import { ImportResultView } from '../components/ImportResult';
 import { ColorPips } from '../components/Mana';
 import { Modal } from '../components/Modal';
+import { BackupModal } from '../components/BackupModal';
 import { GlobalSearch } from '../components/GlobalSearch';
 import { FavStar, Tag, TagList } from '../components/TagEditor';
 import { navigate } from '../lib/router';
@@ -28,6 +29,7 @@ export function Library() {
   const [format, setFormat] = useState('all');
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [favOnly, setFavOnly] = useState(false);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const allTags = useAllDeckTags();
@@ -130,6 +132,9 @@ export function Library() {
             <button className="btn btn-primary btn-lg" onClick={() => setCreating(true)}>+ New deck</button>
             <button className="btn btn-lg" onClick={() => setImporting(true)}>⇪ Import deck</button>
           </div>
+          <p className="muted small empty-restore">
+            Moving from another device or browser? <button className="link-btn" onClick={() => setRestoring(true)}>Restore a backup</button>
+          </p>
         </div>
       ) : rows.length === 0 ? (
         <div className="empty">No decks match.</div>
@@ -141,6 +146,7 @@ export function Library() {
 
       {creating && <NewDeckModal onClose={() => setCreating(false)} />}
       {importing && <ImportDeckModal onClose={() => setImporting(false)} />}
+      {restoring && <BackupModal initialTab="restore" onClose={() => setRestoring(false)} />}
     </div>
   );
 }

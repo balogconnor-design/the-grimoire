@@ -6,6 +6,7 @@ import { exportDecklist, importDecklist, importSummary, parseDecklist, type Impo
 import { requestCardSearch } from '../lib/searchBus';
 import { wasReported } from '../lib/store';
 import { ImportResultView } from './ImportResult';
+import { download as saveFile } from '../lib/backup';
 
 export function ImportExportModal({ deck, initialTab = 'import', onClose }: { deck: Deck; initialTab?: 'import' | 'export'; onClose: () => void }) {
   const [tab, setTab] = useState(initialTab);
@@ -45,14 +46,7 @@ export function ImportExportModal({ deck, initialTab = 'import', onClose }: { de
     }
   };
 
-  const download = () => {
-    const url = URL.createObjectURL(new Blob([exported], { type: 'text/plain' }));
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${deck.name.replace(/[^\w\- ]+/g, '').trim() || 'deck'}.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
+  const download = () => void saveFile(`${deck.name.replace(/[^\w\- ]+/g, '').trim() || 'deck'}.txt`, exported);
 
   return (
     <Modal onClose={onClose} title="Import / Export">

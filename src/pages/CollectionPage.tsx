@@ -36,7 +36,6 @@ const TABS: { id: CollectionTab; label: string }[] = [
   { id: 'watch', label: 'Watchlist' },
 ];
 
-const DAY = 24 * 60 * 60 * 1000;
 const quoteTag = (t: string) => (/\s/.test(t) ? `"${t}"` : t);
 
 export function CollectionPage({ tab }: { tab: CollectionTab }) {
@@ -90,7 +89,7 @@ export function CollectionPage({ tab }: { tab: CollectionTab }) {
 
       {!loaded ? <div className="loading">Loading collection…</div> : (
         <>
-          {tab === 'overview' && <Overview onAdd={() => setAdding(true)} onBackup={() => setExporting(items)} showInInventory={showInInventory} />}
+          {tab === 'overview' && <Overview onAdd={() => setAdding(true)} showInInventory={showInInventory} />}
           {tab === 'inventory' && <Inventory query={invQuery} setQuery={setInvQuery} onExport={(sel) => setExporting(sel)} onAdd={() => setAdding(true)} />}
           {tab === 'buy' && <BuyList />}
           {tab === 'binder' && <TradeBinder />}
@@ -108,7 +107,7 @@ export function CollectionPage({ tab }: { tab: CollectionTab }) {
 
 // ======================= Overview =======================
 
-function Overview({ onAdd, onBackup, showInInventory }: { onAdd: () => void; onBackup: () => void; showInInventory: (q: string) => void }) {
+function Overview({ onAdd, showInInventory }: { onAdd: () => void; showInInventory: (q: string) => void }) {
   const items = collectionT.useAll();
   const decks = decksT.useAll();
   const sales = salesT.useAll();
@@ -142,8 +141,6 @@ function Overview({ onAdd, onBackup, showInInventory }: { onAdd: () => void; onB
     return rows.filter((r) => r.count > 0);
   }, [items, settings.conditionAdjust]);
 
-  const needsBackup = items.length > 0 && (!settings.lastBackupAt || Date.now() - settings.lastBackupAt > 30 * DAY);
-
   if (!items.length) {
     return (
       <div className="empty-hero">
@@ -156,13 +153,6 @@ function Overview({ onAdd, onBackup, showInInventory }: { onAdd: () => void; onB
 
   return (
     <div className="overview">
-      {needsBackup && (
-        <div className="banner">
-          <span>Your collection lives only in this browser. {settings.lastBackupAt ? 'It’s been over a month since your last backup.' : 'You haven’t made a backup yet.'}</span>
-          <button className="btn btn-sm btn-primary" onClick={onBackup}>Back up now</button>
-        </div>
-      )}
-
       <div className="stat-grid">
         <Stat label="Market value" sub={pl.priced < pl.qty ? `${pl.qty - pl.priced} cards have no price` : settings.conditionAdjust ? 'condition-adjusted estimate' : 'near-mint market'}>
           {formatUSD(pl.value)}

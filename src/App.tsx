@@ -4,11 +4,10 @@ import { DeckPage } from './pages/DeckPage';
 import { CollectionPage, type CollectionTab } from './pages/CollectionPage';
 import { navigate } from './lib/router';
 import { UpdatePrompt } from './components/UpdatePrompt';
+import { DataSafety } from './components/DataSafety';
+import { isPortable } from './lib/device';
 import logoUrl from './assets/grimoire-logo.png';
 
-// The portable launcher serves the app on this port. It already works offline, so it skips the
-// service worker (which would otherwise keep serving the old app after the app folder is replaced).
-const isPortable = window.location.port === '47823';
 const THEME_COLOR: Record<string, string> = { dark: '#0f1218', light: '#f3f5f8' };
 
 function useHashRoute() {
@@ -72,10 +71,13 @@ export function App() {
           {theme === 'dark' ? '☀' : '☾'}
         </button>
       </header>
+      <DataSafety />
       <main>
         {deckMatch ? <DeckPage key={deckMatch[1]} id={deckMatch[1]} /> : collMatch ? <CollectionPage tab={collTab} /> : <Library />}
       </main>
-      {!isPortable && <UpdatePrompt />}
+      {/* The portable launcher already works offline, so it skips the service worker (which would
+          otherwise keep serving the old app after the portable app folder is replaced). */}
+      {!isPortable() && <UpdatePrompt />}
       <footer className="app-footer muted small">
         <p className="footer-data">Your decks and collection are saved only in this browser on this device. Use <strong>Collection → Export &amp; backup</strong> to keep a copy or move them elsewhere.</p>
         The Grimoire is unofficial fan content. It is not affiliated with, endorsed by, or sponsored by Wizards of the Coast. Magic: The Gathering, card names, text, symbols and artwork are the property of Wizards of the Coast LLC and the artists. Card images and data are provided by Scryfall.

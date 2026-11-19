@@ -206,8 +206,11 @@ const emitSettings = (next: Settings) => {
   settingsListeners.forEach((l) => l());
 };
 
+let settingsLoaded = false;
+
 export async function loadSettings() {
   const row = await (await db()).get('meta', 'settings');
+  settingsLoaded = true;
   emitSettings({ ...DEFAULT_SETTINGS, ...(row?.value ?? {}) });
 }
 
@@ -231,11 +234,15 @@ export async function replaceSettings(next: Partial<Settings>) {
   await transact(['meta'], async (tx) => { tx.putSettings(value); });
 }
 
+const subscribeSettings = (l: () => void) => { settingsListeners.add(l); return () => settingsListeners.delete(l); };
+
 export function useSettings(): Settings {
-  return useSyncExternalStore(
-    (l) => { settingsListeners.add(l); return () => settingsListeners.delete(l); },
-    () => settings,
-  );
+  return useSyncExternalStore(subscribeSettings, () => settings);
+}
+
+/** True once saved settings have been read from storage (before that, useSettings returns defaults). */
+export function useSettingsLoaded(): boolean {
+  return useSyncExternalStore(subscribeSettings, () => settingsLoaded);
 }
 
 export async function loadAll() {
