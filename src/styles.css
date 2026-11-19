@@ -843,3 +843,6 @@ button.alert-row:hover { background: var(--panel-2); }
 .import-missing li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .app-footer { max-width: 760px; margin-left: auto; margin-right: auto; line-height: 1.5; padding: 16px; text-align: center; border-top: 1px solid var(--border, rgba(127,127,127,0.25)); margin-top: 24px; }
 .app-footer .footer-data { margin: 0 0 8px; }
+
+/* ---------- New-version prompt (service worker update) ---------- */
+.update-bar { position: fixed; left: 50%; top: calc(var(--topbar-h) + 10px); transform: translateX(-50%); z-index: 1000; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 10px; width: max-content; max-width: calc(100vw - 24px); padding: 10px 14px; background: var(--panel); border: 1px solid var(--accent); border-radius: var(--radius); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45); }
