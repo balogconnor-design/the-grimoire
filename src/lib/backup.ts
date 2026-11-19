@@ -3,8 +3,29 @@ import { allocatedQty, backfillLedgerTx, clampAllocations, FINISH_LABEL, intentL
 import {
   collectionT, decksT, DEFAULT_SETTINGS, getSettings, ownedDecksT, pricesT, salesT, searchesT, setSettings, transact, watchT, type Settings, type StoreName,
 } from './store';
+import { prefersShareSheet } from './device';
 
-export function download(filename: string, text: string, type = 'text/plain') {
+export type SaveResult = 'downloaded' | 'shared' | 'cancelled';
+
+/**
+ * Save a text file. On phones and tablets this opens the share sheet (Save to Files, Drive, AirDrop,
+ * email...), which is more reliable there than a download, especially in the installed app; elsewhere,
+ * or if sharing isn't possible, it downloads. Must be called straight from a click: the share sheet
+ * needs the user's tap, so nothing may be awaited before calling this.
+ */
+export async function download(filename: string, text: string, type = 'text/plain'): Promise<SaveResult> {
+  if (prefersShareSheet()) {
+    const file = new File([text], filename, { type });
+    if (navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], title: filename });
+        return 'shared';
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return 'cancelled';
+        // Any other failure: fall back to a normal download below.
+      }
+    }
+  }
   const url = URL.createObjectURL(new Blob([text], { type }));
   const a = document.createElement('a');
   a.href = url;
@@ -13,6 +34,7 @@ export function download(filename: string, text: string, type = 'text/plain') {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return 'downloaded';
 }
 
 const stamp = () => new Date().toISOString().slice(0, 10);
@@ -96,9 +118,11 @@ export function makeBackup(): Backup {
   };
 }
 
-export function downloadBackup() {
-  download(`grimoire-backup-${stamp()}.json`, JSON.stringify(makeBackup()), 'application/json');
-  setSettings({ lastBackupAt: Date.now() });
+/** Save a full backup file. The "last backup" date only moves if the file was actually saved. */
+export async function downloadBackup(): Promise<SaveResult> {
+  const result = await download(`grimoire-backup-${stamp()}.json`, JSON.stringify(makeBackup()), 'application/json');
+  if (result !== 'cancelled') setSettings({ lastBackupAt: Date.now() });
+  return result;
 }
 
 /** Records dropped (or repaired) while reading a backup because they were incomplete or invalid. */

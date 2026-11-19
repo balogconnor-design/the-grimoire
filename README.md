@@ -2,7 +2,7 @@
 
 A browser-based deck builder and collection tracker for Magic: The Gathering, focused on Commander. Card data and images come from the [Scryfall API](https://scryfall.com/docs/api).
 
-Everything is stored locally in your browser (IndexedDB). There's no account, no server and no sync. Use **Backup** to keep a copy of your data or move it to another computer.
+Everything is stored locally in your browser (IndexedDB). There's no account, no server and no sync. Use **Collection → Export & backup** to keep a copy of your data or move it to another device.
 
 ## Run it
 
@@ -103,7 +103,13 @@ drive, replace the `.exe` and `app\` and keep `data\`.
 
 ### Backup and restore
 - **Exports:** collection as text or CSV, purchase and sale reports, and a full JSON backup of decks, collection, ledger, watchlist, price history, saved searches and settings.
-- **Restore:** checks the file first and shows what it contains, including any incomplete records it will skip. Restore is all-or-nothing: if anything fails, nothing is changed.
+- **Restore:** checks the file first and shows what it contains, including any incomplete records it will skip. Restore is all-or-nothing: if anything fails, nothing is changed. A brand-new, empty library also offers **Restore a backup**, for moving in from another device or browser.
+- **Phones and tablets:** backups and exports open the share sheet (Save to Files, Drive, AirDrop, email…) instead of downloading, which is more reliable there. If the share is cancelled, nothing counts as backed up, and a restore that was set to back up first doesn't go ahead.
+
+### Keeping your data safe
+- **Backup reminder:** once you have decks, a collection or a watchlist, a bar reminds you if you've never backed up or the last backup is over a month old. **Remind me in a week** snoozes it.
+- **Storage protection:** the app asks the browser to protect its saved data from being cleared when the device runs low on space. The backup screen shows whether the browser granted it (Chrome and Edge decide on their own, often only for installed or frequently used sites; Firefox may ask).
+- **iPhone and iPad:** in a Safari tab, a one-time bar explains installing to the home screen. Safari can clear a website's data after 7 days without a visit, and the installed app keeps its own data, separate from Safari (so install first, or back up and restore in the app).
 
 ### Reliability
 - Changes that touch several kinds of data (selling, trading, buying a deck, deleting a deck, restoring) are saved in a single transaction, so a failed save never leaves things half-done.
@@ -128,13 +134,15 @@ drive, replace the `.exe` and `app\` and keep `data\`.
 | `src/lib/ownership.ts` | Matching decks against the collection, shared copy pool, buy list |
 | `src/lib/query.ts`, `search.ts` | Local search syntax and mixed Scryfall + local queries |
 | `src/lib/store.ts` | IndexedDB persistence, multi-store transactions (`transact`), save-error reporting, React hooks |
-| `src/lib/backup.ts` | Exports, full backup, validated all-or-nothing restore, backup migrations |
+| `src/lib/backup.ts` | Exports (share sheet on phones, download elsewhere), full backup, validated all-or-nothing restore, backup migrations |
 | `src/pages/` | Library, deck builder, collection and ledger screens |
+| `src/lib/device.ts` | Device checks (iOS, installed app, phone share sheet, portable) and data-safety rules: backup reminder, storage protection |
+| `src/components/DataSafety.tsx` | App-wide backup reminder, iPhone install hint, storage-protection request |
 | `src/components/UpdatePrompt.tsx` | Service worker registration (offline support) and the new-version prompt; skipped in the portable build |
 | `vite.config.ts` | Build config, including the web app manifest and service worker caching rules |
 | `scripts/make-icons.ps1` | Makes the web app icons in `public/icons/` from the logo |
 | `src/components/` | Search, deck list, details panel, card modal, import/export, backup, transaction dialogs, etc. |
-| `tests/` | Vitest unit, storage (fake-indexeddb) and import tests, with decklist fixtures |
+| `tests/` | Vitest unit, storage (fake-indexeddb), import and device/data-safety tests, with decklist fixtures |
 
 ## License
 

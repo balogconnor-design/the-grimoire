@@ -1,14 +1,31 @@
-import { useState, type ChangeEvent } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import type { CollectionItem } from '../types';
 import { Modal } from './Modal';
 import { useToast } from './Toast';
 import { downloadBackup, exportCollection, parseBackup, restoreBackup, type Backup, type BackupSummary } from '../lib/backup';
-import { decksT, salesT, useSettings } from '../lib/store';
+import { collectionT, decksT, salesT, useSettings } from '../lib/store';
+import { isIOSBrowserTab, prefersShareSheet, storageProtection, type StorageProtection } from '../lib/device';
 import { exportSummary, exportTransactions, PERIODS, type Period } from '../lib/ledger';
 
-/** Export (text / CSV), full JSON backup, and restore from a backup file. */
-export function BackupModal({ items, selectedCount, onClose }: { items: CollectionItem[]; selectedCount?: number; onClose: () => void }) {
-  const [tab, setTab] = useState<'export' | 'backup' | 'restore'>('export');
+export type BackupTab = 'export' | 'backup' | 'restore';
+
+const PROTECTION_TEXT: Record<StorageProtection, string> = {
+  persisted: 'On. The browser won’t clear this data to free up space.',
+  'not-granted': 'Not granted. The browser may clear this data if the device runs low on space, so keep a recent backup.',
+  unsupported: 'Not available in this browser. Keep a recent backup.',
+};
+
+/**
+ * Export (text / CSV), full JSON backup, and restore from a backup file.
+ * `items` is the collection to export (defaults to all of it).
+ */
+export function BackupModal({ items: only, selectedCount, initialTab = 'export', onClose }: { items?: CollectionItem[]; selectedCount?: number; initialTab?: BackupTab; onClose: () => void }) {
+  const allItems = collectionT.useAll();
+  const items = only ?? allItems;
+  const [tab, setTab] = useState<BackupTab>(initialTab);
+  const [protection, setProtection] = useState<StorageProtection | null>(null);
+  useEffect(() => { void storageProtection().then(setProtection); }, []);
+  const share = prefersShareSheet();
   const [pending, setPending] = useState<{ backup: Backup; summary: BackupSummary } | null>(null);
   const [error, setError] = useState('');
   const [safety, setSafety] = useState(true);
@@ -35,11 +52,20 @@ export function BackupModal({ items, selectedCount, onClose }: { items: Collecti
     }
   };
 
+  const saveBackup = async () => {
+    const result = await downloadBackup();
+    if (result !== 'cancelled') toast(result === 'shared' ? 'Backup saved' : 'Backup downloaded', 'success');
+  };
+
   const restore = async () => {
     if (!pending) return;
     setBusy(true);
     try {
-      if (safety) downloadBackup();
+      // The safety copy is saved first (straight from the click, so the share sheet can open on phones).
+      if (safety && (await downloadBackup()) === 'cancelled') {
+        setError('The backup of your current data was cancelled, so nothing was restored.');
+        return;
+      }
       await restoreBackup(pending.backup);
       const skipped = pending.summary.droppedTotal;
       toast(skipped ? `Backup restored (${skipped} damaged record${skipped === 1 ? '' : 's'} skipped)` : 'Backup restored', 'success');
@@ -120,8 +146,13 @@ export function BackupModal({ items, selectedCount, onClose }: { items: Collecti
             sales, price history, saved searches and settings — so you can restore it here or on another computer.
           </p>
           <p className="muted small">Last backup: {lastBackupAt ? new Date(lastBackupAt).toLocaleString() : 'never'}</p>
+          {protection && <p className="muted small">Storage protection: {PROTECTION_TEXT[protection]}</p>}
+          {isIOSBrowserTab() && (
+            <p className="muted small">On iPhone and iPad, Safari can clear a website’s data after 7 days without a visit. Installing the app (Share → Add to Home Screen) avoids that; restore this backup in the installed app.</p>
+          )}
+          {share && <p className="muted small">Choose <b>Save to Files</b> (or Drive, email…) in the share sheet to keep the file.</p>}
           <div className="ie-actions">
-            <button className="btn btn-primary" onClick={() => { downloadBackup(); toast('Backup downloaded', 'success'); }}>Download backup (.json)</button>
+            <button className="btn btn-primary" onClick={() => void saveBackup()}>{share ? 'Save backup…' : 'Download backup (.json)'}</button>
           </div>
         </div>
       )}
@@ -141,7 +172,7 @@ export function BackupModal({ items, selectedCount, onClose }: { items: Collecti
                 <li>{pending.summary.prices} days of price history</li>
               </ul>
               <DroppedNotice summary={pending.summary} />
-              <label className="radio"><input type="checkbox" checked={safety} onChange={(e) => setSafety(e.target.checked)} /> Download a backup of my current data first</label>
+              <label className="radio"><input type="checkbox" checked={safety} onChange={(e) => setSafety(e.target.checked)} /> {share ? 'Save' : 'Download'} a backup of my current data first</label>
               <div className="ie-actions">
                 <button className="btn btn-ghost" onClick={() => setPending(null)}>Cancel</button>
                 <button className="btn btn-danger" disabled={busy} onClick={restore}>Replace my data with this backup</button>

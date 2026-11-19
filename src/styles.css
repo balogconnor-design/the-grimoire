@@ -129,6 +129,9 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .btn-lg { padding: 10px 20px; font-size: 1rem; }
 .link-btn { background: none; border: 0; padding: 0; color: var(--accent); }
 .link-btn:hover { text-decoration: underline; }
+.empty-restore { margin-top: 14px; }
+.global-banner { max-width: 1280px; margin: 12px auto 0; width: calc(100% - 24px); }
+.banner-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .icon-btn {
   display: inline-flex; align-items: center; justify-content: center;
