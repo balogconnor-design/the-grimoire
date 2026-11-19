@@ -83,6 +83,8 @@ Write-Host '4/5 Copying the app...'
 # The "data" folder (saved decks and collection) is never touched.
 if (Test-Path "$out\app") { Remove-Item -Recurse -Force "$out\app" }
 Copy-Item -Recurse .\dist "$out\app"
+# _headers is Cloudflare Pages config for the hosted web version; the launcher doesn't use it.
+Remove-Item -Force "$out\app\_headers" -ErrorAction SilentlyContinue
 (Get-Content .\portable\README.txt -Raw).Replace('{{VERSION}}', $version) | Set-Content -Encoding UTF8 "$out\README.txt"
 Copy-Item .\LICENSE "$out\LICENSE.txt"
 
