@@ -36,12 +36,21 @@ calls Scryfall directly and saves everything in that browser, as in the other ve
 - **Build settings:** build command `npm run build:web` (a failing test blocks the deploy), output directory `dist`, Node version
   from `.node-version`.
 - **Headers:** `public/_headers` sets the security headers (the Content-Security-Policy allows only `api.scryfall.com` and
-  `*.scryfall.io`, so a new outside source must be added there or it will be blocked) and long caching for `assets/`. The portable
+  `*.scryfall.io`, for both images and the service worker's fetches, so a new outside source must be added there or it will be blocked) and long caching for `assets/`. The portable
   build leaves this file out. To test it locally, run `npx wrangler pages dev dist` after a build.
 - **The address must never change.** Like the portable port, saved data is tied to `https://the-grimoire.app`; moving to another
   address (including switching to `www.` or letting the domain lapse) leaves every user's data behind unless they back up and
   restore. Keep the domain on auto-renew.
 - The web version, the portable app and the dev server each keep separate data; use **Export & backup** to move it between them.
+- **Installable app and offline (PWA):** `vite-plugin-pwa` (config in `vite.config.ts`) builds `manifest.webmanifest` and a
+  service worker (`sw.js`). The service worker precaches the app so it opens offline, and caches Scryfall card images (up to 600,
+  60 days) and mana symbols as they're viewed. The Scryfall API is never cached, so search results and prices are always live.
+  `src/components/UpdatePrompt.tsx` registers it and shows "A new version is available" with a Reload button when a deploy lands
+  (it also checks hourly). The dev server never registers a service worker, and the portable build (port 47823) skips it too,
+  because the launcher already works offline. To try it locally: `npm run build`, then `npx wrangler pages dev dist`.
+- **Icons:** `public/icons/` is made from `src/assets/grimoire-logo.png` by
+  `powershell -ExecutionPolicy Bypass -File scripts/make-icons.ps1`. Re-run it after changing the logo. The logo is 192×192, so the
+  512px icons are enlarged; a 512px-or-larger logo would make them sharp.
 
 ## Portable (flash drive) build
 
@@ -100,6 +109,11 @@ drive, replace the `.exe` and `app\` and keep `data\`.
 - Changes that touch several kinds of data (selling, trading, buying a deck, deleting a deck, restoring) are saved in a single transaction, so a failed save never leaves things half-done.
 - If a save fails, the app says so and reloads the affected data from storage, so what you see matches what is saved.
 
+### Install and offline (web version)
+- **Install:** add The Grimoire to your home screen or desktop like an app (Chrome/Edge: the install icon in the address bar; Android: *Install app*; iPhone/iPad: Safari → Share → *Add to Home Screen*). It opens in its own window with its own icon.
+- **Offline:** after the first visit the app opens without a connection, and decks, collection and ledger all work. Card images you have already viewed are kept for offline use; searching Scryfall and refreshing prices need a connection.
+- **Updates:** when a new version is published, a bar offers **Reload** (or **Later**), so an update never interrupts you mid-edit.
+
 ## Code map
 
 | Path | What it does |
@@ -116,6 +130,9 @@ drive, replace the `.exe` and `app\` and keep `data\`.
 | `src/lib/store.ts` | IndexedDB persistence, multi-store transactions (`transact`), save-error reporting, React hooks |
 | `src/lib/backup.ts` | Exports, full backup, validated all-or-nothing restore, backup migrations |
 | `src/pages/` | Library, deck builder, collection and ledger screens |
+| `src/components/UpdatePrompt.tsx` | Service worker registration (offline support) and the new-version prompt; skipped in the portable build |
+| `vite.config.ts` | Build config, including the web app manifest and service worker caching rules |
+| `scripts/make-icons.ps1` | Makes the web app icons in `public/icons/` from the logo |
 | `src/components/` | Search, deck list, details panel, card modal, import/export, backup, transaction dialogs, etc. |
 | `tests/` | Vitest unit, storage (fake-indexeddb) and import tests, with decklist fixtures |
 
