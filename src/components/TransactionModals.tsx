@@ -14,6 +14,7 @@ import {
 } from '../lib/ledger';
 import { searchCards } from '../lib/scryfall';
 import { cardImage, formatUSD, uid } from '../lib/rules';
+import { LabeledTable } from './LabeledTable';
 
 const num = (s: string) => { const n = parseFloat(s); return Number.isFinite(n) && n >= 0 ? n : 0; };
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? '' : 's'}`;
@@ -107,7 +108,7 @@ export function SellModal({ itemIds, onClose, onDone }: { itemIds: string[]; onC
           </div>
         )}
         <div className="table-wrap tx-lines">
-          <table className="inv-table">
+          <LabeledTable className="inv-table">
             <thead><tr><th>Card</th><th className="num">Copies</th><th className="num">Market</th><th className="num">Paid</th><th className="num">{mode === 'each' ? 'Sale price (each)' : 'Share (each)'}</th></tr></thead>
             <tbody>
               {lots.map((l) => (
@@ -132,7 +133,7 @@ export function SellModal({ itemIds, onClose, onDone }: { itemIds: string[]; onC
                 </tr>
               ))}
             </tbody>
-          </table>
+          </LabeledTable>
         </div>
         <div className="if-grid">
           {mode === 'total' && (

@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import type { Card, CollectionItem, Intent } from '../types';
 import {
   collectionT, decksT, pricesT, salesT, setSettings, useSettings, watchT,
@@ -24,6 +24,7 @@ import { AddToCollectionModal, ItemModal, WatchModal } from '../components/Colle
 import { useToast } from '../components/Toast';
 import { SellModal, TradeModal } from '../components/TransactionModals';
 import { PurchasedDecks, Stat, Transactions } from './CollectionLedger';
+import { LabeledTable } from '../components/LabeledTable';
 
 export type CollectionTab = 'overview' | 'inventory' | 'decks' | 'transactions' | 'buy' | 'binder' | 'watch';
 const TABS: { id: CollectionTab; label: string }[] = [
@@ -47,6 +48,11 @@ export function CollectionPage({ tab }: { tab: CollectionTab }) {
   const [refreshing, setRefreshing] = useState<string | null>(null);
   const [invQuery, setInvQuery] = useState('');
   const toast = useToast();
+  // On narrow screens the tab strip scrolls sideways: keep the current tab in view.
+  const tabsRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    tabsRef.current?.querySelector<HTMLElement>('.tab.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [tab]);
 
   const refresh = async () => {
     setRefreshing('Starting…');
@@ -79,7 +85,7 @@ export function CollectionPage({ tab }: { tab: CollectionTab }) {
         </div>
       </div>
 
-      <nav className="board-tabs coll-tabs">
+      <nav className="board-tabs coll-tabs" ref={tabsRef}>
         {TABS.map((t) => (
           <button key={t.id} className={`tab ${tab === t.id ? 'active' : ''}`} onClick={() => navigate(t.id === 'overview' ? '/collection' : `/collection/${t.id}`)}>
             {t.label}
@@ -407,7 +413,7 @@ function Inventory({ query, setQuery, onExport, onAdd }: { query: string; setQue
       )}
 
       <div className="table-wrap">
-        <table className="inv-table">
+        <LabeledTable className="inv-table">
           <thead>
             <tr>
               <th className="cb"><input type="checkbox" checked={allOn} onChange={() => setSelected(allOn ? new Set() : new Set(rows.map((r) => r.id)))} aria-label="Select all" /></th>
@@ -473,7 +479,7 @@ function Inventory({ query, setQuery, onExport, onAdd }: { query: string; setQue
               );
             })}
           </tbody>
-        </table>
+        </LabeledTable>
       </div>
       {rows.length > limit && <button className="btn btn-ghost load-more" onClick={() => setLimit((l) => l + 300)}>Show more ({rows.length - limit} hidden)</button>}
       {rows.length === 0 && <div className="empty">No cards match.</div>}
@@ -615,7 +621,7 @@ function BuyList() {
         <div className="empty">{decks.length ? 'You own everything your decks need. 🎉' : 'Create a deck to see what you need to buy.'}</div>
       ) : (
         <div className="table-wrap">
-          <table className="inv-table">
+          <LabeledTable className="inv-table">
             <thead><tr><th>Card</th><th>Decks</th><th className="num">Needed</th><th className="num">Owned</th><th className="num">To buy</th><th className="num">Each</th><th className="num">Subtotal</th><th /></tr></thead>
             <tbody>
               {lines.map((l) => {
@@ -647,7 +653,7 @@ function BuyList() {
                 );
               })}
             </tbody>
-          </table>
+          </LabeledTable>
         </div>
       )}
 
@@ -714,7 +720,7 @@ function TradeBinder() {
         <div className="empty">Nothing in your binder. Set a lot's Market status to Sell or Trade (in Inventory, or in bulk) to list it here.</div>
       ) : (
         <div className="table-wrap">
-          <table className="inv-table">
+          <LabeledTable className="inv-table">
             <thead><tr><th>Card</th><th>Status</th><th className="num">Available</th><th className="num">Paid</th><th className="num">Market</th><th className="num">Target</th><th className="num">7d</th><th className="num">Gain / loss</th><th /></tr></thead>
             <tbody>
               {binder.map((i) => {
@@ -742,7 +748,7 @@ function TradeBinder() {
                 );
               })}
             </tbody>
-          </table>
+          </LabeledTable>
         </div>
       )}
       {openItem && <ItemModal itemId={openItem} onClose={() => setOpenItem(null)} />}
@@ -793,7 +799,7 @@ function Watchlist() {
         <div className="empty">Watch cards you want and set a buy-at price — you'll see when the market reaches it. You can also watch from any card's details.</div>
       ) : (
         <div className="table-wrap">
-          <table className="inv-table">
+          <LabeledTable className="inv-table">
             <thead><tr><th>Card</th><th className="num">Want</th><th className="num">Market</th><th className="num">Buy at</th><th className="num">7d</th><th>History</th><th /></tr></thead>
             <tbody>
               {watch.map((w) => {
@@ -847,7 +853,7 @@ function Watchlist() {
                 );
               })}
             </tbody>
-          </table>
+          </LabeledTable>
         </div>
       )}
       {editing && <WatchModal card={editing.card} watchId={editing.id} onClose={() => setEditing(null)} />}
