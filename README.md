@@ -11,7 +11,7 @@ npm install      # first time only
 npm run dev      # opens http://localhost:5173
 ```
 
-On Windows you can also double-click `Start Commander Deck.bat`, which installs dependencies if needed and opens the app.
+On Windows you can also double-click `Start The Grimoire.bat`, which installs dependencies if needed and opens the app.
 
 | Command | What it does |
 |---|---|
@@ -24,10 +24,18 @@ On Windows you can also double-click `Start Commander Deck.bat`, which installs 
 
 ## Portable (flash drive) build
 
-Double-click `Build Portable.bat`. It produces `Portable Build\Commander Deck\`. Copy that folder to a drive and
-run `Commander Deck.exe`. The launcher (`portable/Launcher.cs`, compiled with the csc.exe built into Windows) serves the app on
-`http://localhost:47823` and opens it in an Edge/Chrome app window. That window's browser profile lives in the folder's `data\`, so
-saved data travels with the drive. Re-run the build after code changes; the `data\` folder on the drive is left alone.
+The portable build is the release distribution. Double-click `Build Portable.bat` (needs `npm install` once). It type-checks,
+runs the tests, builds the app and produces:
+
+- `Portable Build\The Grimoire\`: copy this folder to a drive and run `The Grimoire.exe`.
+- `Portable Build\The-Grimoire-<version>-portable.zip`: the same folder zipped for sharing (never includes a `data\` folder).
+
+The launcher (`portable/Launcher.cs`, compiled with the csc.exe built into Windows) serves the app on `http://localhost:47823` and
+opens it in an Edge/Chrome app window. That window's browser profile lives in the folder's `data\`, so saved data travels with the
+drive. The port must never change, because the browser ties saved data to it. The portable app and the dev server (port 5173)
+keep separate data; use **Backup** to move data between them. The `.exe` icon is made from `src/assets/grimoire-logo.png`, and its
+version comes from `package.json`. Re-run the build after code changes; the `data\` folder is left alone. To update a copy on a
+drive, replace the `.exe` and `app\` and keep `data\`.
 
 ## Features
 
