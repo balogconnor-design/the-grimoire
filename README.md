@@ -28,11 +28,11 @@ On Windows you can also double-click `Start The Grimoire.bat`, which installs de
 The same static build is hosted free on Cloudflare Pages at **https://the-grimoire.app**. There's no server: the browser
 calls Scryfall directly and saves everything in that browser, as in the other versions.
 
-- **Addresses:** `the-grimoire.app` is the only production address. The Pages project is `the-grimoire-mtg`, and
-  `the-grimoire-mtg.pages.dev` and `www.the-grimoire.app` both redirect to it (Cloudflare Bulk Redirects and a DNS redirect rule),
+- **Addresses:** `the-grimoire.app` is the only production address. The Pages project is `the-grimoire`, and
+  its default address `the-grimoire-4rq.pages.dev` and `www.the-grimoire.app` both redirect to it (a Bulk Redirect and a Redirect Rule),
   so nobody ends up saving data on a second address. The domain's DNS is on Cloudflare.
 - **Deploys:** Cloudflare builds from GitHub on every push. `main` is production; every other branch gets its own preview URL
-  (`<branch>.the-grimoire-mtg.pages.dev`, not redirected). Preview URLs keep their own data, separate from production.
+  (`<branch>.the-grimoire-4rq.pages.dev`, not redirected). Preview URLs keep their own data, separate from production.
 - **Build settings:** build command `npm run build:web` (a failing test blocks the deploy), output directory `dist`, Node version
   from `.node-version`.
 - **Headers:** `public/_headers` sets the security headers (the Content-Security-Policy allows only `api.scryfall.com` and
