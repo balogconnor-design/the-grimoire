@@ -25,18 +25,22 @@ On Windows you can also double-click `Start The Grimoire.bat`, which installs de
 
 ## Web version (Cloudflare Pages)
 
-The same static build is hosted free on Cloudflare Pages at **https://the-grimoire-mtg.pages.dev**. There's no server: the browser
+The same static build is hosted free on Cloudflare Pages at **https://the-grimoire.app**. There's no server: the browser
 calls Scryfall directly and saves everything in that browser, as in the other versions.
 
+- **Addresses:** `the-grimoire.app` is the only production address. The Pages project is `the-grimoire-mtg`, and
+  `the-grimoire-mtg.pages.dev` and `www.the-grimoire.app` both redirect to it (Cloudflare Bulk Redirects and a DNS redirect rule),
+  so nobody ends up saving data on a second address. The domain's DNS is on Cloudflare.
 - **Deploys:** Cloudflare builds from GitHub on every push. `main` is production; every other branch gets its own preview URL
-  (`<branch>.the-grimoire-mtg.pages.dev`). Preview URLs keep their own data, separate from production.
+  (`<branch>.the-grimoire-mtg.pages.dev`, not redirected). Preview URLs keep their own data, separate from production.
 - **Build settings:** build command `npm run build:web` (a failing test blocks the deploy), output directory `dist`, Node version
   from `.node-version`.
 - **Headers:** `public/_headers` sets the security headers (the Content-Security-Policy allows only `api.scryfall.com` and
   `*.scryfall.io`, so a new outside source must be added there or it will be blocked) and long caching for `assets/`. The portable
   build leaves this file out. To test it locally, run `npx wrangler pages dev dist` after a build.
-- **The address must never change.** Like the portable port, saved data is tied to `the-grimoire-mtg.pages.dev`; moving to another
-  address (including a custom domain) leaves every user's data behind unless they back up and restore.
+- **The address must never change.** Like the portable port, saved data is tied to `https://the-grimoire.app`; moving to another
+  address (including switching to `www.` or letting the domain lapse) leaves every user's data behind unless they back up and
+  restore. Keep the domain on auto-renew.
 - The web version, the portable app and the dev server each keep separate data; use **Export & backup** to move it between them.
 
 ## Portable (flash drive) build
