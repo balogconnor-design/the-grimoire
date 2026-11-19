@@ -298,6 +298,9 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .adv-colors select { width: auto; margin-left: 6px; }
 .adv-inline { display: flex; gap: 6px; }
 .adv-inline select { width: 60px; flex-shrink: 0; }
+/* Beat ".adv-field .input { width: 100% }" so the operator stays narrow next to its number. */
+.adv-inline select.input { width: 64px; flex-shrink: 0; }
+.adv-inline input.input { flex: 1; min-width: 0; }
 .adv-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; }
 .pip-toggle { padding: 3px; border-radius: 50%; border: 2px solid transparent; background: transparent; opacity: 0.4; line-height: 0; transition: opacity 0.1s; }
 .pip-toggle.on { opacity: 1; border-color: var(--accent); }
@@ -849,3 +852,69 @@ button.alert-row:hover { background: var(--panel-2); }
 
 /* ---------- New-version prompt (service worker update) ---------- */
 .update-bar { position: fixed; left: 50%; top: calc(var(--topbar-h) + 10px); transform: translateX(-50%); z-index: 1000; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 10px; width: max-content; max-width: calc(100vw - 24px); padding: 10px 14px; background: var(--panel); border: 1px solid var(--accent); border-radius: var(--radius); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45); }
+
+/* ======================================================================
+   Phones and touch screens (mobile layout pass)
+   ====================================================================== */
+
+/* iOS zooms the page when a text box with text under 16px is focused. Touch screens get 16px. */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']), select, textarea, .input-sm, .input-xs { font-size: 16px; }
+  /* Bigger tap targets for the small icon buttons. */
+  .icon-btn { min-width: 34px; min-height: 34px; }
+  .icon-btn.sm { width: 30px; height: 30px; min-width: 30px; min-height: 30px; }
+  .btn-sm { min-height: 34px; }
+  .chip, .seg { min-height: 34px; }
+}
+
+/* Room for the notch, rounded corners and home bar (the viewport uses viewport-fit=cover). */
+.topbar { padding-left: max(18px, env(safe-area-inset-left)); padding-right: max(18px, env(safe-area-inset-right)); }
+.app-footer { padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+.toasts { bottom: calc(18px + env(safe-area-inset-bottom)); }
+
+@media (max-width: 640px) {
+  /* ---------- Tables on phones: each row becomes a card, values labelled (LabeledTable.tsx) ---------- */
+  .table-wrap:has(> .inv-table) { overflow: visible; border: 0; background: none; border-radius: 0; }
+  .inv-table, .inv-table tbody { display: block; }
+  .inv-table thead { display: none; }
+  .inv-table tr { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; padding: 10px 12px; margin-bottom: 8px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); }
+  .inv-table td { display: block; padding: 0; border: 0; }
+  .inv-table tbody tr:hover td, .inv-table tr.selected td { background: none; }
+  .inv-table tr.selected { background: var(--accent-soft); border-color: var(--accent); }
+  .inv-table tr.row-gain td:first-child, .inv-table tr.row-loss td:first-child { box-shadow: none; }
+  .inv-table tr.row-gain { box-shadow: inset 3px 0 0 var(--good); }
+  .inv-table tr.row-loss { box-shadow: inset 3px 0 0 var(--bad); }
+  .inv-table .num { text-align: left; }
+  .inv-table td[data-label]::before { content: attr(data-label); display: block; font-size: 0.68rem; font-weight: 650; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+  .inv-table td:empty { display: none; }
+  /* The card cell takes the rest of the first line; its label would just say "Card". */
+  .inv-table td.inv-card { display: flex; flex: 1 1 calc(100% - 100px); min-width: 0; }
+  .inv-table td.inv-card::before { display: none; }
+  .inv-card { min-width: 0; }
+  .inv-name { max-width: none; }
+  .inv-table .cb { width: auto; }
+  /* Row buttons go to the end of the card. */
+  .inv-table td:has(> .row-actions) { margin-left: auto; }
+
+  /* ---------- Dialogs fill the screen ---------- */
+  .modal-backdrop { padding: 0; }
+  .modal, .modal-wide { max-width: none; min-height: 100dvh; border: 0; border-radius: 0; padding: 16px max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); }
+  .modal-title { padding-top: env(safe-area-inset-top); }
+  .modal-close { position: fixed; top: calc(10px + env(safe-area-inset-top)); right: max(10px, env(safe-area-inset-right)); z-index: 5; background: var(--panel-2); border: 1px solid var(--border); border-radius: 50%; }
+
+  /* ---------- Forms ---------- */
+  .advanced { grid-template-columns: 1fr; }
+}
+
+/* Deck rows on touch phones: the +/- and row buttons are always shown there (no hover), which left no
+   room for the card name. Use two lines: quantity | name and price, then mana cost and row buttons. */
+@media (max-width: 640px) and (hover: none) {
+  .entry { grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: 'qty main price' 'qty sub sub'; row-gap: 2px; padding: 5px 4px; }
+  .entry > .qty-ctrl { grid-area: qty; }
+  .entry > .entry-main { grid-area: main; }
+  /* Mana cost and row buttons share the second line: cost on the left, buttons on the right. */
+  .entry > .mana-cost { grid-area: sub; justify-self: start; }
+  .entry > .entry-price { grid-area: price; }
+  .entry > .entry-actions { grid-area: sub; justify-self: end; }
+  .entry + .entry { border-top: 1px solid var(--border); }
+}

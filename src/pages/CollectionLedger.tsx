@@ -10,6 +10,7 @@ import { navigate } from '../lib/router';
 import { DeltaBadge, PLBadge, ValueChart } from '../components/Money';
 import { BuyDeckModal, SellDeckModal, TradeModal } from '../components/TransactionModals';
 import { ItemModal } from '../components/CollectionModals';
+import { LabeledTable } from '../components/LabeledTable';
 
 export function Stat({ label, children, sub }: { label: string; children: ReactNode; sub?: ReactNode }) {
   return (
@@ -184,7 +185,7 @@ export function Transactions() {
         <div className="empty">{all.length ? 'No transactions match.' : 'No transactions yet. Adding cards logs a purchase; selling or trading (from Inventory, a card, or a deck) logs the rest.'}</div>
       ) : (
         <div className="table-wrap">
-          <table className="inv-table tx-table">
+          <LabeledTable className="inv-table tx-table">
             <thead>
               <tr>
                 <Th k="date">Date</Th><Th k="kind">Type</Th><Th k="card">Card</Th><Th k="qty" num>Qty</Th><Th k="price" num>Each</Th>
@@ -227,7 +228,7 @@ export function Transactions() {
                 );
               })}
             </tbody>
-          </table>
+          </LabeledTable>
         </div>
       )}
       {rows.length > limit && <button className="btn btn-ghost load-more" onClick={() => setLimit((l) => l + 300)}>Show more ({rows.length - limit} hidden)</button>}
@@ -355,7 +356,7 @@ function PurchasedDeckDetail({ pd, lots, realizedProceeds, deckName, onSell }: {
           </div>
         </div>
         <div className="table-wrap pd-lots">
-          <table className="inv-table">
+          <LabeledTable className="inv-table">
             <thead><tr><th>Card</th><th className="num">Qty</th><th className="num">Cost each</th><th className="num">Value</th></tr></thead>
             <tbody>
               {sorted.map((l) => {
@@ -371,7 +372,7 @@ function PurchasedDeckDetail({ pd, lots, realizedProceeds, deckName, onSell }: {
               })}
               {sorted.length === 0 && <tr><td colSpan={4} className="muted small">No cards left — all sold or traded.</td></tr>}
             </tbody>
-          </table>
+          </LabeledTable>
         </div>
       </div>
       {openItem && <ItemModal itemId={openItem} onClose={() => setOpenItem(null)} />}

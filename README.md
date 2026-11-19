@@ -115,6 +115,11 @@ drive, replace the `.exe` and `app\` and keep `data\`.
 - Changes that touch several kinds of data (selling, trading, buying a deck, deleting a deck, restoring) are saved in a single transaction, so a failed save never leaves things half-done.
 - If a save fails, the app says so and reloads the affected data from storage, so what you see matches what is saved.
 
+### Phones and tablets
+- **Layout:** works down to phone width with no sideways page scrolling. The deck builder switches to Search / Deck / Details tabs; collection, ledger, buy list, binder and watchlist tables turn into one card per row with labelled values; dialogs fill the screen with the close button always in reach; advanced search is one column.
+- **Touch:** text boxes use 16px text on touch screens so iPhones don't zoom in when you tap them, small buttons get bigger tap targets, and deck rows use two lines (name and price, then mana cost and row buttons) so card names stay readable.
+- **Installed app:** leaves room for the notch, rounded corners and home bar.
+
 ### Install and offline (web version)
 - **Install:** add The Grimoire to your home screen or desktop like an app (Chrome/Edge: the install icon in the address bar; Android: *Install app*; iPhone/iPad: Safari → Share → *Add to Home Screen*). It opens in its own window with its own icon.
 - **Offline:** after the first visit the app opens without a connection, and decks, collection and ledger all work. Card images you have already viewed are kept for offline use; searching Scryfall and refreshing prices need a connection.
@@ -138,6 +143,7 @@ drive, replace the `.exe` and `app\` and keep `data\`.
 | `src/pages/` | Library, deck builder, collection and ledger screens |
 | `src/lib/device.ts` | Device checks (iOS, installed app, phone share sheet, portable) and data-safety rules: backup reminder, storage protection |
 | `src/components/DataSafety.tsx` | App-wide backup reminder, iPhone install hint, storage-protection request |
+| `src/components/LabeledTable.tsx` | Table that labels each cell with its column name, so tables can stack into cards on phones |
 | `src/components/UpdatePrompt.tsx` | Service worker registration (offline support) and the new-version prompt; skipped in the portable build |
 | `vite.config.ts` | Build config, including the web app manifest and service worker caching rules |
 | `scripts/make-icons.ps1` | Makes the web app icons in `public/icons/` from the logo |
