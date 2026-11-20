@@ -97,9 +97,10 @@ drive, replace the `.exe` and `app\` and keep `data\`.
 - **Formats:** every Scryfall-tracked format, each with its own size, copy-limit, sideboard and legality rules.
 - **Commander:** set a commander, shown with its art. Its color identity limits search results, the basic land adder and legality checks.
 - **Boards:** Main, Sideboard and Maybeboard. Export decklists as text.
-- **Adding from search:** each result's + button (bottom-left of the card) adds to the board shown in the deck list. On desktop, drag a result onto the deck list to add it to that board, or onto a board tab to add it there.
+- **Adding from search:** each result's + button (bottom-left of the card) adds to the board shown in the deck list. On desktop, drag a result onto the deck list to add it to that board, or onto a board tab to add it there; the card picture shown while dragging stays tile-sized in every browser.
 - **Deck details:** card counter (e.g. `73/100`), a requirements checklist, prices, a clickable mana curve, color split (pips, %, land sources) and a type breakdown.
 - **Tags and favorites:** tag decks, tag cards within a deck, and mark favorites.
+- **Card favorites:** star any card from anywhere (☆ on search results, the card view, the Favorites tab), owned or not. Every search has a ★ Favorites button, and `is:fav` matches cards favorited anywhere. Unfavoriting a card also clears the star on its collection lots and deck rows.
 - **Global tags:** tag a card itself (e.g. Sol Ring: `staple`, `ramp`) from any tag dialog. Global tags follow the card into every deck, search, collection row and printing, whether or not you own it or use it yet. Search them alone with `gtag:staple`; deck-only card tags stay separate (`cardtag:`).
 
 ### Search
@@ -112,6 +113,7 @@ drive, replace the `.exe` and `app\` and keep `data\`.
 - **Card view:** art (both faces), Oracle text, legality in every format, price, and a printing/art picker.
 
 ### Collection
+- **Favorites tab:** every favorite card, whether you own a copy or not, with a filter box (name or search syntax such as `t:creature`, `#ramp`, `is:owned`).
 - **Inventory:** every lot with its printing, finish, condition, quantity, purchase price, source, tags and notes. Search, filter and act on many lots at once.
 - **Add cards:** from a Scryfall search, a pasted list (which keeps set and collector number), or a saved deck.
 - **Overview:** collection value over time, top gainers and losers, big price moves, price alerts, and how much of each deck you own.

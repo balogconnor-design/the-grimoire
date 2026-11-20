@@ -2,7 +2,8 @@ import type { DragEvent, ReactNode } from 'react';
 import type { Card } from '../types';
 import type { Subject } from '../lib/query';
 import { cardImage, cardPrice, formatUSD } from '../lib/rules';
-import { setCardDrag } from '../lib/dnd';
+import { setCardDrag, setDragPreview } from '../lib/dnd';
+import { setCardFavorite } from '../lib/actions';
 import { TagList, type TagScope } from './TagEditor';
 
 /** A search-result card tile with ownership + tag info and quick actions. */
@@ -25,7 +26,7 @@ export function CardResult({ card, subject, onOpen, onTag, onTagClick, onCollect
   const onDragStart = (e: DragEvent<HTMLDivElement>) => {
     setCardDrag(e.dataTransfer, card);
     const pic = e.currentTarget.querySelector('img');
-    if (pic) e.dataTransfer.setDragImage(pic, pic.clientWidth / 2, pic.clientHeight / 3);
+    if (pic) setDragPreview(e.dataTransfer, pic);
   };
   return (
     <div className={`result-card ${draggable ? 'is-draggable' : ''}`}>
@@ -39,6 +40,12 @@ export function CardResult({ card, subject, onOpen, onTag, onTagClick, onCollect
           {decks.length > 0 && <span className="decks-badge" title={decks.join('\n')}>{decks.length} deck{decks.length === 1 ? '' : 's'}</span>}
         </div>
         {addButton}
+        <button
+          className={`result-fav ${subject.favorite ? 'on' : ''}`} aria-pressed={!!subject.favorite}
+          title={subject.favorite ? 'Remove from favorites' : 'Add to favorites'}
+          aria-label={subject.favorite ? `Unfavorite ${card.name}` : `Favorite ${card.name}`}
+          onClick={() => setCardFavorite(card, !subject.favorite)}
+        >{subject.favorite ? '★' : '☆'}</button>
         <div className="result-actions">
           <button className="mini-btn" onClick={onTag} title="Tag this card" aria-label={`Tag ${card.name}`}>🏷</button>
           <button className="mini-btn" onClick={onCollect} title="Add to collection" aria-label={`Add ${card.name} to collection`}>◈+</button>

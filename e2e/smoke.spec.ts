@@ -97,7 +97,20 @@ test('deck search adds to the board shown, by + button and by drag and drop', as
   // (Playwright can't drive HTML drag and drop in WebKit on Windows/Linux; Safari itself supports it.)
   if (browserName === 'webkit') return;
   await tab('Main').click();
+  // Record the drag picture: it must be a tile-sized element, not the full-size image file.
+  await page.evaluate(() => {
+    const orig = DataTransfer.prototype.setDragImage;
+    DataTransfer.prototype.setDragImage = function (el: Element, x: number, y: number) {
+      const r = (el as HTMLElement).getBoundingClientRect();
+      (window as unknown as { dragPic: unknown }).dragPic = { tag: el.tagName, w: r.width, h: r.height };
+      return orig.call(this, el, x, y);
+    };
+  });
   await result.locator('.result-art').dragTo(page.locator('.deck-groups'));
+  const pic = await page.evaluate(() => (window as unknown as { dragPic?: { tag: string; w: number; h: number } }).dragPic);
+  expect(pic?.tag).toBe('DIV');
+  expect(pic!.w).toBeLessThanOrEqual(180);
+  expect(pic!.h).toBeLessThanOrEqual(260);
   await expect(tab('Main').locator('.tab-count')).toHaveText('1');
   await result.locator('.result-art').dragTo(tab('Maybeboard'));
   await expect(tab('Maybeboard').locator('.tab-count')).toHaveText('1');
@@ -178,10 +191,41 @@ test('global tags follow a card into searches and every deck', async ({ page, is
   expect(errors).toEqual([]);
 });
 
+test('favorite a card from search, owned or not, and find it everywhere', async ({ page }) => {
+  const errors = watchErrors(page);
+  await open(page);
+  const box = page.locator('.search-form input').first();
+  await box.fill('sol ring');
+  await box.press('Enter');
+  const result = page.locator('.result-card').first();
+  await result.hover();
+  await result.getByRole('button', { name: 'Favorite Sol Ring' }).click();
+  await expect(result.locator('.result-fav.on')).toBeVisible();
+
+  // The ★ Favorites button on its own lists favorite cards, even ones you don't own.
+  const main = page.locator('.global-search');
+  await main.getByRole('button', { name: 'Clear' }).click();
+  await main.getByRole('button', { name: '★ Favorites' }).click();
+  await expect(page.locator('.results-meta')).toContainText('1 of your cards');
+  await expect(page.locator('.result-card')).toContainText('Sol Ring');
+
+  // The collection's Favorites tab shows it too, and unfavoriting there removes it.
+  await page.goto('/#/collection/favorites');
+  const fav = page.locator('.favorites-tab .result-card');
+  await expect(fav).toContainText('Sol Ring');
+  await expect(page.locator('.favorites-tab')).toContainText('1 favorite card · 0 owned · 1 not owned');
+  await fav.locator('.result-img-btn').click();
+  await expect(page.locator('.modal .card-fav-btn')).toHaveText('★ Favorite');
+  await page.locator('.modal .card-fav-btn').click();
+  await page.locator('.modal-close').click();
+  await expect(page.locator('.favorites-tab')).toContainText('No favorite cards yet');
+  expect(errors).toEqual([]);
+});
+
 test('every collection tab renders', async ({ page }) => {
   const errors = watchErrors(page);
   await open(page, '/#/collection');
-  for (const tab of ['inventory', 'decks', 'transactions', 'buy', 'binder', 'watch', '']) {
+  for (const tab of ['inventory', 'favorites', 'decks', 'transactions', 'buy', 'binder', 'watch', '']) {
     await page.goto(`/#/collection${tab ? `/${tab}` : ''}`);
     await expect(page.locator('.coll-tabs .tab.active')).toBeVisible();
   }

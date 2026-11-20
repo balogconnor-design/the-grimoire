@@ -35,6 +35,7 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
   const [adv, setAdv] = useState<Adv>(EMPTY_ADV);
   const [showAdv, setShowAdv] = useState(false);
   const [showTags, setShowTags] = useState(false);
+  const [favOnly, setFavOnly] = useState(false);
   const [useIdentity, setUseIdentity] = useState(true);
   const [useLegal, setUseLegal] = useState(true);
   const [order, setOrder] = useState<SortOrder>('edhrec');
@@ -59,7 +60,7 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
   }, [useIdentity, identity, useLegal, fmt.searchKey]);
 
   const userQuery = [query.trim(), buildAdvanced(adv)].filter(Boolean).join(' ');
-  const fullQuery = [userQuery, constraints].filter(Boolean).join(' ');
+  const fullQuery = [userQuery, favOnly ? 'is:fav' : '', constraints].filter(Boolean).join(' ');
 
   const inDeck = useMemo(() => {
     const m = new Map<string, number>();
@@ -67,8 +68,9 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
     return m;
   }, [deck.entries, board]);
 
-  const run = async (q = userQuery, extra = constraints) => {
-    if (!q.trim() && !extra.trim()) return;
+  const run = async (base = userQuery, extra = constraints, fav = favOnly) => {
+    const q = [base.trim(), fav ? 'is:fav' : ''].filter(Boolean).join(' ');
+    if (!q && !extra.trim()) return;
     setShowTags(false);
     setLoading(true);
     setError('');
@@ -115,7 +117,7 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
   const apply = (q: string) => { setQuery(q); void run([q.trim(), buildAdvanced(adv)].filter(Boolean).join(' ')); };
   // 'Search' buttons in import results pre-fill this search.
   // Run exactly what was asked for: advanced filters could hide the card being looked for.
-  const applyRaw = (q: string) => { setQuery(q); void run(q); };
+  const applyRaw = (q: string) => { setQuery(q); void run(q, undefined, false); };
   const applyRef = useRef(applyRaw);
   applyRef.current = applyRaw;
   useEffect(() => onCardSearchRequest((q) => applyRef.current(q)), []);
@@ -163,6 +165,10 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
           </button>
           <SavedSearches query={query} onApply={apply} />
           <button type="button" className={`chip ${showTags ? 'chip-on' : ''}`} onClick={() => setShowTags((v) => !v)} aria-pressed={showTags}>🏷 All tags</button>
+          <button
+            type="button" className={`chip ${favOnly ? 'chip-gold' : ''}`} aria-pressed={favOnly} title="Only favorite cards (owned or not)"
+            onClick={() => { const on = !favOnly; setFavOnly(on); if (on || userQuery || results.length) void run(undefined, undefined, on); }}
+          >★ Favorites</button>
           {fmt.hasCommander && identity && (
             <label className={`chip ${useIdentity ? 'chip-on' : ''}`}>
               <input type="checkbox" checked={useIdentity} onChange={(e) => setUseIdentity(e.target.checked)} />
