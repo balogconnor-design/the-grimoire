@@ -56,8 +56,8 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
 
   // Graph filters in the details panel describe the main deck; jump there when one is applied.
   useEffect(() => {
-    if (filter.cmc != null || filter.type || filter.color) setBoard('main');
-  }, [filter.cmc, filter.type, filter.color]);
+    if (filter.cmc != null || filter.type || filter.color || filter.producer) setBoard('main');
+  }, [filter.cmc, filter.type, filter.color, filter.producer]);
 
   const entries = useMemo(
     () => boardEntries(deck, board)
@@ -81,7 +81,7 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
     return TYPE_ORDER.filter((t) => m.has(t)).map((t) => ({ type: t, entries: m.get(t)! }));
   }, [entries, deck]);
 
-  const hasFilter = filter.cmc != null || !!filter.type || !!filter.color || !!filter.text || favOnly;
+  const hasFilter = filter.cmc != null || !!filter.type || !!filter.color || !!filter.producer || !!filter.text || favOnly;
   const shown = entries.reduce((n, e) => n + e.qty, 0);
 
   // Drop a search result on the list to add it to the board shown, or on a board tab to add it there.
@@ -205,6 +205,11 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
           {filter.color && (
             <button className="chip chip-on" onClick={() => setFilter({ ...filter, color: undefined })}>
               <ManaSymbol symbol={filter.color} size={13} /> {COLOR_NAMES[filter.color]} ✕
+            </button>
+          )}
+          {filter.producer && (
+            <button className="chip chip-on" onClick={() => setFilter({ ...filter, producer: undefined })}>
+              {{ all: 'Mana producers', rock: 'Mana rocks', dork: 'Mana dorks', other: 'Other mana producers' }[filter.producer]} ✕
             </button>
           )}
           {filter.text && (

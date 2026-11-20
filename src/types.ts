@@ -254,5 +254,6 @@ export interface DeckFilter {
   cmc?: number; // 7 means 7+
   type?: TypeCategory;
   color?: string; // W U B R G C
+  producer?: 'all' | 'rock' | 'dork' | 'other'; // mana rocks / dorks (see manaProducer)
   text?: string;
 }
