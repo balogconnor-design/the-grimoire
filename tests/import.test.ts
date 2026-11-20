@@ -153,3 +153,18 @@ describe.skipIf(!hasFixture('jhoira-artifacts.txt'))('Jhoira fixture through the
     expect(qty(exported)).toEqual(qty(text)); // names and quantities; printings are default on import by design
   });
 });
+
+describe('Archidekt export through the deck import', () => {
+  it('sets the commander and brings categories in as card tags', async () => {
+    addCard(card('Jhoira, Ageless Innovator', { type_line: 'Legendary Creature — Human Artificer' }));
+    addCard(card('Sol Ring'));
+    const d = newDeck('T', 'commander');
+    await saveDeck(d);
+    const r = await importDecklist(d.id, '1x Jhoira, Ageless Innovator (dmu) 202 [Commander{top}]\n1x Sol Ring (c21) 263 [Ramp,Artifact] ^Buy,#0066ff^\n', 'replace');
+    expect(r).toMatchObject({ added: 2, missing: [] });
+    const saved = decksT.get(d.id)!;
+    const sol = saved.entries.find((e) => e.card.name === 'Sol Ring')!;
+    expect(sol.tags).toEqual(['ramp']);
+    expect(saved.entries.find((e) => e.uid === saved.commanderUid)?.card.name).toBe('Jhoira, Ageless Innovator');
+  });
+});

@@ -318,7 +318,7 @@ function ImportDeckModal({ onClose }: { onClose: () => void }) {
       <form className="new-deck-form" onSubmit={submit}>
         <p className="muted small">
           Paste a decklist (Moxfield, Archidekt, MTGO or Arena format) or choose a .txt file. Section headers <code>Commander</code>,{' '}
-          <code>Deck</code>, <code>Sideboard</code>, <code>Maybeboard</code> and the <code>*CMDR*</code> tag are recognized.
+          <code>Deck</code>, <code>Sideboard</code>, <code>Maybeboard</code> and the <code>*CMDR*</code> tag are recognized. Archidekt categories (<code>[Ramp]</code>) become card tags.
         </p>
         <textarea
           className="input textarea" rows={12} value={text} aria-label="Decklist"

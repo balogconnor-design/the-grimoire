@@ -1,4 +1,5 @@
 import { useState, type KeyboardEvent } from 'react';
+import { cleanTag } from '../lib/listMarkup';
 
 /** global = on the card everywhere · deck = tags on a deck · card = a card's tags inside one deck · collection = tags on owned lots */
 export type TagScope = 'global' | 'deck' | 'card' | 'collection';
@@ -24,7 +25,7 @@ interface Props {
   autoFocus?: boolean;
 }
 
-export const cleanTag = (t: string) => t.trim().replace(/\s+/g, ' ').toLowerCase().slice(0, 40);
+export { cleanTag };
 
 export function Tag({ scope, children, onRemove, onClick, small }: {
   scope: TagScope; children: string; onRemove?: () => void; onClick?: () => void; small?: boolean;

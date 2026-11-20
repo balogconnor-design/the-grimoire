@@ -93,7 +93,7 @@ drive, replace the `.exe` and `app\` and keep `data\`.
 ### Decks
 - **Library:** all saved decks, filterable by status (In progress / Finished) and format, with a search for decks containing a card.
 - **New deck or import:** start empty, or **Import deck** from pasted text or a `.txt` file (Moxfield, Archidekt, MTGO and Arena formats). The deck is named after its commander, otherwise the file name. Cards come in as their default printing; change printings later in the deck.
-- **Import results:** shows how many cards were added and lists any that couldn't be found, each with a button that searches for it. Two-faced and split cards (e.g. `Tony Stark // The Invincible Iron Man`, `Fire // Ice`) are matched by their full name.
+- **Import results:** shows how many cards were added and lists any that couldn't be found, each with a button that searches for it. Two-faced and split cards (e.g. `Tony Stark // The Invincible Iron Man`, `Fire // Ice`) are matched by their full name. Archidekt exports keep their extras: `[Commander]` sets the commander, `[Sideboard]`, `[Maybeboard]` and other out-of-deck categories pick the board, and other categories (e.g. `[Ramp,Removal]`) become card tags (plain card types like `[Land]` are skipped). Color labels (`^Buy,#0066ff^`) are ignored.
 - **Formats:** every Scryfall-tracked format, each with its own size, copy-limit, sideboard and legality rules.
 - **Commander:** set a commander, shown with its art. Its color identity limits search results, the basic land adder and legality checks.
 - **Boards:** Main, Sideboard and Maybeboard. Export decklists as text.

@@ -5,6 +5,7 @@ import { lookupLines } from './cardLookup';
 import { BASIC_FOR_COLOR, canBeCommander, copyLimit, uid } from './rules';
 import { collectionT, decksT, deleteDeck, getDeck, globalTagsT, saveDeck, updateDeck } from './store';
 import { writeSnapshot } from './collection';
+import { categoryMeaning, splitListMarkup } from './listMarkup';
 
 export function newDeck(name: string, format: string): Deck {
   const now = Date.now();
@@ -230,6 +231,8 @@ export interface ParsedLine {
   collector?: string;
   board: Board;
   commander: boolean;
+  /** Card tags from the line's categories (Archidekt's `[Ramp,Removal]`). */
+  tags?: string[];
 }
 
 export function parseDecklist(text: string): ParsedLine[] {
@@ -252,16 +255,23 @@ export function parseDecklist(text: string): ParsedLine[] {
     let lineBoard = board;
     if (/^SB:\s*/i.test(line)) { lineBoard = 'side'; line = line.replace(/^SB:\s*/i, ''); }
 
-    let commander = commanderSection;
+    // Archidekt: `[Category,...]` and `^color label^` after the card.
+    const split = splitListMarkup(line);
+    line = split.line;
+    const cat = categoryMeaning(split.categories);
+    if (cat.board) lineBoard = cat.board;
+
+    let commander = commanderSection || cat.commander;
     if (/\*CMDR\*/i.test(line)) { commander = true; line = line.replace(/\*CMDR\*/gi, ''); }
     if (commander) lineBoard = 'main'; // the commander always lives in the main deck
     line = line.replace(/\*F\*|\*E\*|#\S+/g, '').trim(); // foil/etched markers, tags
 
+    const tags = cat.tags.length ? { tags: cat.tags } : {};
     const m = line.match(/^(\d+)\s*x?\s+(.+?)(?:\s+\(([A-Za-z0-9]{2,6})\)(?:\s+([A-Za-z0-9★-]+))?)?\s*$/);
     if (m) {
-      out.push({ qty: parseInt(m[1], 10), name: m[2].trim(), set: m[3]?.toLowerCase(), collector: m[4], board: lineBoard, commander });
+      out.push({ qty: parseInt(m[1], 10), name: m[2].trim(), set: m[3]?.toLowerCase(), collector: m[4], board: lineBoard, commander, ...tags });
     } else {
-      out.push({ qty: 1, name: line, board: lineBoard, commander });
+      out.push({ qty: 1, name: line, board: lineBoard, commander, ...tags });
     }
   }
   return out;
@@ -302,6 +312,7 @@ export async function importDecklist(deckId: string, text: string, mode: 'append
       entry = { uid: uid(), qty: line.qty, board: line.board, card };
       next.entries.push(entry);
     }
+    if (line.tags?.length) entry.tags = [...new Set([...(entry.tags ?? []), ...line.tags])];
     if (line.commander && getFormat(next.format).hasCommander) next.commanderUid = entry.uid;
     added += line.qty;
   }

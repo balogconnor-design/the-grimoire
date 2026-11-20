@@ -1,6 +1,7 @@
 import type { Card, CollectionItem, Condition, Deck, Finish, Intent, PriceSnapshot, SaleRecord, WatchItem } from '../types';
 import { getCollection } from './scryfall';
 import { lookupLines } from './cardLookup';
+import { splitListMarkup } from './listMarkup';
 import { cardPrice, uid } from './rules';
 import { collectionT, decksT, getSettings, pricesT, setSettings, transact, watchT, type Tx } from './store';
 
@@ -261,7 +262,7 @@ export function parseCollectionList(text: string): ListLine[] {
     let line = raw.trim();
     if (!line || line.startsWith('//') || line.startsWith('#')) continue;
     if (/^(commanders?|deck|main(board)?|side(board)?|maybe(board)?|considering|companion)[:\s]*$/i.test(line)) continue;
-    line = line.replace(/^SB:\s*/i, '').replace(/\*CMDR\*/gi, '');
+    line = splitListMarkup(line.replace(/^SB:\s*/i, '').replace(/\*CMDR\*/gi, '')).line; // drops Archidekt's [categories] and ^labels^
     let finish: Finish | undefined;
     if (/\*F\*|\(foil\)|\bfoil$/i.test(line)) finish = 'foil';
     if (/\*E\*|\(etched\)/i.test(line)) finish = 'etched';
