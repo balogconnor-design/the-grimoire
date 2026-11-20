@@ -11,6 +11,6 @@
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
 
-# Vite gives built files content-hashed names, so they can be cached forever.
-/assets/*
-  Cache-Control: public, max-age=31536000, immutable
+# No long-lived Cache-Control on /assets/: during a deploy, a request for a new file can reach the old
+# version and get the wrong response, and a year-long "immutable" header made Cloudflare keep that mistake
+# (2026-11-20). Pages' default (revalidate with ETag) is cheap, and the service worker serves repeat visits.
