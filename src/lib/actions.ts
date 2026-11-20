@@ -3,7 +3,7 @@ import { getFormat } from './formats';
 import { getCollection, getNamed } from './scryfall';
 import { lookupLines } from './cardLookup';
 import { BASIC_FOR_COLOR, canBeCommander, copyLimit, uid } from './rules';
-import { deleteDeck, getDeck, globalTagsT, saveDeck, updateDeck } from './store';
+import { collectionT, decksT, deleteDeck, getDeck, globalTagsT, saveDeck, updateDeck } from './store';
 import { writeSnapshot } from './collection';
 
 export function newDeck(name: string, format: string): Deck {
@@ -130,9 +130,30 @@ export function setDeckTags(deckId: string, tags: string[]) {
 
 /** Global tags live on the card (by name): they show in every deck, search and printing. */
 export function setGlobalTags(card: Card, tags: string[]) {
-  const clean = [...new Set(tags)];
-  if (clean.length) void globalTagsT.put({ id: card.name, card: globalTagsT.get(card.name)?.card ?? card, tags: clean, updatedAt: Date.now() }).catch(() => undefined);
-  else void globalTagsT.remove(card.name).catch(() => undefined);
+  saveCardInfo(card, { tags: [...new Set(tags)] });
+}
+
+/** Write a card's global row, dropping it once it has no tags and isn't a favorite. */
+function saveCardInfo(card: Card, patch: { tags?: string[]; favorite?: boolean }) {
+  const prev = globalTagsT.get(card.name);
+  const next = { id: card.name, card: prev?.card ?? card, tags: prev?.tags ?? [], favorite: prev?.favorite, updatedAt: Date.now(), ...patch };
+  if (!next.favorite) delete next.favorite;
+  if (next.tags.length || next.favorite) void globalTagsT.put(next).catch(() => undefined);
+  else if (prev) void globalTagsT.remove(card.name).catch(() => undefined);
+}
+
+/**
+ * Favorite or unfavorite a card everywhere. Favoriting marks the card itself (owned or not).
+ * Unfavoriting also clears the star on its collection lots and deck rows, so it leaves the
+ * favorites list entirely.
+ */
+export function setCardFavorite(card: Card, on: boolean) {
+  saveCardInfo(card, { favorite: on });
+  if (on) return;
+  collectionT.all().filter((i) => i.card.name === card.name && i.favorite)
+    .forEach((i) => collectionT.update(i.id, (d) => { d.favorite = false; }));
+  decksT.all().filter((d) => d.entries.some((e) => e.card.name === card.name && e.favorite))
+    .forEach((d) => updateDeck(d.id, (x) => { x.entries.forEach((e) => { if (e.card.name === card.name) e.favorite = false; }); }));
 }
 
 export function toggleDeckFavorite(deckId: string) {

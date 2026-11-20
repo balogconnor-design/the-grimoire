@@ -49,6 +49,7 @@ export function useSubjects(): (card: Card, opts?: SubjectOpts) => Subject {
   const items = collectionT.useAll();
   const decks = decksT.useAll();
   const globalTags = useGlobalTags();
+  const favs = useCardFavorites();
   return useMemo(() => {
     const lots = new Map<string, CollectionItem[]>();
     for (const i of items) {
@@ -79,9 +80,10 @@ export function useSubjects(): (card: Card, opts?: SubjectOpts) => Subject {
         finish: opts.item?.finish ?? opts.finish,
         item: opts.item,
         entry: opts.entry,
-        favorite: opts.item ? opts.item.favorite
+        // A card favorited anywhere counts as a favorite in every view.
+        favorite: favs.has(card.name) || (opts.item ? opts.item.favorite
           : opts.entry ? !!opts.entry.favorite
-            : myLots.some((i) => i.favorite) || deckEntries.some((e) => e.favorite),
+            : myLots.some((i) => i.favorite) || deckEntries.some((e) => e.favorite)),
         globalTags: globalTags.get(card.name) ?? [],
         collectionTags: opts.item ? opts.item.tags : uniq(myLots.flatMap((i) => i.tags)),
         cardTags: uniq(deckEntries.flatMap((e) => e.tags ?? [])),
@@ -92,13 +94,36 @@ export function useSubjects(): (card: Card, opts?: SubjectOpts) => Subject {
         decks: uses.map((u) => u.deck.name),
       };
     };
-  }, [items, decks, globalTags]);
+  }, [items, decks, globalTags, favs]);
 }
 
 /** card name -> its global tags. */
 export function useGlobalTags(): Map<string, string[]> {
   const rows = globalTagsT.useAll();
-  return useMemo(() => new Map(rows.map((r) => [r.id, r.tags])), [rows]);
+  return useMemo(() => new Map(rows.filter((r) => r.tags.length).map((r) => [r.id, r.tags])), [rows]);
+}
+
+/** Names of cards favorited directly (search, card view, favorites tab). */
+export function useCardFavorites(): Set<string> {
+  const rows = globalTagsT.useAll();
+  return useMemo(() => new Set(rows.filter((r) => r.favorite).map((r) => r.id)), [rows]);
+}
+
+/**
+ * Every favorite card, owned or not: favorited directly, or starred on a collection lot or a deck row.
+ * One card (printing snapshot) per name, sorted by name.
+ */
+export function useFavoriteCards(): Card[] {
+  const rows = globalTagsT.useAll();
+  const items = collectionT.useAll();
+  const decks = decksT.useAll();
+  return useMemo(() => {
+    const m = new Map<string, Card>();
+    rows.forEach((r) => r.favorite && r.card && m.set(r.id, r.card));
+    items.forEach((i) => i.favorite && !m.has(i.card.name) && m.set(i.card.name, i.card));
+    decks.forEach((d) => d.entries.forEach((e) => e.favorite && !m.has(e.card.name) && m.set(e.card.name, e.card)));
+    return [...m.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [rows, items, decks]);
 }
 
 /** Every global tag in use, most used first. */

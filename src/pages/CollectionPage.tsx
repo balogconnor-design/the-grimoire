@@ -25,11 +25,13 @@ import { useToast } from '../components/Toast';
 import { SellModal, TradeModal } from '../components/TransactionModals';
 import { PurchasedDecks, Stat, Transactions } from './CollectionLedger';
 import { LabeledTable } from '../components/LabeledTable';
+import { FavoritesTab } from './FavoritesTab';
 
-export type CollectionTab = 'overview' | 'inventory' | 'decks' | 'transactions' | 'buy' | 'binder' | 'watch';
+export type CollectionTab = 'overview' | 'inventory' | 'favorites' | 'decks' | 'transactions' | 'buy' | 'binder' | 'watch';
 const TABS: { id: CollectionTab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'inventory', label: 'Inventory' },
+  { id: 'favorites', label: '★ Favorites' },
   { id: 'decks', label: 'Purchased decks' },
   { id: 'transactions', label: 'Transactions' },
   { id: 'buy', label: 'Buy list' },
@@ -97,6 +99,7 @@ export function CollectionPage({ tab }: { tab: CollectionTab }) {
         <>
           {tab === 'overview' && <Overview onAdd={() => setAdding(true)} showInInventory={showInInventory} />}
           {tab === 'inventory' && <Inventory query={invQuery} setQuery={setInvQuery} onExport={(sel) => setExporting(sel)} onAdd={() => setAdding(true)} />}
+          {tab === 'favorites' && <FavoritesTab />}
           {tab === 'buy' && <BuyList />}
           {tab === 'binder' && <TradeBinder />}
           {tab === 'watch' && <Watchlist />}

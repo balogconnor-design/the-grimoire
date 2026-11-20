@@ -8,9 +8,9 @@ import { FORMATS, getFormat } from '../lib/formats';
 import {
   canBeCommander, cardImage, commanderEntry, cardPrice, deckIdentity, formatUSD, hasBackFaceImage, withinIdentity,
 } from '../lib/rules';
-import { addCard, changePrinting, setCommander } from '../lib/actions';
+import { addCard, changePrinting, setCardFavorite, setCommander } from '../lib/actions';
 import { decksT, useDeck, watchT } from '../lib/store';
-import { useLotsFor } from '../lib/hooks';
+import { useLotsFor, useSubjects } from '../lib/hooks';
 import { FINISH_LABEL, intentLabel, itemPL, printBadges } from '../lib/collection';
 import { AddToCollectionModal, ItemModal, WatchModal } from './CollectionModals';
 import { TagModal, type TagContext } from './TagModal';
@@ -44,6 +44,7 @@ export function CardModal({ card: initial, deckId, entryUid, onClose }: Props) {
   const lots = useLotsFor(card);
   const watching = watchT.useAll().some((w) => w.card.name === card.name);
   const toast = useToast();
+  const favorite = !!useSubjects()(card).favorite;
   const deck = useDeck(deckId);
   const tagContext: TagContext = deckId ? { kind: 'deck', deckId } : { kind: 'search' };
   const badges = printBadges(card);
@@ -93,6 +94,12 @@ export function CardModal({ card: initial, deckId, entryUid, onClose }: Props) {
         </div>
 
         <div className="card-modal-info">
+          <div className="card-modal-tools">
+            <button
+              type="button" className={`btn btn-sm card-fav-btn ${favorite ? 'on' : ''}`} aria-pressed={favorite}
+              onClick={() => setCardFavorite(card, !favorite)}
+            >{favorite ? '★ Favorite' : '☆ Add to favorites'}</button>
+          </div>
           {shownFaces.map((f, i) => (
             <div key={i} className="face-block">
               <div className="face-head">

@@ -264,7 +264,10 @@ export function parseBackup(text: string): { backup: Backup; summary: BackupSumm
   const globalTags = keep<GlobalCardTags>(arr(b.globalTags, 'globalTags'), 'globalTags', (g) => {
     if (!isStr(g.id) || !Array.isArray(g.tags)) return null;
     const tags = [...new Set(g.tags.filter(isStr))];
-    return tags.length ? { id: g.id, card: isValidCard(g.card) ? g.card : undefined, tags, updatedAt: typeof g.updatedAt === 'number' ? g.updatedAt : Date.now() } : null;
+    const favorite = g.favorite === true;
+    return tags.length || favorite
+      ? { id: g.id, card: isValidCard(g.card) ? g.card : undefined, tags, ...(favorite ? { favorite } : {}), updatedAt: typeof g.updatedAt === 'number' ? g.updatedAt : Date.now() }
+      : null;
   });
 
   const backup: Backup = {

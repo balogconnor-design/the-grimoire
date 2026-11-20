@@ -10,6 +10,26 @@ export function setCardDrag(dt: DataTransfer, card: Card) {
   dt.effectAllowed = 'copy';
 }
 
+/**
+ * Use a copy of the card image at its on-screen size as the drag picture. Given the <img> itself,
+ * Firefox draws it at the image file's full size (488×680), which is far bigger than the tile.
+ */
+export function setDragPreview(dt: DataTransfer, img: HTMLImageElement) {
+  const w = Math.min(img.clientWidth || 140, 180);
+  const h = Math.round(w * (img.clientHeight && img.clientWidth ? img.clientHeight / img.clientWidth : 680 / 488));
+  // Wrapped in a div: browsers draw an element at its laid-out size, but a bare <img> at its file size.
+  const ghost = document.createElement('div');
+  const pic = img.cloneNode() as HTMLImageElement;
+  pic.removeAttribute('loading');
+  Object.assign(pic.style, { display: 'block', width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' });
+  Object.assign(ghost.style, { position: 'fixed', top: '-10000px', left: '-10000px', width: `${w}px`, height: `${h}px`, pointerEvents: 'none' });
+  ghost.appendChild(pic);
+  document.body.appendChild(ghost);
+  dt.setDragImage(ghost, w / 2, h / 3);
+  // The browser snapshots the drag picture right away; the copy can go on the next frame.
+  setTimeout(() => ghost.remove(), 0);
+}
+
 /** True while a Grimoire card is being dragged (the data itself is only readable on drop). */
 export const isCardDrag = (dt: DataTransfer | null) => !!dt && Array.from(dt.types).includes(CARD_TYPE);
 

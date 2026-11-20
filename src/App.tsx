@@ -49,7 +49,7 @@ export function App() {
   const deckMatch = route.match(/^\/deck\/([^/]+)/);
   const collMatch = route.match(/^\/collection(?:\/(\w+))?/);
   const rawTab = collMatch?.[1] === 'sales' ? 'transactions' : collMatch?.[1] ?? '';
-  const collTab = (['inventory', 'decks', 'transactions', 'buy', 'binder', 'watch'].includes(rawTab) ? rawTab : 'overview') as CollectionTab;
+  const collTab = (['inventory', 'favorites', 'decks', 'transactions', 'buy', 'binder', 'watch'].includes(rawTab) ? rawTab : 'overview') as CollectionTab;
   const helpMatch = route.startsWith('/help');
   const section = deckMatch ? 'decks' : collMatch ? 'collection' : helpMatch ? 'help' : 'home';
 

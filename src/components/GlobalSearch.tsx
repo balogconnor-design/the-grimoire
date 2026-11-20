@@ -23,6 +23,7 @@ export function GlobalSearch() {
   const [adv, setAdv] = useState<Adv>(EMPTY_ADV);
   const [showAdv, setShowAdv] = useState(false);
   const [showTags, setShowTags] = useState(false);
+  const [favOnly, setFavOnly] = useState(false);
   const [order, setOrder] = useState<SortOrder>('name');
   const [results, setResults] = useState<Card[] | null>(null);
   const [total, setTotal] = useState<number | null>(null);
@@ -37,11 +38,12 @@ export function GlobalSearch() {
   const [collecting, setCollecting] = useState<Card | null>(null);
 
   const advQuery = buildAdvanced(adv);
-  const fullQuery = [query.trim(), advQuery].filter(Boolean).join(' ');
+  const fullQuery = [query.trim(), advQuery, favOnly ? 'is:fav' : ''].filter(Boolean).join(' ');
   const advCount = countAdvanced(adv);
 
-  const run = async (q = fullQuery) => {
-    if (!q.trim()) return;
+  const run = async (base = [query.trim(), advQuery].join(' '), fav = favOnly) => {
+    const q = [base.trim(), fav ? 'is:fav' : ''].filter(Boolean).join(' ');
+    if (!q) return;
     setShowTags(false);
     setLoading(true);
     setError('');
@@ -79,7 +81,7 @@ export function GlobalSearch() {
   const apply = (q: string) => { setQuery(q); void run([q.trim(), advQuery].filter(Boolean).join(' ')); };
   // 'Search' buttons in import results pre-fill this search.
   // Run exactly what was asked for: advanced filters could hide the card being looked for.
-  const applyRaw = (q: string) => { setQuery(q); void run(q); };
+  const applyRaw = (q: string) => { setQuery(q); void run(q, false); };
   const applyRef = useRef(applyRaw);
   applyRef.current = applyRaw;
   useEffect(() => onCardSearchRequest((q) => applyRef.current(q)), []);
@@ -90,7 +92,7 @@ export function GlobalSearch() {
       onCollect={() => setCollecting(c)} onTagClick={onTagClick}
     />
   );
-  const clear = () => { setQuery(''); setAdv(EMPTY_ADV); setResults(null); setTotal(null); setNext(undefined); setError(''); setWarnings([]); };
+  const clear = () => { setQuery(''); setAdv(EMPTY_ADV); setFavOnly(false); setResults(null); setTotal(null); setNext(undefined); setError(''); setWarnings([]); };
 
   return (
     <section className="panel global-search">
@@ -104,7 +106,7 @@ export function GlobalSearch() {
             />
           </div>
           <button className="btn btn-primary" type="submit" disabled={loading}>Search</button>
-          {(results || advCount > 0) && <button type="button" className="btn btn-ghost" onClick={clear}>Clear</button>}
+          {(results || advCount > 0 || favOnly) && <button type="button" className="btn btn-ghost" onClick={clear}>Clear</button>}
         </div>
         <div className="search-options">
           <button type="button" className={`chip ${showAdv ? 'chip-on' : ''}`} onClick={() => setShowAdv((v) => !v)} aria-expanded={showAdv}>
@@ -114,6 +116,10 @@ export function GlobalSearch() {
           <button type="button" className={`chip ${showTags ? 'chip-on' : ''}`} onClick={() => setShowTags((v) => !v)} aria-pressed={showTags}>
             🏷 All tags
           </button>
+          <button
+            type="button" className={`chip ${favOnly ? 'chip-gold' : ''}`} aria-pressed={favOnly} title="Only favorite cards (owned or not)"
+            onClick={() => { const on = !favOnly; setFavOnly(on); if (on || [query.trim(), advQuery].join(' ').trim() || results) void run(undefined, on); }}
+          >★ Favorites</button>
           <select className="input input-sm" value={order} onChange={(e) => setOrder(e.target.value as SortOrder)} aria-label="Sort by">
             {SORT_ORDERS.map((o) => <option key={o.value} value={o.value}>Sort: {o.label}</option>)}
           </select>
@@ -122,7 +128,7 @@ export function GlobalSearch() {
           </span>
         </div>
         {showAdv && <AdvancedSearch value={adv} onChange={setAdv} />}
-        {advQuery && <div className="query-preview" title="Query being searched"><code>{fullQuery}</code></div>}
+        {(advQuery || favOnly) && <div className="query-preview" title="Query being searched"><code>{fullQuery}</code></div>}
       </form>
 
       {showTags ? (
@@ -148,7 +154,9 @@ export function GlobalSearch() {
       )}
       {loading && <div className="loading">Searching…</div>}
       {!loading && next && <button className="btn btn-ghost load-more" onClick={more}>Load more results</button>}
-      {!loading && results?.length === 0 && !error && <div className="empty">No cards match that search.</div>}
+      {!loading && results?.length === 0 && !error && (
+        <div className="empty">{favOnly && localOnly ? 'No favorite cards yet. Use ☆ on any card to add it.' : 'No cards match that search.'}</div>
+      )}
       </>)}
 
       {open && <CardModal card={open} onClose={() => setOpen(null)} />}
