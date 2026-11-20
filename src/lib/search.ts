@@ -1,7 +1,7 @@
 import type { Card, ScryfallList } from '../types';
 import { fetchPage, searchCards, type SortDir, type SortOrder, type Unique } from './scryfall';
 import { parseQuery, splitForScryfall, type Subject } from './query';
-import { collectionT, decksT } from './store';
+import { collectionT, decksT, globalTagsT } from './store';
 
 export interface HybridResult {
   cards: Card[];
@@ -30,10 +30,11 @@ export async function hybridSearch(
   const keep = (cs: Card[]) => (split.local ? cs.filter((c) => local.test(subjectFor(c))) : cs);
 
   if (!split.remote && split.local) {
-    // Local-only: everything you own or have in a deck, one per name.
+    // Local-only: everything you own, have in a deck or have tagged globally, one per name.
     const seen = new Map<string, Card>();
     collectionT.all().forEach((i) => seen.has(i.card.name) || seen.set(i.card.name, i.card));
     decksT.all().forEach((d) => d.entries.forEach((e) => seen.has(e.card.name) || seen.set(e.card.name, e.card)));
+    globalTagsT.all().forEach((g) => g.card && !seen.has(g.id) && seen.set(g.id, g.card));
     const extra = opts.extra ? parseQuery(opts.extra) : null;
     const cards = keep([...seen.values()]).filter((c) => !extra || extra.test(subjectFor(c))).sort((a, b) => a.name.localeCompare(b.name));
     return { cards, total: cards.length, localOnly: true, warnings: local.warnings, remote: '', local: split.local };

@@ -32,6 +32,8 @@
   --mtg-c: #b9bec6;
 
   /* Tag scopes — kept clear of the good/bad status colors used for gains & losses */
+  --tag-global: #3fc9a8;
+  --tag-global-soft: rgba(63, 201, 168, 0.15);
   --tag-deck: #e3b54f;
   --tag-deck-soft: rgba(227, 181, 79, 0.15);
   --tag-card: #6aa7f8;
@@ -75,6 +77,8 @@
   --mtg-r: #cf3b26;
   --mtg-g: #1d7f45;
   --mtg-c: #9aa1ab;
+  --tag-global: #0b7a62;
+  --tag-global-soft: rgba(11, 122, 98, 0.1);
   --tag-deck: #8a5f00;
   --tag-deck-soft: rgba(176, 125, 18, 0.12);
   --tag-card: #1f5cc0;
@@ -558,6 +562,7 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
   font-size: 0.8rem; font-weight: 600; line-height: 1.35; border: 1px solid; white-space: nowrap; max-width: 100%;
   background: var(--panel-2); color: var(--text-2); border-color: var(--border-strong);
 }
+.tag-global { background: var(--tag-global-soft); color: var(--tag-global); border-color: color-mix(in srgb, var(--tag-global) 55%, transparent); }
 .tag-deck { background: var(--tag-deck-soft); color: var(--tag-deck); border-color: color-mix(in srgb, var(--tag-deck) 55%, transparent); border-radius: 4px; }
 .tag-card { background: var(--tag-card-soft); color: var(--tag-card); border-color: color-mix(in srgb, var(--tag-card) 55%, transparent); }
 .tag-collection { background: var(--tag-collection-soft); color: var(--tag-collection); border-color: color-mix(in srgb, var(--tag-collection) 55%, transparent); }

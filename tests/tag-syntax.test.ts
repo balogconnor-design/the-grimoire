@@ -13,6 +13,15 @@ describe('#tag search syntax', () => {
     expect(q.test(subject({ cardTags: ['draw'] }))).toBe(false);
   });
 
+  it('includes global tags, and gtag: searches only them', () => {
+    expect(parseQuery('#staple').test(subject({ globalTags: ['staple'] }))).toBe(true);
+    expect(parseQuery('gtag:staple').test(subject({ globalTags: ['staple'] }))).toBe(true);
+    expect(parseQuery('gtag:staple').test(subject({ cardTags: ['staple'] }))).toBe(false);
+    expect(parseQuery('cardtag:staple').test(subject({ globalTags: ['staple'] }))).toBe(false);
+    expect(parseQuery('is:tagged').test(subject({ globalTags: ['staple'] }))).toBe(true);
+    expect(splitForScryfall('t:artifact gtag:staple')).toEqual({ remote: 't:artifact', local: 'gtag:staple' });
+  });
+
   it('supports quotes, negation and OR', () => {
     expect(parseQuery('#"card draw"').test(subject({ cardTags: ['card draw'] }))).toBe(true);
     expect(parseQuery('-#ramp').test(subject({ cardTags: ['ramp'] }))).toBe(false);

@@ -3,7 +3,7 @@ import { getFormat } from './formats';
 import { getCollection, getNamed } from './scryfall';
 import { lookupLines } from './cardLookup';
 import { BASIC_FOR_COLOR, canBeCommander, copyLimit, uid } from './rules';
-import { deleteDeck, getDeck, saveDeck, updateDeck } from './store';
+import { deleteDeck, getDeck, globalTagsT, saveDeck, updateDeck } from './store';
 import { writeSnapshot } from './collection';
 
 export function newDeck(name: string, format: string): Deck {
@@ -126,6 +126,13 @@ export function setDeckTags(deckId: string, tags: string[]) {
   updateDeck(deckId, (d) => {
     d.tags = tags.length ? [...tags] : undefined;
   });
+}
+
+/** Global tags live on the card (by name): they show in every deck, search and printing. */
+export function setGlobalTags(card: Card, tags: string[]) {
+  const clean = [...new Set(tags)];
+  if (clean.length) void globalTagsT.put({ id: card.name, card: globalTagsT.get(card.name)?.card ?? card, tags: clean, updatedAt: Date.now() }).catch(() => undefined);
+  else void globalTagsT.remove(card.name).catch(() => undefined);
 }
 
 export function toggleDeckFavorite(deckId: string) {

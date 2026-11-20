@@ -1,11 +1,11 @@
 import { openDB, type IDBPDatabase, type IDBPTransaction } from 'idb';
 import { useSyncExternalStore } from 'react';
-import type { CollectionItem, Deck, PriceSnapshot, PurchasedDeck, SaleRecord, SavedSearch, WatchItem } from '../types';
+import type { CollectionItem, Deck, GlobalCardTags, PriceSnapshot, PurchasedDeck, SaleRecord, SavedSearch, WatchItem } from '../types';
 
 // Internal name: renaming it makes existing data unreadable. Keep "deckforge".
 const DB_NAME = 'deckforge';
-const DB_VERSION = 3;
-export const STORES = ['decks', 'collection', 'watchlist', 'sales', 'prices', 'searches', 'owneddecks', 'meta'] as const;
+const DB_VERSION = 4;
+export const STORES = ['decks', 'collection', 'watchlist', 'sales', 'prices', 'searches', 'owneddecks', 'cardtags', 'meta'] as const;
 export type StoreName = (typeof STORES)[number];
 
 type UpgradeStep = (d: IDBPDatabase) => void;
@@ -19,13 +19,14 @@ const ensureStores: UpgradeStep = (d) => {
 
 /**
  * Schema upgrade steps, keyed by the version they upgrade TO. Opening runs every step after the
- * stored version, in order. v1 had only 'decks'; v2/v3 added the rest. Add a step here (and bump
+ * stored version, in order. v1 had only 'decks'; v2/v3 added the rest; v4 added 'cardtags' (global tags). Add a step here (and bump
  * DB_VERSION) only when the schema itself changes.
  */
 export const UPGRADES: Record<number, UpgradeStep> = {
   1: ensureStores,
   2: ensureStores,
   3: ensureStores,
+  4: ensureStores,
 };
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
@@ -184,7 +185,10 @@ export const searchesT = createTable<SavedSearch>('searches', (a, b) => a.name.l
 
 export const ownedDecksT = createTable<PurchasedDeck>('owneddecks', (a, b) => (b.acquiredAt ?? '').localeCompare(a.acquiredAt ?? '') || b.createdAt - a.createdAt);
 
-export const TABLES = [decksT, collectionT, watchT, salesT, pricesT, searchesT, ownedDecksT];
+/** Global card tags, keyed by card name (not tied to a deck or an owned copy). */
+export const globalTagsT = createTable<GlobalCardTags>('cardtags', (a, b) => a.id.localeCompare(b.id));
+
+export const TABLES = [decksT, collectionT, watchT, salesT, pricesT, searchesT, ownedDecksT, globalTagsT];
 
 // ---------- Settings (meta store, key/value) ----------
 
