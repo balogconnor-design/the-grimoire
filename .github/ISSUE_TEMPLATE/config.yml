@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Help & about
+    url: https://the-grimoire.app/#/help
+    about: Where your data lives, backups, installing and offline use.

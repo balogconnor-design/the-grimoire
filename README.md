@@ -2,6 +2,8 @@
 
 A browser-based deck builder and collection tracker for Magic: The Gathering, focused on Commander. Card data and images come from the [Scryfall API](https://scryfall.com/docs/api).
 
+**Use it at [the-grimoire.app](https://the-grimoire.app)**: it works in any modern browser, installs like an app on phones and computers, and works offline. There's also a portable Windows build for flash drives (below). Bugs and ideas: [open an issue](https://github.com/balogconnor-design/the-grimoire/issues/new/choose).
+
 Everything is stored locally in your browser (IndexedDB). There's no account, no server and no sync. Use **Collection → Export & backup** to keep a copy of your data or move it to another device.
 
 ## Run it
@@ -58,6 +60,9 @@ calls Scryfall directly and saves everything in that browser, as in the other ve
   address (including switching to `www.` or letting the domain lapse) leaves every user's data behind unless they back up and
   restore. Keep the domain on auto-renew.
 - The web version, the portable app and the dev server each keep separate data; use **Export & backup** to move it between them.
+- **Analytics:** Cloudflare Web Analytics (cookie-free visit counts) is switched on in the Pages project's dashboard; Cloudflare
+  injects its script, which `public/_headers` allows (`static.cloudflareinsights.com`, `cloudflareinsights.com`). The Help page
+  says so. Nothing about users' decks or collections is ever sent anywhere.
 - **Installable app and offline (PWA):** `vite-plugin-pwa` (config in `vite.config.ts`) builds `manifest.webmanifest` and a
   service worker (`sw.js`). The service worker precaches the app so it opens offline, and caches Scryfall card images (up to 600,
   60 days) and mana symbols as they're viewed. The Scryfall API is never cached, so search results and prices are always live.
@@ -131,6 +136,10 @@ drive, replace the `.exe` and `app\` and keep `data\`.
 - Changes that touch several kinds of data (selling, trading, buying a deck, deleting a deck, restoring) are saved in a single transaction, so a failed save never leaves things half-done.
 - If a save fails, the app says so and reloads the affected data from storage, so what you see matches what is saved.
 
+### Help, feedback and versions
+- **Help & about** (the **?** button, or `#/help`): where data lives, backups, installing, offline, privacy, feedback and credits, adjusted for the web or portable app. It shows the app version from `package.json`.
+- **Feedback:** GitHub Issues with bug-report and idea templates (`.github/ISSUE_TEMPLATE/`); the bug form asks which app (web tab, installed, portable), device and version.
+
 ### Phones and tablets
 - **Layout:** works down to phone width with no sideways page scrolling. The deck builder switches to Search / Deck / Details tabs; collection, ledger, buy list, binder and watchlist tables turn into one card per row with labelled values; dialogs fill the screen with the close button always in reach; advanced search is one column.
 - **Touch:** text boxes use 16px text on touch screens so iPhones don't zoom in when you tap them, small buttons get bigger tap targets, and deck rows use two lines (name and price, then mana cost and row buttons) so card names stay readable.
@@ -156,7 +165,7 @@ drive, replace the `.exe` and `app\` and keep `data\`.
 | `src/lib/query.ts`, `search.ts` | Local search syntax and mixed Scryfall + local queries |
 | `src/lib/store.ts` | IndexedDB persistence, multi-store transactions (`transact`), save-error reporting, React hooks |
 | `src/lib/backup.ts` | Exports (share sheet on phones, download elsewhere), full backup, validated all-or-nothing restore, backup migrations |
-| `src/pages/` | Library, deck builder, collection and ledger screens |
+| `src/pages/` | Library, deck builder, collection and ledger screens, Help & about |
 | `src/lib/device.ts` | Device checks (iOS, installed app, phone share sheet, portable) and data-safety rules: backup reminder, storage protection |
 | `src/components/DataSafety.tsx` | App-wide backup reminder, iPhone install hint, storage-protection request |
 | `src/components/LabeledTable.tsx` | Table that labels each cell with its column name, so tables can stack into cards on phones |

@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import pkg from './package.json';
 
 // Node's process.env, typed here so the app's tsconfig doesn't need Node types.
 declare const process: { env: Record<string, string | undefined> };
@@ -14,7 +15,7 @@ const branch = process.env.CF_PAGES_BRANCH;
 const previewConsole = !!branch && branch !== 'main';
 
 export default defineConfig({
-  define: { __PREVIEW_CONSOLE__: JSON.stringify(previewConsole) },
+  define: { __PREVIEW_CONSOLE__: JSON.stringify(previewConsole), __APP_VERSION__: JSON.stringify(pkg.version) },
   plugins: [
     react(),
     // Installable web app + offline support. The service worker is only built for production
