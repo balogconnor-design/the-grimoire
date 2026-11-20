@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import type { Card, CollectionItem, Deck, DeckEntry, Finish } from '../types';
 import type { Subject } from './query';
-import { collectionT, decksT, useSettings } from './store';
+import { collectionT, decksT, globalTagsT, useSettings } from './store';
 import { computePool, nameKey, ownedByName, type PoolResult } from './ownership';
 
 export function usePool(): PoolResult {
@@ -48,6 +48,7 @@ export interface SubjectOpts {
 export function useSubjects(): (card: Card, opts?: SubjectOpts) => Subject {
   const items = collectionT.useAll();
   const decks = decksT.useAll();
+  const globalTags = useGlobalTags();
   return useMemo(() => {
     const lots = new Map<string, CollectionItem[]>();
     for (const i of items) {
@@ -81,6 +82,7 @@ export function useSubjects(): (card: Card, opts?: SubjectOpts) => Subject {
         favorite: opts.item ? opts.item.favorite
           : opts.entry ? !!opts.entry.favorite
             : myLots.some((i) => i.favorite) || deckEntries.some((e) => e.favorite),
+        globalTags: globalTags.get(card.name) ?? [],
         collectionTags: opts.item ? opts.item.tags : uniq(myLots.flatMap((i) => i.tags)),
         cardTags: uniq(deckEntries.flatMap((e) => e.tags ?? [])),
         deckTags: opts.deckId
@@ -90,7 +92,23 @@ export function useSubjects(): (card: Card, opts?: SubjectOpts) => Subject {
         decks: uses.map((u) => u.deck.name),
       };
     };
-  }, [items, decks]);
+  }, [items, decks, globalTags]);
+}
+
+/** card name -> its global tags. */
+export function useGlobalTags(): Map<string, string[]> {
+  const rows = globalTagsT.useAll();
+  return useMemo(() => new Map(rows.map((r) => [r.id, r.tags])), [rows]);
+}
+
+/** Every global tag in use, most used first. */
+export function useAllGlobalTags(): string[] {
+  const rows = globalTagsT.useAll();
+  return useMemo(() => {
+    const counts = new Map<string, number>();
+    rows.forEach((r) => r.tags.forEach((t) => counts.set(t, (counts.get(t) ?? 0) + 1)));
+    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([t]) => t);
+  }, [rows]);
 }
 
 export function useAllCollectionTags(): string[] {

@@ -219,6 +219,15 @@ export interface PriceSnapshot {
   updatedAt: number;
 }
 
+/** Global tags on a card: by card name, so they follow the card into every deck and printing. */
+export interface GlobalCardTags {
+  id: string; // card name
+  /** Snapshot of a printing, so tagged cards you don't own or use can still be listed. */
+  card?: Card;
+  tags: string[];
+  updatedAt: number;
+}
+
 export interface SavedSearch {
   id: string;
   name: string;

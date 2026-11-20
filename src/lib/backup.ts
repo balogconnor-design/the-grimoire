@@ -1,7 +1,7 @@
-import type { Card, CollectionItem, Deck, PriceSnapshot, PurchasedDeck, SaleRecord, SavedSearch, TxKind, WatchItem } from '../types';
+import type { Card, CollectionItem, Deck, GlobalCardTags, PriceSnapshot, PurchasedDeck, SaleRecord, SavedSearch, TxKind, WatchItem } from '../types';
 import { allocatedQty, backfillLedgerTx, clampAllocations, FINISH_LABEL, intentLabel, itemPL, itemUnitValue, printBadges } from './collection';
 import {
-  collectionT, decksT, DEFAULT_SETTINGS, getSettings, ownedDecksT, pricesT, salesT, searchesT, setSettings, transact, watchT, type Settings, type StoreName,
+  collectionT, decksT, DEFAULT_SETTINGS, getSettings, globalTagsT, ownedDecksT, pricesT, salesT, searchesT, setSettings, transact, watchT, type Settings, type StoreName,
 } from './store';
 import { prefersShareSheet } from './device';
 
@@ -99,6 +99,8 @@ export interface Backup {
   prices: PriceSnapshot[];
   searches: SavedSearch[];
   ownedDecks: PurchasedDeck[];
+  /** Global card tags. Missing from backups made before global tags existed. */
+  globalTags: GlobalCardTags[];
   settings: Partial<Settings>;
 }
 
@@ -114,6 +116,7 @@ export function makeBackup(): Backup {
     prices: pricesT.all(),
     searches: searchesT.all(),
     ownedDecks: ownedDecksT.all(),
+    globalTags: globalTagsT.all(),
     settings: { ...getSettings() },
   };
 }
@@ -135,6 +138,7 @@ export interface DroppedCounts {
   prices: number;
   searches: number;
   ownedDecks: number;
+  globalTags: number;
   /** Lots whose deck allocations added up to more than the lot's quantity (trimmed, not dropped). */
   allocationsClamped: number;
 }
@@ -149,6 +153,7 @@ export interface BackupSummary {
   prices: number;
   searches: number;
   ownedDecks: number;
+  globalTags: number;
   dropped: DroppedCounts;
   /** Total records dropped (not counting clamped allocations). */
   droppedTotal: number;
@@ -208,7 +213,7 @@ export function parseBackup(text: string): { backup: Backup; summary: BackupSumm
     if (!Array.isArray(x)) throw new Error(`Backup is damaged (${name}).`);
     return x;
   };
-  const dropped: DroppedCounts = { decks: 0, deckCards: 0, collection: 0, watchlist: 0, sales: 0, prices: 0, searches: 0, ownedDecks: 0, allocationsClamped: 0 };
+  const dropped: DroppedCounts = { decks: 0, deckCards: 0, collection: 0, watchlist: 0, sales: 0, prices: 0, searches: 0, ownedDecks: 0, globalTags: 0, allocationsClamped: 0 };
   const keep = <T,>(list: unknown[], key: Exclude<keyof DroppedCounts, 'deckCards' | 'allocationsClamped'>, fix: (x: Record<string, unknown>) => T | null): T[] => {
     const out: T[] = [];
     for (const x of list) {
@@ -256,11 +261,17 @@ export function parseBackup(text: string): { backup: Backup; summary: BackupSumm
   const searches = keep<SavedSearch>(arr(b.searches, 'searches'), 'searches', (s) => (isStr(s.id) && typeof s.query === 'string' ? (s as unknown as SavedSearch) : null));
   const ownedDecks = keep<PurchasedDeck>(arr(b.ownedDecks, 'ownedDecks'), 'ownedDecks', (d) => (isStr(d.id) ? (d as unknown as PurchasedDeck) : null));
 
+  const globalTags = keep<GlobalCardTags>(arr(b.globalTags, 'globalTags'), 'globalTags', (g) => {
+    if (!isStr(g.id) || !Array.isArray(g.tags)) return null;
+    const tags = [...new Set(g.tags.filter(isStr))];
+    return tags.length ? { id: g.id, card: isValidCard(g.card) ? g.card : undefined, tags, updatedAt: typeof g.updatedAt === 'number' ? g.updatedAt : Date.now() } : null;
+  });
+
   const backup: Backup = {
     app: BACKUP_APP,
     version: BACKUP_VERSION,
     exportedAt: typeof b.exportedAt === 'string' ? b.exportedAt : '',
-    decks, collection, watchlist, sales, prices, searches, ownedDecks,
+    decks, collection, watchlist, sales, prices, searches, ownedDecks, globalTags,
     settings: isObj(b.settings) ? (b.settings as Partial<Settings>) : {},
   };
   return {
@@ -275,6 +286,7 @@ export function parseBackup(text: string): { backup: Backup; summary: BackupSumm
       prices: prices.length,
       searches: searches.length,
       ownedDecks: ownedDecks.length,
+      globalTags: globalTags.length,
       dropped,
       droppedTotal: Object.values(dropped).reduce((a, n) => a + n, 0) - dropped.allocationsClamped,
     },
@@ -285,7 +297,7 @@ export function parseBackup(text: string): { backup: Backup; summary: BackupSumm
 export async function restoreBackup(b: Backup) {
   const groups: [StoreName, { id: string; updatedAt: number }[]][] = [
     ['decks', b.decks], ['collection', b.collection], ['watchlist', b.watchlist], ['sales', b.sales],
-    ['prices', b.prices], ['searches', b.searches], ['owneddecks', b.ownedDecks],
+    ['prices', b.prices], ['searches', b.searches], ['owneddecks', b.ownedDecks], ['cardtags', b.globalTags],
   ];
   await transact([...groups.map(([s]) => s), 'meta'], async (tx) => {
     for (const [store, rows] of groups) {

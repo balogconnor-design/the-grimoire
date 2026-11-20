@@ -139,6 +139,45 @@ test('#tag search and the tag browser find tagged cards', async ({ page, isMobil
   expect(errors).toEqual([]);
 });
 
+test('global tags follow a card into searches and every deck', async ({ page, isMobile }) => {
+  const errors = watchErrors(page);
+  await open(page);
+  // Tag Sol Ring globally from the main search, without owning it or using it in a deck.
+  const box = page.locator('.search-form input').first();
+  await box.fill('sol ring');
+  await box.press('Enter');
+  const result = page.locator('.result-card').first();
+  await result.hover();
+  await result.getByRole('button', { name: 'Tag Sol Ring' }).click();
+  const tagBox = page.locator('.modal').getByPlaceholder('e.g. staple, ramp, removal');
+  for (const t of ['staple', 'ramp']) { await tagBox.fill(t); await tagBox.press('Enter'); }
+  await page.locator('.modal-close').click();
+  await expect(result.locator('.tag-global')).toHaveCount(2);
+
+  // #staple and gtag:staple find it among your own cards.
+  for (const q of ['#staple', 'gtag:staple']) {
+    await box.fill(q);
+    await box.press('Enter');
+    await expect(page.locator('.results-meta')).toContainText('1 of your cards');
+    await expect(page.locator('.result-card')).toContainText('Sol Ring');
+  }
+  await page.getByRole('button', { name: /All tags/ }).click();
+  await expect(page.locator('.tag-pick.tag-global', { hasText: 'staple' })).toContainText('1');
+
+  // In any deck, the card carries its global tags.
+  await createDeck(page, 'Global Tag Deck');
+  if (isMobile) await page.locator('.mobile-tabs .tab', { hasText: 'Search' }).click();
+  const search = page.locator('.search-panel');
+  await search.locator('.search-input').fill('sol ring');
+  await search.locator('.search-input').press('Enter');
+  const r = search.locator('.result-card').first();
+  await r.hover();
+  await r.getByRole('button', { name: 'Add Sol Ring to main deck' }).click();
+  if (isMobile) await page.locator('.mobile-tabs .tab', { hasText: 'Deck' }).click();
+  await expect(page.locator('.deck-list-panel .tag-global', { hasText: 'staple' })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test('every collection tab renders', async ({ page }) => {
   const errors = watchErrors(page);
   await open(page, '/#/collection');

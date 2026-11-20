@@ -4,9 +4,9 @@ import { Modal } from './Modal';
 import { TagEditor, TagLegend, SCOPE_META, type TagScope } from './TagEditor';
 import { useToast } from './Toast';
 import { collectionT, decksT } from '../lib/store';
-import { addCard, cardTagSuggestions, setCardTagsInDeck, setDeckTags } from '../lib/actions';
+import { addCard, cardTagSuggestions, setCardTagsInDeck, setDeckTags, setGlobalTags } from '../lib/actions';
 import { addItems, setCollectionTagsForCard, updateItem } from '../lib/collection';
-import { useAllCardTags, useAllCollectionTags, useAllDeckTags, useLotsFor } from '../lib/hooks';
+import { useAllCardTags, useAllCollectionTags, useAllDeckTags, useAllGlobalTags, useGlobalTags, useLotsFor } from '../lib/hooks';
 import { cardImage } from '../lib/rules';
 
 /** Where the tag panel was opened from — decides which scope leads and what's suggested. */
@@ -28,6 +28,8 @@ export function TagModal({ card, context, onClose }: Props) {
   const allCollectionTags = useAllCollectionTags();
   const allCardTags = useAllCardTags();
   const allDeckTags = useAllDeckTags();
+  const allGlobalTags = useAllGlobalTags();
+  const globalTags = useGlobalTags().get(card.name) ?? [];
   const toast = useToast();
 
   const deckOptions = useMemo(() => {
@@ -47,6 +49,23 @@ export function TagModal({ card, context, onClose }: Props) {
   const lead: TagScope = context.kind === 'deck' ? 'card'
     : context.kind === 'collection' ? 'collection'
       : lots.length ? 'collection' : 'card';
+
+  // ----- Global section: tags on the card itself, shown in every deck and search -----
+  const globalSection = (
+    <Section key="global" title="Global" lead={false} defaultOpen
+      aside={<span className="muted small">Every deck, search and printing</span>}
+    >
+      <div className="label">{SCOPE_META.global.icon} Global tags — on {card.name} everywhere</div>
+      <TagEditor
+        scope="global" tags={globalTags} onChange={(t) => setGlobalTags(card, t)}
+        placeholder="e.g. staple, ramp, removal" autoFocus={context.kind === 'search'}
+        suggestions={[
+          { label: 'Card tags on this card in your decks', tags: [...new Set(decks.flatMap((d) => d.entries.filter((e) => e.card.name === card.name).flatMap((e) => e.tags ?? [])))] },
+          { label: 'Your global tags', tags: allGlobalTags.slice(0, 12) },
+        ]}
+      />
+    </Section>
+  );
 
   // ----- Collection section: one lot (from an inventory row) or every copy -----
   const allLotTags = [...new Set(lots.flatMap((i) => i.tags))];
@@ -82,7 +101,7 @@ export function TagModal({ card, context, onClose }: Props) {
           {entries.length ? (
             <TagEditor
               scope="card" tags={cardTags} onChange={(t) => setCardTagsInDeck(deck.id, card.name, t)}
-              placeholder="e.g. ramp, wincon, removal" autoFocus={lead === 'card'}
+              placeholder="e.g. ramp, wincon, removal" autoFocus={lead === 'card' && context.kind !== 'search'}
               suggestions={[
                 { label: 'This card in your other decks', tags: sugg.fromOtherDecks },
                 { label: 'Used in this deck', tags: sugg.inThisDeck },
@@ -148,19 +167,20 @@ export function TagModal({ card, context, onClose }: Props) {
           <div>
             <TagLegend />
             <p className="muted small">
-              Search any kind with <code>tag:</code>, or one kind with <code>{SCOPE_META.card.key}:</code>{' '}
+              Search any kind with <code>#tag</code> or <code>tag:</code>, or one kind with <code>{SCOPE_META.global.key}:</code> <code>{SCOPE_META.card.key}:</code>{' '}
               <code>{SCOPE_META.deck.key}:</code> <code>{SCOPE_META.collection.key}:</code> — in every search box.
             </p>
           </div>
         </div>
+        {globalSection}
         {lead === 'collection' ? [collectionSection, deckSection] : [deckSection, collectionSection]}
       </div>
     </Modal>
   );
 }
 
-function Section({ title, lead, aside, children }: { title: string; lead: boolean; aside?: ReactNode; children: ReactNode }) {
-  const [open, setOpen] = useState(lead);
+function Section({ title, lead, defaultOpen, aside, children }: { title: string; lead: boolean; defaultOpen?: boolean; aside?: ReactNode; children: ReactNode }) {
+  const [open, setOpen] = useState(lead || !!defaultOpen);
   return (
     <section className={`tag-section ${lead ? 'lead' : ''}`}>
       <div className="tag-section-head">

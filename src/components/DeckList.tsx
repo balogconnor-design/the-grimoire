@@ -7,7 +7,7 @@ import {
 } from '../lib/rules';
 import { addCard, clearCommander, moveEntry, removeEntry, setCommander, setQty, toggleEntryFavorite } from '../lib/actions';
 import { looksLikeQuery, parseQuery } from '../lib/query';
-import { usePool, useSubjects } from '../lib/hooks';
+import { useGlobalTags, usePool, useSubjects } from '../lib/hooks';
 import { nameKey } from '../lib/ownership';
 import { CardModal } from './CardModal';
 import { ColorPips, ManaCost, ManaSymbol } from './Mana';
@@ -46,6 +46,7 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
   const pool = usePool();
   const coverage = pool.byDeck.get(deck.id);
   const subjects = useSubjects();
+  const globalTags = useGlobalTags();
 
   // Typed query syntax (t:, tag:, is:fav…) runs through the local search engine; plain text stays a substring filter.
   const text = filter.text ?? '';
@@ -271,7 +272,7 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
                             {e.favorite && <span className="fav-inline" title="Favorite">★</span>}
                             {problems && <span className="problem-icon" title={problems.join('\n')}>⚠</span>}
                           </button>
-                          <TagList groups={[{ scope: 'card', tags: e.tags ?? [] }]} max={3} onTagClick={onTagClick} />
+                          <TagList groups={[{ scope: 'global', tags: globalTags.get(e.card.name) ?? [] }, { scope: 'card', tags: e.tags ?? [] }]} max={3} onTagClick={onTagClick} />
                         </div>
                         <ManaCost cost={manaCost(e.card)} size={14} />
                         <span className="entry-price" title={p != null && e.qty > 1 ? `${formatUSD(p)} each` : undefined}>

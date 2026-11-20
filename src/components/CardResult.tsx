@@ -50,6 +50,7 @@ export function CardResult({ card, subject, onOpen, onTag, onTagClick, onCollect
       </div>
       <TagList
         groups={[
+          { scope: 'global', tags: subject.globalTags ?? [] },
           { scope: 'card', tags: subject.cardTags ?? [] },
           { scope: 'collection', tags: subject.collectionTags ?? [] },
           { scope: 'deck', tags: subject.deckTags ?? [] },

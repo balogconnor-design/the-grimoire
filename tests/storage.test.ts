@@ -4,7 +4,7 @@ import { addItems, disposeLots } from '../src/lib/collection';
 import { makeBackup, parseBackup, restoreBackup } from '../src/lib/backup';
 import { buyDeck } from '../src/lib/ledger';
 import {
-  collectionT, db, decksT, deleteDeck, getSettings, onSaveError, ownedDecksT, pricesT, saveDeck, salesT, searchesT, setSettings, watchT,
+  collectionT, db, decksT, deleteDeck, getSettings, globalTagsT, onSaveError, ownedDecksT, pricesT, saveDeck, salesT, searchesT, setSettings, watchT,
 } from '../src/lib/store';
 import { newDeck } from '../src/lib/actions';
 import { card, freshDb } from './helpers';
@@ -115,6 +115,7 @@ describe('backup round trip', () => {
     await watchT.put({ id: 'w1', card: card('Mana Crypt'), finish: 'nonfoil', qty: 1, addedAt: 1, updatedAt: 1 });
     await pricesT.put({ id: '2026-11-18', prices: { x: [1, null, null] }, createdAt: 1, updatedAt: 1 });
     await searchesT.put({ id: 's1', name: 'Rocks', query: 't:artifact', createdAt: 1, updatedAt: 1 });
+    await globalTagsT.put({ id: 'Sol Ring', card: card('Sol Ring'), tags: ['staple', 'ramp'], updatedAt: 1 });
     setSettings({ ignoreBasics: false });
 
     const before = { decks: decksT.all().length, collection: collectionT.all().length, sales: salesT.all().length, watch: watchT.all().length };
@@ -129,6 +130,8 @@ describe('backup round trip', () => {
     expect(after).toEqual(before);
     expect(pricesT.all()).toHaveLength(1);
     expect(searchesT.all()).toHaveLength(1);
+    expect(globalTagsT.get('Sol Ring')?.tags).toEqual(['staple', 'ramp']);
+    expect(await dbRows('cardtags')).toHaveLength(1);
     expect(getSettings().ignoreBasics).toBe(false);
 
     // And it is really in the database, not only in memory.
@@ -152,6 +155,7 @@ describe('backup round trip', () => {
     expect(salesT.all()).toHaveLength(1);
     expect(salesT.all()[0].kind).toBe('bought');
     expect(getSettings().ledgerBackfilled).toBe(true);
+    expect(globalTagsT.all()).toHaveLength(0); // older backups have no global tags
   });
 
   it('drops invalid nested records, clamps allocations, and counts what was dropped', () => {

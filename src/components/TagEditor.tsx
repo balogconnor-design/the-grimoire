@@ -1,9 +1,10 @@
 import { useState, type KeyboardEvent } from 'react';
 
-/** deck = tags on a deck · card = a card's tags inside one deck · collection = tags on owned lots */
-export type TagScope = 'deck' | 'card' | 'collection';
+/** global = on the card everywhere · deck = tags on a deck · card = a card's tags inside one deck · collection = tags on owned lots */
+export type TagScope = 'global' | 'deck' | 'card' | 'collection';
 
 export const SCOPE_META: Record<TagScope, { icon: string; label: string; key: string }> = {
+  global: { icon: '✦', label: 'Global tag (every deck)', key: 'gtag' },
   deck: { icon: '▣', label: 'Deck tag', key: 'decktag' },
   card: { icon: '#', label: 'Card tag (this deck)', key: 'cardtag' },
   collection: { icon: '◈', label: 'Collection tag', key: 'coltag' },

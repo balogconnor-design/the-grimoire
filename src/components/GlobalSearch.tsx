@@ -133,7 +133,7 @@ export function GlobalSearch() {
           {error ? <span className="error-text">{error}</span> : (
             <>
               {results && <span>{localOnly ? `${results.length} of your cards` : total != null ? `${total.toLocaleString()} cards` : `${results.length} matching so far`}</span>}
-              {localOnly && <span className="muted"> · searched your collection & decks (no Scryfall terms)</span>}
+              {localOnly && <span className="muted"> · searched your collection, decks and tagged cards (no Scryfall terms)</span>}
               {local && !localOnly && <span className="muted"> · filtered by <code>{local}</code></span>}
               {warnings.map((w) => <div key={w} className="warn-text">{w}</div>)}
             </>
