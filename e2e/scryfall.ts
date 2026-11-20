@@ -14,7 +14,8 @@ export async function mockScryfall(page: Page) {
     // Scryfall tag downloads (CSV): Sol Ring is ramp and a mana rock; other tags have no cards.
     if (url.pathname === '/cards/search' && url.searchParams.get('format') === 'csv') {
       const tagged = ['otag:ramp', 'otag:mana-rock'].includes(url.searchParams.get('q') ?? '');
-      return tagged ? route.fulfill({ status: 200, contentType: 'text/csv', body: 'name\nSol Ring\n' }) : json(404, { object: 'error', status: 404 });
+      // 200 with no rows for the rest (a 404 would log a console error the tests treat as a failure).
+      return route.fulfill({ status: 200, contentType: 'text/csv', body: tagged ? 'name\nSol Ring\n' : 'name\n' });
     }
     if (url.pathname === '/cards/search') return json(200, { object: 'list', total_cards: 1, has_more: false, data: [SOL_RING] });
     if (url.pathname === '/cards/collection') return json(200, { object: 'list', data: [SOL_RING], not_found: [] });
