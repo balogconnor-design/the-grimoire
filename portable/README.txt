@@ -16,7 +16,17 @@ Where your data lives
   the "data" folder next to the .exe, so they travel with the drive.
   - Close the app window before unplugging the drive.
   - Keep the whole "The Grimoire" folder together.
-  - To back up, use the app's Backup option, or copy the "data" folder.
+  - To back up, use Collection > Export & backup > Full backup, or copy the
+    "data" folder. The app reminds you if you haven't backed up in a month.
+
+Also on the web
+  The same app runs in any browser at https://the-grimoire.app, and can be
+  installed on phones and computers. Each copy keeps its own data: to move
+  yours, make a Full backup in one and use Restore in the other.
+
+Help and feedback
+  Click the ? button in the app for help. To report a bug or suggest an idea:
+  https://github.com/balogconnor-design/the-grimoire/issues
 
 Updating to a new version
   Replace "The Grimoire.exe" and the "app" folder with the new ones.

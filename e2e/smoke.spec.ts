@@ -116,3 +116,13 @@ test('installable and works offline after the first visit', async ({ browser, br
   await expect(page.locator('.topbar')).toBeVisible();
   await ctx.close();
 });
+
+test('help page opens from the top bar and shows the version', async ({ page }) => {
+  const errors = watchErrors(page);
+  await open(page);
+  await page.getByRole('button', { name: 'Help and about' }).click();
+  await expect(page.getByRole('heading', { name: 'Help & about' })).toBeVisible();
+  await expect(page.locator('.help-page')).toContainText(/Version \d+\.\d+\.\d+/);
+  await expect(page.getByRole('link', { name: 'Open an issue on GitHub' })).toHaveAttribute('href', /github\.com\/balogconnor-design\/the-grimoire\/issues/);
+  expect(errors).toEqual([]);
+});

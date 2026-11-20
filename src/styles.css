@@ -918,3 +918,15 @@ button.alert-row:hover { background: var(--panel-2); }
   .entry > .entry-actions { grid-area: sub; justify-self: end; }
   .entry + .entry { border-top: 1px solid var(--border); }
 }
+
+/* ---------- Help & about ---------- */
+.help-page { max-width: 760px; margin: 0 auto; padding: 28px 20px 40px; line-height: 1.6; }
+.help-page > .muted { margin: 8px 0 22px; }
+.help-section { margin-bottom: 22px; }
+.help-section h2 { margin-bottom: 6px; }
+.help-section p { margin: 0 0 8px; }
+.help-section ul { margin: 0; padding-left: 20px; }
+.help-section li { margin-bottom: 6px; }
+.help-btn { margin-left: auto; font-weight: 700; }
+.help-btn.on { background: var(--panel-2); color: var(--text); }
+.help-btn + .theme-btn { margin-left: 0; }
