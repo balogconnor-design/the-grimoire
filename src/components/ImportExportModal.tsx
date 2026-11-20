@@ -60,7 +60,7 @@ export function ImportExportModal({ deck, initialTab = 'import', onClose }: { de
           <p className="muted small">
             Paste a decklist (Moxfield, Archidekt, MTGO or Arena format). One card per line, like <code>1 Sol Ring</code> or{' '}
             <code>1 Sol Ring (CMM) 400</code>. Section headers <code>Commander</code>, <code>Deck</code>, <code>Sideboard</code>,{' '}
-            <code>Maybeboard</code> and the <code>*CMDR*</code> tag are recognized.
+            <code>Maybeboard</code> and the <code>*CMDR*</code> tag are recognized. Archidekt categories (<code>[Ramp]</code>) become card tags.
           </p>
           <textarea
             className="input textarea" rows={14} value={text} onChange={(e) => setText(e.target.value)}
