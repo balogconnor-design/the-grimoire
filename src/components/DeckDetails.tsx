@@ -227,10 +227,17 @@ const MTG_COLOR_VAR: Record<string, string> = {
   W: 'var(--mtg-w)', U: 'var(--mtg-u)', B: 'var(--mtg-b)', R: 'var(--mtg-r)', G: 'var(--mtg-g)', C: 'var(--mtg-c)',
 };
 
+/** "+3 MDFC" beside a source count; hover lists the spell // land cards behind it. */
+function MdfcExtra({ count, names, short }: { count: number; names: string[]; short?: boolean }) {
+  if (!count) return null;
+  const title = `${count} spell // land card${count === 1 ? '' : 's'} — a source only when played as the land side:\n${names.join('\n')}`;
+  return <span className="mdfc-extra" title={title}>+{count}{short ? '' : ' MDFC'}</span>;
+}
+
 function ColorSplit({ deck, filter, setFilter }: ChartProps) {
   const stats = computeColorStats(boardEntries(deck, 'main'));
   const totalPips = stats.reduce((n, s) => n + s.pips, 0);
-  const shown = stats.filter((s) => s.pips > 0 || s.sources > 0 || s.cards > 0);
+  const shown = stats.filter((s) => s.pips > 0 || s.sources > 0 || s.mdfcSources > 0 || s.cards > 0);
 
   return (
     <div className="detail-section">
@@ -250,7 +257,7 @@ function ColorSplit({ deck, filter, setFilter }: ChartProps) {
       ) : (
         <table className="color-table">
           <thead>
-            <tr><th>Color</th><th>Pips</th><th>%</th><th title="Nonland cards of this color">Cards</th><th title="Lands that can produce this color">Land sources</th></tr>
+            <tr><th>Color</th><th>Pips</th><th>%</th><th title="Nonland cards of this color">Cards</th><th title="Lands that can produce this color (+ spell // land MDFCs)">Land sources</th></tr>
           </thead>
           <tbody>
             {shown.map((s) => {
@@ -272,7 +279,7 @@ function ColorSplit({ deck, filter, setFilter }: ChartProps) {
                     </div>
                   </td>
                   <td>{s.cards}</td>
-                  <td>{s.sources}</td>
+                  <td>{s.sources}<MdfcExtra count={s.mdfcSources} names={s.mdfcNames} /></td>
                 </tr>
               );
             })}
@@ -290,7 +297,7 @@ const STATUS_LABEL: Record<ManaBaseStatus, string> = {
 
 function ManaBaseCheck({ deck, filter, setFilter }: ChartProps) {
   const mb = computeManaBase(boardEntries(deck, 'main'));
-  const { rows, lands, offColorLands, worst, moves } = mb;
+  const { rows, lands, offColorLands, mdfcLands, worst, moves } = mb;
   const fmtDelta = (d: number) => `${d >= 0 ? '+' : '−'}${Math.abs(d).toFixed(0)}`;
   const plural = (n: number) => `${n} land${n === 1 ? '' : 's'}`;
   const fromName = (c: string) => (c === 'other' ? 'utility/colorless' : COLOR_NAMES[c]);
@@ -299,7 +306,7 @@ function ManaBaseCheck({ deck, filter, setFilter }: ChartProps) {
   if (worst) {
     const name = COLOR_NAMES[worst.color];
     verdict = worst.sources === 0
-      ? { tone: 'bad', text: `No lands produce ${name}.` }
+      ? { tone: 'bad', text: worst.mdfcSources ? `No lands produce ${name} — only ${worst.mdfcSources} MDFC${worst.mdfcSources === 1 ? '' : 's'}.` : `No lands produce ${name}.` }
       : { tone: worst.status === 'critical' ? 'bad' : 'warn', text: `Short on ${name}: ${worst.sourcePct.toFixed(0)}% of sources vs ${worst.pipPct.toFixed(0)}% of symbols.` };
   } else if (rows.length > 1) {
     verdict = { tone: 'ok', text: `Mana base matches your spells (all colors within ±${MANA_BASE_TOLERANCE} pts).` };
@@ -311,7 +318,7 @@ function ManaBaseCheck({ deck, filter, setFilter }: ChartProps) {
     <div className="detail-section">
       <div className="section-head">
         <h3>Mana base check</h3>
-        <span className="muted small">{lands} land{lands === 1 ? '' : 's'}</span>
+        <span className="muted small">{lands} land{lands === 1 ? '' : 's'}{mdfcLands > 0 && ` · ${mdfcLands} MDFC`}</span>
       </div>
       {rows.length === 0 || lands === 0 ? (
         <div className="muted small">Add nonland spells and lands to compare sources against symbols.</div>
@@ -353,7 +360,7 @@ function ManaBaseCheck({ deck, filter, setFilter }: ChartProps) {
               <tr>
                 <th>Color</th>
                 <th title="Share of colored mana symbols in nonland costs">Symbols</th>
-                <th title="Share of land color-production (a dual counts for both colors)">Sources</th>
+                <th title="Share of land color-production (a dual counts for both colors; MDFC land faces count too)">Sources</th>
                 <th title="Sources % minus Symbols %, in percentage points">Diff</th>
                 <th title="Lands that can make this color / total lands">Lands</th>
               </tr>
@@ -373,7 +380,7 @@ function ManaBaseCheck({ deck, filter, setFilter }: ChartProps) {
                         title={`${STATUS_LABEL[r.status]}${r.shift ? ` · ${r.shift > 0 ? 'add' : 'could drop'} ${plural(Math.abs(r.shift))} to match exactly` : ''}`}
                       >{fmtDelta(r.delta)}</span>
                     </td>
-                    <td><span title={`${r.coverage.toFixed(0)}% of lands`}>{r.sources}/{lands}</span></td>
+                    <td><span title={`${r.coverage.toFixed(0)}% of lands`}>{r.sources}/{lands}</span><MdfcExtra count={r.mdfcSources} names={r.mdfcNames} short /></td>
                   </tr>
                 );
               })}
@@ -382,6 +389,7 @@ function ManaBaseCheck({ deck, filter, setFilter }: ChartProps) {
           <div className="muted tiny">
             Green = within ±{MANA_BASE_TOLERANCE} pts, amber = {MANA_BASE_TOLERANCE}–{MANA_BASE_TOLERANCE * 2} pts short, red = more than {MANA_BASE_TOLERANCE * 2} short, grey = surplus.
             {' '}Counts lands only (not rocks/dorks); fetch lands without listed mana aren't counted.
+            {mdfcLands > 0 && <> Spell // land MDFCs count as full sources and are shown as “+N”.</>}
             {offColorLands > 0 && <> {offColorLands} land{offColorLands === 1 ? '' : 's'} make none of your spell colors.</>}
           </div>
         </>

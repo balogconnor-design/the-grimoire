@@ -524,6 +524,7 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .mb-chip.low { background: var(--gold-soft); color: var(--warn); }
 .mb-chip.critical { background: var(--bad-soft); color: var(--bad); }
 .mb-chip.high { background: var(--panel-2); color: var(--muted); }
+.mdfc-extra { margin-left: 4px; color: var(--muted); font-size: 0.78em; white-space: nowrap; cursor: help; border-bottom: 1px dotted currentColor; }
 
 .type-bars { display: flex; flex-direction: column; gap: 2px; }
 .type-row { display: grid; grid-template-columns: 96px 1fr 30px 36px; gap: 8px; align-items: center; padding: 4px 6px; background: none; border: 0; border-radius: var(--radius-sm); text-align: left; font-size: 0.87rem; font-variant-numeric: tabular-nums; }

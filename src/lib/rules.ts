@@ -65,6 +65,26 @@ export function isLand(card: Card) {
   return /\bLand\b/.test(frontTypeLine(card));
 }
 
+/**
+ * A modal double-faced card whose front is a spell and whose back is a land
+ * (e.g. Sink into Stupor // Soporific Springs). It plays as a spell in the curve
+ * and pips, but can be a mana source when you choose the land side.
+ */
+export function isMdfcLand(card: Card): boolean {
+  if (card.layout !== 'modal_dfc' || isLand(card)) return false;
+  return (card.card_faces ?? []).slice(1).some((f) => /\bLand\b/.test(f.type_line ?? ''));
+}
+
+/** Colors a land (or an MDFC's land face) can produce. */
+export function landManaColors(card: Card): string[] {
+  if (card.produced_mana?.length) return [...new Set(card.produced_mana)];
+  if (!isMdfcLand(card)) return [];
+  // Fallback for snapshots without produced_mana: read the land face's "Add {X}".
+  const face = card.card_faces!.slice(1).find((f) => /\bLand\b/.test(f.type_line ?? ''));
+  const adds = (face?.oracle_text ?? '').match(/Add [^.]*/g) ?? [];
+  return [...new Set(adds.flatMap((a) => [...a.matchAll(/\{([WUBRGC])\}/g)].map((m) => m[1])))];
+}
+
 export function isBasicLand(card: Card) {
   return /\bBasic\b/.test(card.type_line) && /\bLand\b/.test(card.type_line);
 }
@@ -272,6 +292,8 @@ export interface ColorStat {
   pips: number;
   pipPct: number;
   sources: number; // lands producing this color
+  mdfcSources: number; // spell // land MDFCs whose land face produces this color
+  mdfcNames: string[]; // names of those MDFCs (for tooltips)
   cards: number; // nonland cards of this color
 }
 
@@ -285,11 +307,21 @@ export function computeColorStats(entries: DeckEntry[]): ColorStat[] {
   const pips: Record<string, number> = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
   const sources: Record<string, number> = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
   const cards: Record<string, number> = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
+  const mdfc: Record<string, number> = { W: 0, U: 0, B: 0, R: 0, G: 0, C: 0 };
+  const mdfcNames: Record<string, string[]> = { W: [], U: [], B: [], R: [], G: [], C: [] };
   for (const e of entries) {
     const c = e.card;
     if (isLand(c)) {
-      for (const m of new Set(c.produced_mana ?? [])) if (m in sources) sources[m] += e.qty;
+      for (const m of landManaColors(c)) if (m in sources) sources[m] += e.qty;
       continue;
+    }
+    // Spell // land MDFCs stay spells below, but also count as (conditional) sources.
+    if (isMdfcLand(c)) {
+      for (const m of landManaColors(c)) {
+        if (!(m in mdfc)) continue;
+        mdfc[m] += e.qty;
+        mdfcNames[m].push(e.qty > 1 ? `${e.qty}× ${c.name}` : c.name);
+      }
     }
     for (const sym of parseSymbols(card_costs(c))) {
       // Hybrid / Phyrexian symbols ({W/U}, {G/P}, {2/W}) count toward every color in them.
@@ -307,6 +339,8 @@ export function computeColorStats(entries: DeckEntry[]): ColorStat[] {
     pips: pips[color],
     pipPct: (pips[color] / totalPips) * 100,
     sources: sources[color],
+    mdfcSources: mdfc[color],
+    mdfcNames: mdfcNames[color],
     cards: cards[color],
   }));
 }
@@ -319,6 +353,8 @@ export interface ManaBaseRow {
   sourcePct: number; // share of land color-production across needed colors
   delta: number; // sourcePct - pipPct, in percentage points
   sources: number; // lands that produce this color
+  mdfcSources: number; // MDFCs whose land face produces this color (counted in sourcePct)
+  mdfcNames: string[];
   coverage: number; // % of all lands that produce this color
   shift: number; // lands to add (+) or remove (−) for this color to match its symbol share
   status: ManaBaseStatus;
@@ -335,6 +371,7 @@ export interface ManaBase {
   rows: ManaBaseRow[];
   lands: number;
   offColorLands: number; // lands producing none of the needed colors (utility/colorless/fetch)
+  mdfcLands: number; // spell // land MDFCs (not in `lands`, but counted as sources)
   worst?: ManaBaseRow; // the most under-supplied color, if any is off
   moves: ManaBaseMove[]; // suggested swaps to fix under-supplied colors
 }
@@ -346,26 +383,31 @@ export const MANA_BASE_TOLERANCE = 5;
  * Compare where lands put their color production against where nonland spells
  * put their colored symbols. Only colors that actually appear in costs count,
  * so off-color production (e.g. Command Tower's extra colors) doesn't skew it.
+ * Spell // land MDFCs count as full sources but are reported separately.
  */
 export function computeManaBase(entries: DeckEntry[]): ManaBase {
   const stats = computeColorStats(entries);
   const needed = stats.filter((s) => s.pips > 0);
+  const total = (s: ColorStat) => s.sources + s.mdfcSources;
   const pipTotal = needed.reduce((n, s) => n + s.pips, 0);
-  const srcTotal = needed.reduce((n, s) => n + s.sources, 0);
+  const srcTotal = needed.reduce((n, s) => n + total(s), 0);
   const neededSet = new Set(needed.map((s) => s.color));
 
   let lands = 0;
   let offColorLands = 0;
+  let mdfcLands = 0;
   for (const e of entries) {
+    if (isMdfcLand(e.card)) mdfcLands += e.qty;
     if (!isLand(e.card)) continue;
     lands += e.qty;
-    if (!(e.card.produced_mana ?? []).some((m) => neededSet.has(m))) offColorLands += e.qty;
+    if (!landManaColors(e.card).some((m) => neededSet.has(m))) offColorLands += e.qty;
   }
 
   const rows: ManaBaseRow[] = needed.map((s) => {
     const pipPct = pipTotal ? (s.pips / pipTotal) * 100 : 0;
-    const sourcePct = srcTotal ? (s.sources / srcTotal) * 100 : 0;
+    const sourcePct = srcTotal ? (total(s) / srcTotal) * 100 : 0;
     const delta = sourcePct - pipPct;
+    // No real land making a color stays critical even if an MDFC could cover it.
     const status: ManaBaseStatus =
       s.sources === 0 || delta < -2 * MANA_BASE_TOLERANCE ? 'critical'
         : delta < -MANA_BASE_TOLERANCE ? 'low'
@@ -374,12 +416,12 @@ export function computeManaBase(entries: DeckEntry[]): ManaBase {
     // A one-for-one swap of mono-color lands keeps the total production constant,
     // so the target source count is simply this color's symbol share of that total.
     const base = srcTotal || lands;
-    const shift = Math.round((pipPct / 100) * base - s.sources);
-    return { color: s.color, pipPct, sourcePct, delta, sources: s.sources, coverage: lands ? (s.sources / lands) * 100 : 0, shift, status };
+    const shift = Math.round((pipPct / 100) * base - total(s));
+    return { color: s.color, pipPct, sourcePct, delta, sources: s.sources, mdfcSources: s.mdfcSources, mdfcNames: s.mdfcNames, coverage: lands ? (s.sources / lands) * 100 : 0, shift, status };
   });
 
   const short = rows.filter((r) => r.status === 'critical' || r.status === 'low').sort((a, b) => a.delta - b.delta);
-  return { rows, lands, offColorLands, worst: short[0], moves: planMoves(short, rows, offColorLands) };
+  return { rows, lands, offColorLands, mdfcLands, worst: short[0], moves: planMoves(short, rows, offColorLands) };
 }
 
 /** Pair each under-supplied color with the most over-supplied ones, greedily. */
@@ -455,7 +497,7 @@ export function matchesFilter(deck: Deck, e: DeckEntry, f: DeckFilter): boolean 
   }
   if (f.color) {
     if (isLand(e.card)) {
-      if (!(e.card.produced_mana ?? []).includes(f.color)) return false;
+      if (!landManaColors(e.card).includes(f.color)) return false;
     } else {
       const colors = e.card.colors ?? e.card.card_faces?.[0]?.colors ?? [];
       if (f.color === 'C' ? colors.length > 0 : !colors.includes(f.color)) return false;
