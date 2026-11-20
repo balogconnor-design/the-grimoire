@@ -3,7 +3,8 @@ import type { Deck, DeckFilter, TypeCategory } from '../types';
 import { getFormat } from '../lib/formats';
 import {
   averageMV, boardCount, boardEntries, boardPrice, cardPrice, COLOR_NAMES, computeColorStats, computeCurve,
-  computeManaBase, computeTypes, formatUSD, MANA_BASE_TOLERANCE, type ManaBaseStatus, type Validation,
+  computeManaBase, computeManaProducers, computeTypes, formatUSD, MANA_BASE_TOLERANCE, type ManaBaseStatus, type ProducerKind,
+  type Validation,
 } from '../lib/rules';
 import { refreshPrices } from '../lib/actions';
 import { ManaSymbol } from './Mana';
@@ -119,6 +120,7 @@ export function DeckDetails({ deck, validation, filter, setFilter }: Props) {
       <ManaCurve deck={deck} filter={filter} setFilter={setFilter} />
       <ColorSplit deck={deck} filter={filter} setFilter={setFilter} />
       <ManaBaseCheck deck={deck} filter={filter} setFilter={setFilter} />
+      <ManaProducers deck={deck} filter={filter} setFilter={setFilter} />
       <TypeBreakdown deck={deck} filter={filter} setFilter={setFilter} />
     </aside>
   );
@@ -394,6 +396,103 @@ function ManaBaseCheck({ deck, filter, setFilter }: ChartProps) {
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+/** Text with inline mana symbols, e.g. "{U} or {R}" or "1 of any color". */
+function ManaText({ text, size = 13 }: { text: string; size?: number }) {
+  return (
+    <span className="mana-text">
+      {text.split(/(\{[^}]+\})/).filter(Boolean).map((part, i) =>
+        /^\{[^}]+\}$/.test(part) ? <ManaSymbol key={i} symbol={part.slice(1, -1)} size={size} /> : <span key={i}>{part}</span>)}
+    </span>
+  );
+}
+
+const PRODUCER_KIND_LABEL: Record<'all' | ProducerKind, string> = { all: 'All', rock: 'Rocks', dork: 'Dorks', other: 'Other' };
+
+function ManaProducers({ deck, filter, setFilter }: ChartProps) {
+  const main = boardEntries(deck, 'main');
+  const sum = computeManaProducers(main);
+  const mb = computeManaBase(main);
+  const needed = computeColorStats(main).filter((s) => s.pips > 0 && s.color !== 'C').map((s) => s.color);
+  const fixingColors = (needed.length ? needed : ['W', 'U', 'B', 'R', 'G']).filter((c) => sum.fixing[c] > 0);
+  const signed = (n: number | null) => (n == null ? 'X' : `${n >= 0 ? '+' : '−'}${Math.abs(n)}`);
+  const kinds = (['all', 'rock', 'dork', 'other'] as const).filter((k) => k === 'all' || sum.byKind[k] > 0);
+
+  return (
+    <div className="detail-section">
+      <div className="section-head">
+        <h3>Mana producers</h3>
+        <span className="muted small">
+          {sum.count} card{sum.count === 1 ? '' : 's'}{sum.count > 0 && ` · ${signed(sum.netTotal)} net${sum.variable ? ' + X' : ''}`}
+        </span>
+      </div>
+      {sum.count === 0 ? (
+        <div className="muted small">No mana rocks or dorks in the main deck.</div>
+      ) : (
+        <>
+          <div className="producer-kinds">
+            {kinds.map((k) => {
+              const active = filter.producer === k;
+              return (
+                <button key={k} className={`chip ${active ? 'chip-on' : ''}`} aria-pressed={active}
+                  onClick={() => setFilter({ ...filter, producer: active ? undefined : k })}>
+                  {PRODUCER_KIND_LABEL[k]} {k === 'all' ? sum.count : sum.byKind[k]}
+                </button>
+              );
+            })}
+          </div>
+          <div className="muted small">
+            {mb.lands} land{mb.lands === 1 ? '' : 's'}{mb.mdfcLands > 0 && ` + ${mb.mdfcLands} MDFC`} + {sum.count} producer{sum.count === 1 ? '' : 's'}
+            {' · '}avg MV {sum.avgMV.toFixed(1)}
+          </div>
+          <table className="color-table producer-table">
+            <thead>
+              <tr>
+                <th>Card</th>
+                <th title="Mana value">MV</th>
+                <th title="Mana the ability adds">Gross</th>
+                <th title="Mana added minus the mana spent to activate it">Net</th>
+                <th title="Colors it can make">Makes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sum.producers.map((p) => (
+                <tr key={p.entry.uid}>
+                  <td>
+                    <div className="producer-name">{p.entry.qty > 1 && <span className="muted">{p.entry.qty}× </span>}{p.entry.card.name}</div>
+                    {p.filter && (
+                      <div className="muted tiny-label producer-note">
+                        Filters <ManaText text={p.filter.from} size={12} /> → <ManaText text={p.filter.into} size={12} />
+                      </div>
+                    )}
+                    {p.restricted && <div className="muted tiny-label producer-note">Restricted (“spend this mana only…”)</div>}
+                  </td>
+                  <td>{p.mv}</td>
+                  <td>{signed(p.gross)}</td>
+                  <td className={p.net != null && p.net <= 0 ? 'muted' : ''}>{signed(p.net)}</td>
+                  <td>
+                    {p.anyColor ? <span className="small">Any</span> : (
+                      <span className="mana-text">{p.colors.map((col) => <ManaSymbol key={col} symbol={col} size={14} />)}</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="small producer-fixing">
+            <span className="muted">Fixing:</span>
+            {fixingColors.map((c) => <span key={c} className="color-cell"><ManaSymbol symbol={c} size={14} /> {sum.fixing[c]}</span>)}
+            {sum.colorlessOnly > 0 && <span className="color-cell"><ManaSymbol symbol="C" size={14} /> only {sum.colorlessOnly}</span>}
+          </div>
+        </>
+      )}
+      <div className="muted tiny">
+        Nonland permanents with a repeatable mana ability. Gross = mana the ability adds, net = gross minus its activation cost; X = variable.
+        {' '}Not counted in the mana base check. Rituals, Treasure makers and land-search ramp aren’t included.
+      </div>
     </div>
   );
 }

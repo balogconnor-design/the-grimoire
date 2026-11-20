@@ -450,6 +450,152 @@ function planMoves(short: ManaBaseRow[], rows: ManaBaseRow[], offColorLands: num
   return moves;
 }
 
+// ---------- Mana producers (rocks / dorks) ----------
+
+export type ProducerKind = 'rock' | 'dork' | 'other';
+
+export interface ManaProducer {
+  entry: DeckEntry;
+  kind: ProducerKind;
+  mv: number;
+  gross: number | null; // mana the best ability adds; null = variable (X / "for each")
+  net: number | null; // gross minus mana spent to activate it
+  colors: string[]; // what it can make (W U B R G C)
+  anyColor: boolean;
+  /** Set when the best colored ability costs mana: it converts `from` into `into`. */
+  filter?: { from: string; into: string };
+  restricted: boolean; // "Spend this mana only…"
+}
+
+interface ManaAbility { gross: number | null; costMana: number; costSymbols: string; colors: string[]; anyColor: boolean; output: string; restricted: boolean }
+
+const MANA_SYM_RE = /\{([^}]+)\}/g;
+const WUBRG = ['W', 'U', 'B', 'R', 'G'];
+
+/** Parse the bit after "Add" ("{C}{C}", "{U} or {R}", "two mana of any one color", …). */
+function parseManaOutput(phrase: string, card: Card): Omit<ManaAbility, 'costMana' | 'costSymbols' | 'restricted'> | null {
+  const p = phrase.trim();
+  // "Any color" / "chosen color": trust Scryfall's produced_mana when it narrows it down.
+  const listed = (card.produced_mana ?? []).filter((m) => WUBRG.includes(m));
+  const anyColors = listed.length ? listed : WUBRG;
+  const counted = p.match(/^(an?|one|two|three|four|five|six|seven|eight|nine|ten|x|\d+) (?:additional )?mana\b(.*)$/i);
+  if (counted) {
+    const word = counted[1].toLowerCase();
+    const n = word === 'x' ? null : /^\d+$/.test(word) ? Number(word) : word === 'a' || word === 'an' ? 1 : NUMBER_WORDS[word] ?? null;
+    const rest = counted[2];
+    const gross = n == null || /\bfor each\b|\bequal to\b/i.test(rest) ? null : n;
+    const colorless = /\bcolorless\b/i.test(rest);
+    return {
+      gross,
+      colors: colorless ? ['C'] : anyColors,
+      anyColor: !colorless && anyColors.length === 5,
+      output: `${gross ?? 'X'} ${colorless ? 'colorless' : anyColors.length === 5 ? 'of any color' : anyColors.map((m) => `{${m}}`).join('/')}`,
+    };
+  }
+  // "an amount of {G} equal to…" — variable output of the named color(s).
+  const amount = p.match(/^an amount of (.+)$/i);
+  if (amount) {
+    const colors = [...new Set([...amount[1].matchAll(MANA_SYM_RE)].map((m) => m[1].toUpperCase()).filter((s) => /^[WUBRGC]$/.test(s)))];
+    return colors.length ? { gross: null, colors, anyColor: false, output: `X ${colors.map((m) => `{${m}}`).join('')}` } : null;
+  }
+  if (!/^\{/.test(p)) return null;
+  const symbolsPart = p.split(/\.|\bfor each\b|\bequal to\b/i)[0];
+  const options = symbolsPart.split(/,? or |, /).map((o) => [...o.matchAll(MANA_SYM_RE)].map((m) => m[1].toUpperCase()));
+  const valid = options.filter((o) => o.length && o.every((s) => /^[WUBRGC]$/.test(s)));
+  if (!valid.length) return null;
+  const variable = /\bfor each\b|\bequal to\b|\bamount\b/i.test(p);
+  return {
+    gross: variable ? null : Math.max(...valid.map((o) => o.length)),
+    colors: [...new Set(valid.flat())],
+    anyColor: false,
+    output: valid.map((o) => o.map((s) => `{${s}}`).join('')).join(' or '),
+  };
+}
+
+function manaAbilities(card: Card): ManaAbility[] {
+  const text = (card.card_faces?.[0]?.oracle_text ?? card.oracle_text ?? '').replace(/\([^)]*\)/g, '');
+  const out: ManaAbility[] = [];
+  for (const line of text.split('\n')) {
+    const restricted = /spend this mana only/i.test(line);
+    // Activated: "<cost>: Add …". Skip loyalty abilities and one-shot "Sacrifice" sources.
+    const act = line.match(/^([^:"]+):\s*(.*)$/);
+    if (act) {
+      const [, cost, effect] = act;
+      if (/^\s*[+−-]?\d+\s*$/.test(cost) || /\bsacrifice\b/i.test(cost)) continue;
+      const add = effect.match(/\bAdd (.+?)(?:\.|$)/);
+      if (!add) continue;
+      const parsed = parseManaOutput(add[1], card);
+      if (!parsed) continue;
+      const costSyms = [...cost.matchAll(MANA_SYM_RE)].map((m) => m[1]).filter((s) => !/^[TQE]$/.test(s));
+      const costMana = costSyms.reduce((n, s) => n + (/^\d+$/.test(s) ? Number(s) : 1), 0);
+      out.push({ ...parsed, costMana, costSymbols: costSyms.map((s) => `{${s}}`).join(''), restricted });
+      continue;
+    }
+    // Triggered extras: Wild Growth / Utopia Sprawl ("…adds an additional {G}").
+    const extra = line.match(/\badds? (an additional .+?|additional .+?)(?:\.|$)/i);
+    if (extra) {
+      const parsed = parseManaOutput(extra[1].replace(/^an additional /i, '').replace(/^additional /i, ''), card);
+      if (parsed) out.push({ ...parsed, costMana: 0, costSymbols: '', restricted });
+    }
+  }
+  return out;
+}
+
+/** A nonland permanent with a repeatable mana ability, or null. Rituals, Treasure makers and land ramp aren't producers. */
+export function manaProducer(entry: DeckEntry): ManaProducer | null {
+  const c = entry.card;
+  if (isLand(c)) return null;
+  const t = frontTypeLine(c);
+  if (/\b(Instant|Sorcery|Planeswalker)\b/.test(t)) return null;
+  const abilities = manaAbilities(c);
+  if (!abilities.length) return null;
+  const net = (a: ManaAbility) => (a.gross == null ? Infinity : a.gross - a.costMana);
+  const best = [...abilities].sort((a, b) => net(b) - net(a) || (b.gross ?? Infinity) - (a.gross ?? Infinity))[0];
+  const colors = [...new Set(abilities.flatMap((a) => a.colors))].sort((a, b) => 'WUBRGC'.indexOf(a) - 'WUBRGC'.indexOf(b));
+  const filterAb = abilities.find((a) => a.costMana > 0 && a.colors.some((col) => col !== 'C'));
+  return {
+    entry,
+    kind: /\bCreature\b/.test(t) ? 'dork' : /\bArtifact\b/.test(t) ? 'rock' : 'other',
+    mv: c.cmc ?? 0,
+    gross: best.gross,
+    net: best.gross == null ? null : best.gross - best.costMana,
+    colors,
+    anyColor: abilities.some((a) => a.anyColor),
+    filter: filterAb ? { from: filterAb.costSymbols, into: filterAb.output } : undefined,
+    restricted: abilities.every((a) => a.restricted),
+  };
+}
+
+export interface ManaProducerSummary {
+  producers: ManaProducer[];
+  count: number; // copies, not unique cards
+  byKind: Record<ProducerKind, number>;
+  netTotal: number; // excluding variable producers
+  variable: number; // copies whose output is X
+  avgMV: number;
+  fixing: Record<string, number>; // copies that can make each color (W U B R G)
+  colorlessOnly: number;
+}
+
+export function computeManaProducers(entries: DeckEntry[]): ManaProducerSummary {
+  const producers = entries.map(manaProducer).filter((p): p is ManaProducer => !!p)
+    .sort((a, b) => a.mv - b.mv || a.entry.card.name.localeCompare(b.entry.card.name));
+  const byKind: Record<ProducerKind, number> = { rock: 0, dork: 0, other: 0 };
+  const fixing: Record<string, number> = { W: 0, U: 0, B: 0, R: 0, G: 0 };
+  let count = 0, netTotal = 0, variable = 0, mvTotal = 0, colorlessOnly = 0;
+  for (const p of producers) {
+    const q = p.entry.qty;
+    count += q;
+    byKind[p.kind] += q;
+    mvTotal += p.mv * q;
+    if (p.net == null) variable += q; else netTotal += p.net * q;
+    const colored = p.colors.filter((col) => col !== 'C');
+    if (!colored.length) colorlessOnly += q;
+    colored.forEach((col) => (fixing[col] += q));
+  }
+  return { producers, count, byKind, netTotal, variable, avgMV: count ? mvTotal / count : 0, fixing, colorlessOnly };
+}
+
 function card_costs(c: Card): string {
   // Split/adventure/MDFC cards: count every face's cost; normal cards: top-level cost.
   if (c.card_faces?.length && !c.mana_cost) return c.card_faces.map((f) => f.mana_cost ?? '').join('');
@@ -502,6 +648,10 @@ export function matchesFilter(deck: Deck, e: DeckEntry, f: DeckFilter): boolean 
       const colors = e.card.colors ?? e.card.card_faces?.[0]?.colors ?? [];
       if (f.color === 'C' ? colors.length > 0 : !colors.includes(f.color)) return false;
     }
+  }
+  if (f.producer) {
+    const p = manaProducer(e);
+    if (!p || (f.producer !== 'all' && p.kind !== f.producer)) return false;
   }
   if (f.text) {
     const q = f.text.toLowerCase();

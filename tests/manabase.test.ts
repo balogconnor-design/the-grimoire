@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Card, DeckEntry } from '../src/types';
-import { computeColorStats, computeCurve, computeManaBase, isLand, isMdfcLand, landManaColors } from '../src/lib/rules';
-import { card } from './helpers';
+import { computeColorStats, computeCurve, computeManaBase, computeManaProducers, isLand, isMdfcLand, landManaColors, manaProducer } from '../src/lib/rules';
+import { card, readFixture } from './helpers';
 
 let n = 0;
 const entry = (c: Card, qty = 1): DeckEntry => ({ uid: `e${++n}`, qty, board: 'main', card: c });
@@ -74,5 +74,54 @@ describe('MDFC lands', () => {
     const blue = mb.rows.find((r) => r.color === 'U')!;
     expect(blue.status).toBe('critical');
     expect(mb.worst?.color).toBe('U');
+  });
+});
+
+describe('mana producers', () => {
+  // Real Scryfall oracle text (trimmed), so the parser is tested against actual wording.
+  const fixture: Card[] = JSON.parse(readFixture('mana-producers.json')).map((c: Partial<Card> & { name: string }) => card(c.name, c));
+  const byName = (name: string) => fixture.find((c) => c.name.startsWith(name))!;
+  const prod = (name: string) => manaProducer(entry(byName(name)));
+
+  it('reads gross and net mana, kind and colors', () => {
+    expect(prod('Sol Ring')).toMatchObject({ kind: 'rock', gross: 2, net: 2, colors: ['C'], anyColor: false });
+    expect(prod('Thran Dynamo')).toMatchObject({ gross: 3, net: 3, colors: ['C'] });
+    expect(prod('Gilded Lotus')).toMatchObject({ gross: 3, net: 3, anyColor: true });
+    expect(prod('Llanowar Elves')).toMatchObject({ kind: 'dork', gross: 1, net: 1, colors: ['G'] });
+    expect(prod('Palladium Myr')).toMatchObject({ kind: 'dork', gross: 2, colors: ['C'] });
+    expect(prod('Talisman of Creativity')).toMatchObject({ gross: 1, net: 1, colors: ['U', 'R', 'C'] });
+    expect(prod('Wild Growth')).toMatchObject({ kind: 'other', gross: 1, colors: ['G'] });
+  });
+
+  it('notes filters with what they convert into', () => {
+    expect(prod('Izzet Signet')).toMatchObject({ gross: 2, net: 1, colors: ['U', 'R'], filter: { from: '{1}', into: '{U}{R}' } });
+    expect(prod('Celestial Prism')).toMatchObject({ gross: 1, net: -1, anyColor: true, filter: { from: '{2}', into: '1 of any color' } });
+    expect(prod('Sol Ring')!.filter).toBeUndefined();
+  });
+
+  it('marks "for each" producers as variable', () => {
+    expect(prod('Priest of Titania')).toMatchObject({ gross: null, net: null, colors: ['G'] });
+    expect(prod('Elvish Archdruid')).toMatchObject({ gross: null, net: null });
+  });
+
+  it('leaves out rituals, Treasure makers, land ramp, one-shot sources, planeswalkers and lands', () => {
+    for (const name of ['Dark Ritual', 'Smothering Tithe', 'Cultivate', 'Lotus Petal', 'Jeweled Lotus', "Mishra's Bauble",
+      'Chandra, Torch of Defiance', 'Cryptolith Rite', 'Cabal Stronghold', 'Sink into Stupor']) {
+      expect(prod(name), name).toBeNull();
+    }
+  });
+
+  it('summarises counts, net total and fixing', () => {
+    const sum = computeManaProducers([
+      entry(byName('Sol Ring')), entry(byName('Izzet Signet'), 2), entry(byName('Birds of Paradise')),
+      entry(byName('Priest of Titania')), entry(byName('Dark Ritual')),
+    ]);
+    expect(sum.count).toBe(5);
+    expect(sum.byKind).toEqual({ rock: 3, dork: 2, other: 0 });
+    expect(sum.netTotal).toBe(2 + 2 * 1 + 1);
+    expect(sum.variable).toBe(1);
+    expect(sum.fixing).toMatchObject({ U: 3, R: 2 + 1, G: 2, W: 1 });
+    expect(sum.colorlessOnly).toBe(1);
+    expect(sum.producers.map((p) => p.mv)).toEqual([...sum.producers.map((p) => p.mv)].sort((a, b) => a - b)); // sorted by MV
   });
 });

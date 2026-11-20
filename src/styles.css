@@ -524,6 +524,13 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .mb-chip.low { background: var(--gold-soft); color: var(--warn); }
 .mb-chip.critical { background: var(--bad-soft); color: var(--bad); }
 .mb-chip.high { background: var(--panel-2); color: var(--muted); }
+.producer-kinds { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.producer-table { margin-top: 8px; }
+.producer-table th:not(:first-child), .producer-table td:not(:first-child) { width: 1%; white-space: nowrap; }
+.producer-name { overflow-wrap: anywhere; }
+.producer-note { margin-top: 2px; }
+.mana-text { display: inline-flex; align-items: center; gap: 2px; flex-wrap: wrap; vertical-align: middle; }
+.producer-fixing { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 8px; }
 .mdfc-extra { margin-left: 4px; color: var(--muted); font-size: 0.78em; white-space: nowrap; cursor: help; border-bottom: 1px dotted currentColor; }
 
 .type-bars { display: flex; flex-direction: column; gap: 2px; }
