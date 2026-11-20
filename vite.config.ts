@@ -43,6 +43,7 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico}'], // the plugin adds manifest.webmanifest itself
+        globIgnores: ['404.html'], // Cloudflare's not-found page, never needed offline
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,
         // Scryfall's image hosts allow CORS, so fetch in cors mode: the cached copies are readable

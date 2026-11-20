@@ -54,7 +54,7 @@ calls Scryfall directly and saves everything in that browser, as in the other ve
 - **Build settings:** build command `npm run build:web` (a failing test blocks the deploy), output directory `dist`, Node version
   from `.node-version`.
 - **Headers:** `public/_headers` sets the security headers (the Content-Security-Policy allows only `api.scryfall.com` and
-  `*.scryfall.io`, for both images and the service worker's fetches, so a new outside source must be added there or it will be blocked) and long caching for `assets/`. The portable
+  `*.scryfall.io`, for both images and the service worker's fetches, so a new outside source must be added there or it will be blocked). Built files are not given long cache lifetimes (see the comment in the file). `public/404.html` is the not-found page; having it also stops Pages from answering missing files with `index.html`. The portable
   build leaves this file out. To test it locally, run `npx wrangler pages dev dist` after a build.
 - **The address must never change.** Like the portable port, saved data is tied to `https://the-grimoire.app`; moving to another
   address (including switching to `www.` or letting the domain lapse) leaves every user's data behind unless they back up and
