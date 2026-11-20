@@ -12,6 +12,8 @@ export async function mockScryfall(page: Page) {
     const url = new URL(route.request().url());
     const json = (status: number, body: unknown) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
     if (url.pathname === '/cards/search') return json(200, { object: 'list', total_cards: 1, has_more: false, data: [SOL_RING] });
+    if (url.pathname === '/cards/collection') return json(200, { object: 'list', data: [SOL_RING], not_found: [] });
+    if (url.pathname === '/sets') return json(200, { object: 'list', data: [{ code: 'c21', name: 'Commander 2021', set_type: 'commander', released_at: '2021-04-23' }] });
     if (url.pathname === '/symbology') return json(200, { object: 'list', data: [] });
     return json(404, { object: 'error', status: 404, details: 'Not mocked in e2e tests' });
   });

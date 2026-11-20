@@ -97,12 +97,16 @@ drive, replace the `.exe` and `app\` and keep `data\`.
 - **Formats:** every Scryfall-tracked format, each with its own size, copy-limit, sideboard and legality rules.
 - **Commander:** set a commander, shown with its art. Its color identity limits search results, the basic land adder and legality checks.
 - **Boards:** Main, Sideboard and Maybeboard. Export decklists as text.
+- **Adding from search:** each result's + button (bottom-left of the card) adds to the board shown in the deck list. On desktop, drag a result onto the deck list to add it to that board, or onto a board tab to add it there.
 - **Deck details:** card counter (e.g. `73/100`), a requirements checklist, prices, a clickable mana curve, color split (pips, %, land sources) and a type breakdown.
 - **Tags and favorites:** tag decks, tag cards within a deck, and mark favorites.
 
 ### Search
-- **Scryfall search:** full Scryfall syntax plus an advanced filter builder, sort options and paging.
+- **Scryfall search:** full Scryfall syntax, every Scryfall sort order, and paging, on both the main page and the deck builder.
+- **Advanced search:** the fields from Scryfall's advanced search page in both searches: card name, rules text, type line (include or exclude types, match all or any), colors (exactly / including / at most), commander color identity, mana cost with symbol buttons, stats (mana value, power, toughness, power + toughness, loyalty, release year) with any comparison, formats (legal / restricted / banned), games (paper, Arena, MTGO), sets (searchable by code or name) and block, rarity, Scryfall's `is:` criteria (card, layout, land cycle and printing groups; each can be required or excluded), prices in USD / EUR / tix, artist, flavor text, lore finder, language, and result options (one per card, per artwork or every printing; sort direction; include extras). A "Your cards" group adds ownership, favorites and tag filters. A badge shows how many filters are set and the full query is shown under the form.
 - **Collection-aware filters:** mix in local terms such as `is:owned`, `is:fav`, `tag:ramp`, `deck:atraxa`, `qty>=2`, `paid<10` or `gain>=50`. A query with only local terms searches the cards you own or use in decks.
+- **Tag search:** `#ramp` finds cards with that tag in any scope (card tags, collection tags, deck tags); `#"card draw"` for tags with spaces, `-#ramp` to exclude. It works in the main search, the deck search and the deck list filter, and mixes with Scryfall terms (`t:creature #ramp`).
+- **All tags:** a button in the main and deck searches lists every tag on your cards with a count; click one or more to show the cards under each.
 - **Saved searches:** keep favorite queries, shared across the main search, deck search and collection search.
 - **Card view:** art (both faces), Oracle text, legality in every format, price, and a printing/art picker.
 
@@ -163,6 +167,7 @@ drive, replace the `.exe` and `app\` and keep `data\`.
 | `src/lib/ledger.ts` | Trades, buying/selling decks, period summaries, CSV exports |
 | `src/lib/ownership.ts` | Matching decks against the collection, shared copy pool, buy list |
 | `src/lib/query.ts`, `search.ts` | Local search syntax and mixed Scryfall + local queries |
+| `src/lib/advanced.ts`, `src/components/AdvancedSearch.tsx` | Advanced search form shared by the main and deck searches, and the query it builds |
 | `src/lib/store.ts` | IndexedDB persistence, multi-store transactions (`transact`), save-error reporting, React hooks |
 | `src/lib/backup.ts` | Exports (share sheet on phones, download elsewhere), full backup, validated all-or-nothing restore, backup migrations |
 | `src/pages/` | Library, deck builder, collection and ledger screens, Help & about |

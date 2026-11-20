@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { DeckFilter } from '../types';
+import type { Board, DeckFilter } from '../types';
 import { useDeck, updateDeck, deleteDeck } from '../lib/store';
 import { FORMATS, getFormat } from '../lib/formats';
 import { boardCount, boardPrice, commanderEntry, formatUSD, validateDeck } from '../lib/rules';
@@ -22,6 +22,8 @@ type MobileTab = 'search' | 'deck' | 'details';
 export function DeckPage({ id }: { id: string }) {
   const deck = useDeck(id);
   const [filter, setFilter] = useState<DeckFilter>({});
+  // The board shown in the deck list; search adds (+ and drag and drop) go to it.
+  const [board, setBoard] = useState<Board>('main');
   const [ie, setIe] = useState<'import' | 'export' | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>('deck');
@@ -127,8 +129,8 @@ export function DeckPage({ id }: { id: string }) {
       </nav>
 
       <div className={`deck-workspace show-${mobileTab}`}>
-        <div className="col col-search"><SearchPanel deck={deck} /></div>
-        <div className="col col-deck"><DeckList deck={deck} validation={validation} filter={filter} setFilter={setFilter} /></div>
+        <div className="col col-search"><SearchPanel deck={deck} board={board} /></div>
+        <div className="col col-deck"><DeckList deck={deck} validation={validation} filter={filter} setFilter={setFilter} board={board} setBoard={setBoard} /></div>
         <div className="col col-details"><DeckDetails deck={deck} validation={validation} filter={filter} setFilter={setFilterAndShow} /></div>
       </div>
 

@@ -1,5 +1,5 @@
 import type { Card, ScryfallList } from '../types';
-import { fetchPage, searchCards, type SortOrder } from './scryfall';
+import { fetchPage, searchCards, type SortDir, type SortOrder, type Unique } from './scryfall';
 import { parseQuery, splitForScryfall, type Subject } from './query';
 import { collectionT, decksT } from './store';
 
@@ -21,7 +21,7 @@ export interface HybridResult {
 export async function hybridSearch(
   q: string,
   subjectFor: (c: Card) => Subject,
-  opts: { order?: SortOrder; extra?: string } = {},
+  opts: { order?: SortOrder; dir?: SortDir; unique?: Unique; extra?: string } = {},
 ): Promise<HybridResult> {
   const split = splitForScryfall(q);
   if (split.error) throw new Error(split.error);
@@ -39,7 +39,7 @@ export async function hybridSearch(
     return { cards, total: cards.length, localOnly: true, warnings: local.warnings, remote: '', local: split.local };
   }
 
-  const res: ScryfallList<Card> = await searchCards(remote, { order: opts.order });
+  const res: ScryfallList<Card> = await searchCards(remote, { order: opts.order, dir: opts.dir, unique: opts.unique });
   return {
     cards: keep(res.data),
     total: split.local ? null : res.total_cards ?? res.data.length,

@@ -8,7 +8,7 @@ import { finishPrice, isAltArt, itemPL, itemUnitValue, printBadges } from './col
  *
  *   t:creature  o:"draw a card"  c>=ug  id<=wub  mv<=3  r:mythic  s:mh3  a:"terese"  pow>=4  usd>5
  *   is:foil  is:etched  is:alt  is:borderless  is:showcase  is:promo  is:fav  is:owned
- *   tag:ramp (any scope)  coltag:binder  cardtag:wincon  decktag:cedh  status:sell  cond:nm  qty>=2  paid<10  gain>=50  pl>20  deck:atraxa  source:tcg
+ *   tag:ramp or #ramp (any scope)  coltag:binder  cardtag:wincon  decktag:cedh  status:sell  cond:nm  qty>=2  paid<10  gain>=50  pl>20  deck:atraxa  source:tcg
  *   year>=2020  f:commander  kw:flying  -t:land  (t:elf or t:goblin)  !"Sol Ring"
  */
 
@@ -92,6 +92,8 @@ function tokenize(q: string): Tok[] {
 const unquote = (s: string) => s.replace(/^"|"$/g, '');
 
 function parseTerm(raw: string): Node {
+  // #ramp is shorthand for tag:ramp (a tag in any scope); #"card draw" for tags with spaces.
+  if (raw.startsWith('#') && raw.length > 1) return { kind: 'term', key: 'tag', op: ':', value: unquote(raw.slice(1)), raw };
   if (raw.startsWith('!')) return { kind: 'term', key: 'exact', op: '=', value: unquote(raw.slice(1)), raw };
   const m = raw.match(/^([a-zA-Z]+)(:|>=|<=|!=|=|>|<)(.*)$/);
   if (m) return { kind: 'term', key: m[1].toLowerCase(), op: m[2], value: unquote(m[3]), raw };
@@ -363,7 +365,7 @@ export function parseQuery(q: string): ParsedQuery {
 }
 
 /** True if the text uses query syntax (so a plain substring filter would be the wrong tool). */
-export const looksLikeQuery = (q: string) => /(^|\s)-?[a-zA-Z]+(:|>=|<=|!=|=|>|<)\S|(^|\s)!"|\bor\b|[()]/.test(q);
+export const looksLikeQuery = (q: string) => /(^|\s)-?[a-zA-Z]+(:|>=|<=|!=|=|>|<)\S|(^|\s)-?#\S|(^|\s)!"|\bor\b|[()]/.test(q);
 
 // ---------- Splitting for Scryfall ----------
 

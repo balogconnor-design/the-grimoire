@@ -1,7 +1,10 @@
 import { useEffect, useRef, useMemo, useState, type FormEvent } from 'react';
 import { onCardSearchRequest } from '../lib/searchBus';
-import type { Card, Deck } from '../types';
-import type { SortOrder } from '../lib/scryfall';
+import type { Board, Card, Deck } from '../types';
+import { SORT_ORDERS, type SortOrder } from '../lib/scryfall';
+import { buildAdvanced, countAdvanced, EMPTY_ADV, type Adv } from '../lib/advanced';
+import { AdvancedSearch } from './AdvancedSearch';
+import { TagBrowser } from './TagBrowser';
 import { getFormat } from '../lib/formats';
 import { deckIdentity } from '../lib/rules';
 import { addCard } from '../lib/actions';
@@ -13,40 +16,17 @@ import { TagModal } from './TagModal';
 import { AddToCollectionModal } from './CollectionModals';
 import { SavedSearches } from './SavedSearches';
 import { SCOPE_META, type TagScope } from './TagEditor';
-import { ColorPips, ManaSymbol } from './Mana';
+import { ColorPips } from './Mana';
 import { useToast } from './Toast';
 
-interface Adv {
-  colors: string[];
-  colorMode: 'including' | 'exactly' | 'atmost';
-  type: string;
-  oracle: string;
-  mvOp: '=' | '<=' | '>=';
-  mv: string;
-  rarity: string;
-  set: string;
-  maxPrice: string;
-}
+const BOARD_NAME: Record<Board, { full: string; short: string }> = {
+  main: { full: 'main deck', short: 'in deck' },
+  side: { full: 'sideboard', short: 'in side' },
+  maybe: { full: 'maybeboard', short: 'in maybe' },
+};
 
-const EMPTY_ADV: Adv = { colors: [], colorMode: 'including', type: '', oracle: '', mvOp: '=', mv: '', rarity: '', set: '', maxPrice: '' };
-
-const quote = (s: string) => (/\s/.test(s) ? `"${s.replace(/"/g, '')}"` : s);
-
-function buildAdvanced(a: Adv): string {
-  const parts: string[] = [];
-  const colored = a.colors.filter((c) => c !== 'C').join('').toLowerCase();
-  if (colored) parts.push(`c${a.colorMode === 'including' ? '>=' : a.colorMode === 'exactly' ? '=' : '<='}${colored}`);
-  else if (a.colors.includes('C')) parts.push('c:c');
-  a.type.trim().split(/\s+/).filter(Boolean).forEach((t) => parts.push(`t:${quote(t)}`));
-  if (a.oracle.trim()) parts.push(`o:${quote(a.oracle.trim())}`);
-  if (a.mv.trim()) parts.push(`mv${a.mvOp}${a.mv.trim()}`);
-  if (a.rarity) parts.push(`r:${a.rarity}`);
-  if (a.set.trim()) parts.push(`s:${a.set.trim()}`);
-  if (a.maxPrice.trim()) parts.push(`usd<=${a.maxPrice.trim()}`);
-  return parts.join(' ');
-}
-
-export function SearchPanel({ deck }: { deck: Deck }) {
+/** Card search on the deck page. The + button and drag and drop add to the board shown in the deck list. */
+export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Board }) {
   const fmt = getFormat(deck.format);
   const identity = deckIdentity(deck);
   const toast = useToast();
@@ -54,6 +34,7 @@ export function SearchPanel({ deck }: { deck: Deck }) {
   const [query, setQuery] = useState('');
   const [adv, setAdv] = useState<Adv>(EMPTY_ADV);
   const [showAdv, setShowAdv] = useState(false);
+  const [showTags, setShowTags] = useState(false);
   const [useIdentity, setUseIdentity] = useState(true);
   const [useLegal, setUseLegal] = useState(true);
   const [order, setOrder] = useState<SortOrder>('edhrec');
@@ -82,16 +63,17 @@ export function SearchPanel({ deck }: { deck: Deck }) {
 
   const inDeck = useMemo(() => {
     const m = new Map<string, number>();
-    deck.entries.forEach((e) => e.board === 'main' && m.set(e.card.name, (m.get(e.card.name) ?? 0) + e.qty));
+    deck.entries.forEach((e) => e.board === board && m.set(e.card.name, (m.get(e.card.name) ?? 0) + e.qty));
     return m;
-  }, [deck.entries]);
+  }, [deck.entries, board]);
 
   const run = async (q = userQuery, extra = constraints) => {
     if (!q.trim() && !extra.trim()) return;
+    setShowTags(false);
     setLoading(true);
     setError('');
     try {
-      const res = await hybridSearch(q, subjectFor, { order, extra });
+      const res = await hybridSearch(q, subjectFor, { order, extra, dir: adv.dir, unique: adv.unique });
       setResults(res.cards);
       setTotal(res.total ?? null);
       setNext(res.next);
@@ -130,15 +112,31 @@ export function SearchPanel({ deck }: { deck: Deck }) {
     void run('is:commander', fmt.searchKey && useLegal ? `f:${fmt.searchKey}` : '');
   };
 
-  const apply = (q: string) => { setQuery(q); void run(q); };
+  const apply = (q: string) => { setQuery(q); void run([q.trim(), buildAdvanced(adv)].filter(Boolean).join(' ')); };
   // 'Search' buttons in import results pre-fill this search.
-  const applyRef = useRef(apply);
-  applyRef.current = apply;
+  // Run exactly what was asked for: advanced filters could hide the card being looked for.
+  const applyRaw = (q: string) => { setQuery(q); void run(q); };
+  const applyRef = useRef(applyRaw);
+  applyRef.current = applyRaw;
   useEffect(() => onCardSearchRequest((q) => applyRef.current(q)), []);
   const onTagClick = (scope: TagScope, t: string) => apply(`${SCOPE_META[scope].key}:${/\s/.test(t) ? `"${t}"` : t}`);
 
-  const toggleColor = (c: string) =>
-    setAdv((a) => ({ ...a, colors: a.colors.includes(c) ? a.colors.filter((x) => x !== c) : [...a.colors, c] }));
+  const advCount = countAdvanced(adv);
+  const target = BOARD_NAME[board];
+
+  const renderCard = (c: Card, subject = subjectFor(c)) => {
+    const n = inDeck.get(c.name);
+    return (
+      <CardResult
+        key={c.id} card={c} subject={subject} draggable
+        onOpen={() => setSelected(c)} onTag={() => setTagging(c)} onCollect={() => setCollecting(c)} onTagClick={onTagClick}
+        badge={n ? <span className="in-deck-badge">{n} {target.short}</span> : null}
+        addButton={
+          <button className="quick-add" title={`Add 1 to ${target.full}`} aria-label={`Add ${c.name} to ${target.full}`} onClick={() => toast(addCard(deck.id, c, 1, board), 'success')}>+</button>
+        }
+      />
+    );
+  };
 
   return (
     <section className="panel search-panel">
@@ -160,10 +158,11 @@ export function SearchPanel({ deck }: { deck: Deck }) {
         </div>
 
         <div className="search-options">
-          <button type="button" className={`chip ${showAdv ? 'chip-on' : ''}`} onClick={() => setShowAdv((s) => !s)}>
-            ⚙ Advanced
+          <button type="button" className={`chip ${showAdv ? 'chip-on' : ''}`} onClick={() => setShowAdv((s) => !s)} aria-expanded={showAdv}>
+            ⚙ Advanced{advCount > 0 && <span className="adv-count">{advCount}</span>}
           </button>
           <SavedSearches query={query} onApply={apply} />
+          <button type="button" className={`chip ${showTags ? 'chip-on' : ''}`} onClick={() => setShowTags((v) => !v)} aria-pressed={showTags}>🏷 All tags</button>
           {fmt.hasCommander && identity && (
             <label className={`chip ${useIdentity ? 'chip-on' : ''}`}>
               <input type="checkbox" checked={useIdentity} onChange={(e) => setUseIdentity(e.target.checked)} />
@@ -177,126 +176,52 @@ export function SearchPanel({ deck }: { deck: Deck }) {
             </label>
           )}
           <select className="input input-sm" value={order} onChange={(e) => setOrder(e.target.value as SortOrder)} aria-label="Sort by">
-            <option value="edhrec">Sort: Popularity (EDHREC)</option>
-            <option value="name">Sort: Name</option>
-            <option value="cmc">Sort: Mana value</option>
-            <option value="usd">Sort: Price</option>
-            <option value="released">Sort: Release date</option>
-            <option value="rarity">Sort: Rarity</option>
-            <option value="power">Sort: Power</option>
+            {SORT_ORDERS.map((o) => <option key={o.value} value={o.value}>Sort: {o.label}</option>)}
           </select>
           {fmt.hasCommander && !identity && (
             <button type="button" className="chip chip-gold" onClick={findCommander}>★ Find a commander</button>
           )}
+          {board !== 'main' && <span className="add-target" title="The + button and drag and drop add to the board shown in the deck list">Adding to the {target.full}</span>}
         </div>
 
-        {showAdv && (
-          <div className="advanced">
-            <div className="adv-field">
-              <span className="label">Colors</span>
-              <div className="adv-colors">
-                {['W', 'U', 'B', 'R', 'G', 'C'].map((c) => (
-                  <button
-                    key={c} type="button" onClick={() => toggleColor(c)}
-                    className={`pip-toggle ${adv.colors.includes(c) ? 'on' : ''}`} aria-pressed={adv.colors.includes(c)}
-                  >
-                    <ManaSymbol symbol={c} size={20} />
-                  </button>
-                ))}
-                <select className="input input-sm" value={adv.colorMode} onChange={(e) => setAdv({ ...adv, colorMode: e.target.value as Adv['colorMode'] })}>
-                  <option value="including">Including</option>
-                  <option value="exactly">Exactly</option>
-                  <option value="atmost">At most</option>
-                </select>
-              </div>
-            </div>
-            <label className="adv-field">
-              <span className="label">Type</span>
-              <input className="input" value={adv.type} onChange={(e) => setAdv({ ...adv, type: e.target.value })} placeholder="creature elf" />
-            </label>
-            <label className="adv-field">
-              <span className="label">Rules text</span>
-              <input className="input" value={adv.oracle} onChange={(e) => setAdv({ ...adv, oracle: e.target.value })} placeholder="draw a card" />
-            </label>
-            <div className="adv-field">
-              <span className="label">Mana value</span>
-              <div className="adv-inline">
-                <select className="input input-sm" value={adv.mvOp} onChange={(e) => setAdv({ ...adv, mvOp: e.target.value as Adv['mvOp'] })}>
-                  <option value="=">=</option>
-                  <option value="<=">≤</option>
-                  <option value=">=">≥</option>
-                </select>
-                <input className="input" type="number" min={0} value={adv.mv} onChange={(e) => setAdv({ ...adv, mv: e.target.value })} placeholder="any" />
-              </div>
-            </div>
-            <label className="adv-field">
-              <span className="label">Rarity</span>
-              <select className="input" value={adv.rarity} onChange={(e) => setAdv({ ...adv, rarity: e.target.value })}>
-                <option value="">Any</option>
-                <option value="common">Common</option>
-                <option value="uncommon">Uncommon</option>
-                <option value="rare">Rare</option>
-                <option value="mythic">Mythic</option>
-              </select>
-            </label>
-            <label className="adv-field">
-              <span className="label">Set code</span>
-              <input className="input" value={adv.set} onChange={(e) => setAdv({ ...adv, set: e.target.value })} placeholder="e.g. mh3" />
-            </label>
-            <label className="adv-field">
-              <span className="label">Max price (USD)</span>
-              <input className="input" type="number" min={0} step="0.01" value={adv.maxPrice} onChange={(e) => setAdv({ ...adv, maxPrice: e.target.value })} placeholder="any" />
-            </label>
-            <div className="adv-actions">
-              <button type="button" className="btn btn-ghost" onClick={() => setAdv(EMPTY_ADV)}>Clear</button>
-              <button type="submit" className="btn btn-primary">Apply</button>
-            </div>
-          </div>
-        )}
+        {showAdv && <AdvancedSearch value={adv} onChange={setAdv} />}
 
         {fullQuery && <div className="query-preview" title="Query sent to Scryfall"><code>{fullQuery}</code></div>}
       </form>
 
-      <div className="results-meta">
-        {error ? <span className="error-text">{error}</span> : (
-          <>
-            {total != null ? <span>{total.toLocaleString()} cards</span> : results.length > 0 && <span>{results.length} matching so far</span>}
-            {local && <span className="muted"> · filtered by <code>{local}</code></span>}
-            {warnings.map((w) => <div key={w} className="warn-text">{w}</div>)}
-          </>
-        )}
-      </div>
+      {showTags ? (
+        <TagBrowser subjectFor={(c) => subjects(c)} renderCard={(c) => renderCard(c, subjects(c))} onSearch={apply} />
+      ) : (
+        <>
+          <div className="results-meta">
+            {error ? <span className="error-text">{error}</span> : (
+              <>
+                {total != null ? <span>{total.toLocaleString()} cards</span> : results.length > 0 && <span>{results.length} matching so far</span>}
+                {local && <span className="muted"> · filtered by <code>{local}</code></span>}
+                {warnings.map((w) => <div key={w} className="warn-text">{w}</div>)}
+              </>
+            )}
+          </div>
 
-      <div className="results-grid">
-        {results.map((c) => {
-          const n = inDeck.get(c.name);
-          return (
-            <CardResult
-              key={c.id} card={c} subject={subjectFor(c)}
-              onOpen={() => setSelected(c)} onTag={() => setTagging(c)} onCollect={() => setCollecting(c)} onTagClick={onTagClick}
-              badge={n ? <span className="in-deck-badge">{n} in deck</span> : null}
-              topRight={
-                <button className="quick-add" title="Add 1 to main deck" aria-label={`Add ${c.name}`} onClick={() => toast(addCard(deck.id, c), 'success')}>+</button>
-              }
-            />
-          );
-        })}
-      </div>
+          <div className="results-grid">{results.map((c) => renderCard(c))}</div>
 
-      {loading && <div className="loading">Searching Scryfall…</div>}
-      {!loading && next && (
-        <button className="btn btn-ghost load-more" onClick={loadMore}>Load more results</button>
-      )}
-      {!loading && total === 0 && !error && <div className="empty">No cards match that search.</div>}
-      {!loading && total == null && !error && (
-        <div className="empty search-hints">
-          <p>Search the full Scryfall database. Try:</p>
-          {['t:legendary t:creature', 'o:"draw a card" mv<=2', 't:instant o:counter', 'otag:ramp','t:land o:"any color"'].map((ex) => (
-            <button key={ex} className="chip" onClick={() => { setQuery(ex); void run(ex); }}>
-              <code>{ex}</code>
-            </button>
-          ))}
-        </div>
+          {loading && <div className="loading">Searching Scryfall…</div>}
+          {!loading && next && (
+            <button className="btn btn-ghost load-more" onClick={loadMore}>Load more results</button>
+          )}
+          {!loading && total === 0 && !error && <div className="empty">No cards match that search.</div>}
+          {!loading && total == null && !error && (
+            <div className="empty search-hints">
+              <p>Search the full Scryfall database, or your tagged cards with <code>#tag</code>. Try:</p>
+              {['t:legendary t:creature', 'o:"draw a card" mv<=2', 't:instant o:counter', 'otag:ramp', 't:land o:"any color"'].map((ex) => (
+                <button key={ex} className="chip" onClick={() => { setQuery(ex); void run(ex); }}>
+                  <code>{ex}</code>
+                </button>
+              ))}
+              <p className="muted small">Drag a card onto the deck list, or use its + button, to add it.</p>
+            </div>
+          )}
+        </>
       )}
 
       {selected && <CardModal card={selected} deckId={deck.id} onClose={() => setSelected(null)} />}
