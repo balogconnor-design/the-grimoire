@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Board, Card } from '../types';
+import type { Board, Card, DeckEntry } from '../types';
 import { Modal } from './Modal';
 import { ColorPips, ManaCost, OracleText } from './Mana';
 import { useToast } from './Toast';
@@ -10,11 +10,15 @@ import {
 } from '../lib/rules';
 import { addCard, changePrinting, setCardFavorite, setCommander } from '../lib/actions';
 import { decksT, useDeck, watchT } from '../lib/store';
-import { useLotsFor, useSubjects } from '../lib/hooks';
+import { useGlobalTags, useLotsFor, useSubjects } from '../lib/hooks';
 import { FINISH_LABEL, intentLabel, itemPL, printBadges } from '../lib/collection';
 import { AddToCollectionModal, ItemModal, WatchModal } from './CollectionModals';
 import { TagModal, type TagContext } from './TagModal';
 import { PLBadge } from './Money';
+import { Tag, TagList } from './TagEditor';
+import { useScryfallTags } from '../lib/scryfallTags';
+import { deckmatesByTag, mainGroup } from '../lib/deckTags';
+import { setMainTag } from '../lib/actions';
 
 interface Props {
   card: Card;
@@ -31,7 +35,21 @@ const LEGALITY_TEXT: Record<string, string> = {
   legal: 'Legal', not_legal: 'Not legal', banned: 'Banned', restricted: 'Restricted',
 };
 
-export function CardModal({ card: initial, deckId, entryUid, onClose }: Props) {
+/**
+ * Card window. Clicking another card under "Also in this deck" replaces this window with that card's
+ * (the body is keyed by card, so all of its state starts fresh).
+ */
+export function CardModal({ card, deckId, entryUid, onClose }: Props) {
+  const [cur, setCur] = useState({ card, entryUid });
+  return (
+    <CardModalBody
+      key={cur.entryUid ?? cur.card.id} card={cur.card} deckId={deckId} entryUid={cur.entryUid} onClose={onClose}
+      onNavigate={(e) => setCur({ card: e.card, entryUid: e.uid })}
+    />
+  );
+}
+
+function CardModalBody({ card: initial, deckId, entryUid, onClose, onNavigate }: Props & { onNavigate: (e: DeckEntry) => void }) {
   const [card, setCard] = useState(initial);
   const [face, setFace] = useState(0);
   const [prints, setPrints] = useState<Card[] | null>(null);
@@ -54,6 +72,19 @@ export function CardModal({ card: initial, deckId, entryUid, onClose }: Props) {
   const inDeck = deck?.entries.filter((e) => e.card.name === card.name) ?? [];
   const cmdUid = deck ? commanderEntry(deck)?.uid : undefined;
   const isCommander = !!cmdUid && inDeck.some((e) => e.uid === cmdUid);
+
+  // Tags: this deck's card tags, global tags, then automatic Scryfall tags.
+  const globalTags = useGlobalTags();
+  const stags = useScryfallTags();
+  const tagSrc = { global: globalTags, scryfall: stags };
+  const entry = (entryUid ? deck?.entries.find((e) => e.uid === entryUid) : undefined) ?? inDeck[0];
+  const cardTagsHere = entry?.tags ?? [];
+  const globalHere = globalTags.get(card.name) ?? [];
+  const ownTags = [...new Set([...cardTagsHere, ...globalHere])];
+  const autoTags = (stags.get(card.name) ?? []).filter((t) => !ownTags.includes(t));
+  const allTags = [...ownTags, ...autoTags];
+  const mates = deck ? deckmatesByTag(deck, card.name, allTags, tagSrc) : [];
+  const listedUnder = deck && entry && entry.board === 'main' && entry.uid !== cmdUid ? mainGroup(deck, entry, tagSrc) : undefined;
 
   useEffect(() => {
     setFace(0);
@@ -133,6 +164,47 @@ export function CardModal({ card: initial, deckId, entryUid, onClose }: Props) {
               <div className="value price">{formatUSD(price)}</div>
               {card.prices.usd_foil && <div className="muted small">Foil {formatUSD(parseFloat(card.prices.usd_foil))}</div>}
             </div>
+          </div>
+
+          <div className="card-tags-panel">
+            <div className="section-head">
+              <h3>Tags</h3>
+              <button className="btn btn-sm" onClick={() => setSub('tag')}>🏷 Edit your tags</button>
+            </div>
+            {allTags.length ? (
+              <TagList
+                groups={[{ scope: 'card', tags: cardTagsHere }, { scope: 'global', tags: globalHere.filter((t) => !cardTagsHere.includes(t)) }, { scope: 'scryfall', tags: autoTags }]}
+                max={99}
+              />
+            ) : (
+              <div className="muted small">No tags yet. Scryfall tags (◆) are added automatically once they've downloaded.</div>
+            )}
+            {deck && allTags.length > 0 && (
+              <div className="deckmates">
+                <div className="label">Also in this deck</div>
+                {mates.map(({ tag, entries }) => {
+                  const scope = cardTagsHere.includes(tag) ? 'card' : globalHere.includes(tag) ? 'global' : 'scryfall';
+                  return (
+                    <div key={tag} className="deckmate-row">
+                      <div className="deckmate-head">
+                        <Tag scope={scope} small>{tag}</Tag>
+                        <span className="muted tiny-label">{entries.length} other{entries.length === 1 ? '' : 's'}</span>
+                        {listedUnder && (listedUnder === tag
+                          ? <span className="muted tiny-label">· listed here when grouped by tag</span>
+                          : <button className="link-btn small" onClick={() => entry && setMainTag(deck.id, entry.uid, tag)}>List under {tag}</button>)}
+                      </div>
+                      {entries.length > 0 && (
+                        <div className="deckmate-cards">
+                          {entries.map((e) => (
+                            <button key={e.uid} className="deckmate-card" onClick={() => onNavigate(e)} title={`Open ${e.card.name}`}>{e.card.name}</button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {deck && fmt && (

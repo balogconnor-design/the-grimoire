@@ -3,6 +3,7 @@ import type { Card, CollectionItem, Deck, DeckEntry, Finish } from '../types';
 import type { Subject } from './query';
 import { collectionT, decksT, globalTagsT, useSettings } from './store';
 import { computePool, nameKey, ownedByName, type PoolResult } from './ownership';
+import { useScryfallTags } from './scryfallTags';
 
 export function usePool(): PoolResult {
   const decks = decksT.useAll();
@@ -49,6 +50,7 @@ export function useSubjects(): (card: Card, opts?: SubjectOpts) => Subject {
   const items = collectionT.useAll();
   const decks = decksT.useAll();
   const globalTags = useGlobalTags();
+  const stags = useScryfallTags();
   const favs = useCardFavorites();
   return useMemo(() => {
     const lots = new Map<string, CollectionItem[]>();
@@ -85,6 +87,7 @@ export function useSubjects(): (card: Card, opts?: SubjectOpts) => Subject {
           : opts.entry ? !!opts.entry.favorite
             : myLots.some((i) => i.favorite) || deckEntries.some((e) => e.favorite)),
         globalTags: globalTags.get(card.name) ?? [],
+        scryfallTags: stags.get(card.name) ?? [],
         collectionTags: opts.item ? opts.item.tags : uniq(myLots.flatMap((i) => i.tags)),
         cardTags: uniq(deckEntries.flatMap((e) => e.tags ?? [])),
         deckTags: opts.deckId
@@ -94,7 +97,7 @@ export function useSubjects(): (card: Card, opts?: SubjectOpts) => Subject {
         decks: uses.map((u) => u.deck.name),
       };
     };
-  }, [items, decks, globalTags, favs]);
+  }, [items, decks, globalTags, stags, favs]);
 }
 
 /** card name -> its global tags. */

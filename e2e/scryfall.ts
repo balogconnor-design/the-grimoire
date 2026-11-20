@@ -11,6 +11,11 @@ export async function mockScryfall(page: Page) {
   await page.route('https://api.scryfall.com/**', (route) => {
     const url = new URL(route.request().url());
     const json = (status: number, body: unknown) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+    // Scryfall tag downloads (CSV): Sol Ring is ramp and a mana rock; other tags have no cards.
+    if (url.pathname === '/cards/search' && url.searchParams.get('format') === 'csv') {
+      const tagged = ['otag:ramp', 'otag:mana-rock'].includes(url.searchParams.get('q') ?? '');
+      return tagged ? route.fulfill({ status: 200, contentType: 'text/csv', body: 'name\nSol Ring\n' }) : json(404, { object: 'error', status: 404 });
+    }
     if (url.pathname === '/cards/search') return json(200, { object: 'list', total_cards: 1, has_more: false, data: [SOL_RING] });
     if (url.pathname === '/cards/collection') return json(200, { object: 'list', data: [SOL_RING], not_found: [] });
     if (url.pathname === '/sets') return json(200, { object: 'list', data: [{ code: 'c21', name: 'Commander 2021', set_type: 'commander', released_at: '2021-04-23' }] });

@@ -40,6 +40,8 @@
   --tag-card-soft: rgba(106, 167, 248, 0.15);
   --tag-collection: #b393f5;
   --tag-collection-soft: rgba(179, 147, 245, 0.16);
+  --tag-scryfall: #f07fa9;
+  --tag-scryfall-soft: rgba(240, 127, 169, 0.14);
 
   --topbar-h: 52px;
   color-scheme: dark;
@@ -85,6 +87,8 @@
   --tag-card-soft: rgba(47, 111, 214, 0.1);
   --tag-collection: #6b3fc9;
   --tag-collection-soft: rgba(107, 63, 201, 0.1);
+  --tag-scryfall: #a8285a;
+  --tag-scryfall-soft: rgba(168, 40, 90, 0.09);
   color-scheme: light;
 }
 
@@ -422,7 +426,14 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .basic-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; }
 .basic-foot .btn { margin-left: auto; }
 
-.deck-group { margin-bottom: 6px; }
+.deck-group { margin-bottom: 6px; border-radius: var(--radius-sm); }
+.deck-group.tag-drop-ok { outline: 1px dashed var(--accent); outline-offset: 1px; }
+.deck-group.tag-drop-hover { outline: 2px solid var(--accent); background: var(--accent-soft); }
+.entry.dragging { opacity: 0.45; }
+.entry[draggable='true'] { cursor: grab; }
+.group-tag-icon { margin-right: 4px; color: var(--tag-card); }
+.group-tag-icon.scryfall { color: var(--tag-scryfall); }
+.group-by-select { width: auto; flex: 0 0 auto; }
 .group-head { width: 100%; display: flex; align-items: center; gap: 8px; padding: 6px 4px; background: none; border: 0; border-bottom: 1px solid var(--border); text-align: left; }
 .caret { width: 12px; color: var(--muted); }
 .group-name { font-weight: 700; font-size: 0.86rem; text-transform: uppercase; letter-spacing: 0.05em; }
@@ -574,6 +585,8 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .tag-deck { background: var(--tag-deck-soft); color: var(--tag-deck); border-color: color-mix(in srgb, var(--tag-deck) 55%, transparent); border-radius: 4px; }
 .tag-card { background: var(--tag-card-soft); color: var(--tag-card); border-color: color-mix(in srgb, var(--tag-card) 55%, transparent); }
 .tag-collection { background: var(--tag-collection-soft); color: var(--tag-collection); border-color: color-mix(in srgb, var(--tag-collection) 55%, transparent); }
+/* Scryfall tags are automatic and can't be removed: dashed border sets them apart from tags you made. */
+.tag-scryfall { background: var(--tag-scryfall-soft); color: var(--tag-scryfall); border-color: color-mix(in srgb, var(--tag-scryfall) 55%, transparent); border-style: dashed; }
 .tag-icon { font-size: 0.72em; opacity: 0.85; }
 .tag-sm { font-size: 0.72rem; padding: 0 6px; }
 button.tag { cursor: pointer; font: inherit; font-size: 0.8rem; font-weight: 600; }
@@ -685,6 +698,14 @@ button.tag.tag-sm { font-size: 0.72rem; }
 /* ---------- Card modal: collection panel ---------- */
 .collection-panel { padding: 12px; border: 1px solid color-mix(in srgb, var(--tag-collection) 40%, var(--border)); border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 8px; }
 .collection-panel .section-head { margin: 0; }
+.card-tags-panel { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 8px; }
+.card-tags-panel .section-head { margin: 0; }
+.deckmates { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 8px; }
+.deckmate-row { display: flex; flex-direction: column; gap: 4px; }
+.deckmate-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.deckmate-cards { display: flex; flex-wrap: wrap; gap: 4px; }
+.deckmate-card { font: inherit; font-size: 0.8rem; padding: 2px 8px; border: 1px solid var(--border-strong); border-radius: 999px; background: var(--bg-2); color: inherit; cursor: pointer; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.deckmate-card:hover { border-color: var(--accent); color: var(--accent); }
 .lot-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .lot-row { width: 100%; display: flex; align-items: center; gap: 8px; padding: 4px 6px; background: none; border: 0; border-radius: var(--radius-sm); text-align: left; font-size: 0.86rem; }
 .lot-row:hover { background: var(--panel-2); }

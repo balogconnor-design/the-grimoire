@@ -5,7 +5,7 @@ import {
   boardCount, boardEntries, boardPrice, canBeCommander, cardImage, cardPrice, COLOR_NAMES, commanderEntry,
   entryCategory, formatUSD, manaCost, matchesFilter, sortEntries, TYPE_ORDER, type Validation,
 } from '../lib/rules';
-import { addCard, clearCommander, moveEntry, removeEntry, setCommander, setQty, toggleEntryFavorite } from '../lib/actions';
+import { addCard, clearCommander, moveEntry, removeEntry, setCommander, setMainTag, setQty, toggleEntryFavorite } from '../lib/actions';
 import { looksLikeQuery, parseQuery } from '../lib/query';
 import { useGlobalTags, usePool, useSubjects } from '../lib/hooks';
 import { nameKey } from '../lib/ownership';
@@ -18,6 +18,8 @@ import { SavedSearches } from './SavedSearches';
 import { FavStar, TagList, SCOPE_META, type TagScope } from './TagEditor';
 import { useToast } from './Toast';
 import { isCardDrag, readCardDrag } from '../lib/dnd';
+import { useScryfallTags, useScryfallTagStatus } from '../lib/scryfallTags';
+import { entryTags, groupByManaValue, groupByTag, mainGroup } from '../lib/deckTags';
 
 interface Props {
   deck: Deck;
@@ -29,6 +31,18 @@ interface Props {
 }
 
 const BOARD_LABEL: Record<Board, string> = { main: 'Main', side: 'Sideboard', maybe: 'Maybeboard' };
+
+type GroupBy = 'type' | 'tag' | 'mv';
+const GROUP_BY_KEY = 'grimoire.deckGroupBy';
+const ENTRY_DRAG = 'application/x-grimoire-entry';
+function readGroupBy(): GroupBy {
+  try {
+    const v = localStorage.getItem(GROUP_BY_KEY);
+    return v === 'tag' || v === 'mv' ? v : 'type';
+  } catch {
+    return 'type';
+  }
+}
 
 export function DeckList({ deck, validation, filter, setFilter, board, setBoard }: Props) {
   const fmt = getFormat(deck.format);
@@ -47,6 +61,15 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
   const coverage = pool.byDeck.get(deck.id);
   const subjects = useSubjects();
   const globalTags = useGlobalTags();
+  const stags = useScryfallTags();
+  const stagStatus = useScryfallTagStatus();
+  const [groupBy, setGroupByState] = useState<GroupBy>(readGroupBy);
+  const setGroupBy = (g: GroupBy) => {
+    setGroupByState(g);
+    try { localStorage.setItem(GROUP_BY_KEY, g); } catch { /* storage unavailable: only this session remembers */ }
+  };
+  const [dragUid, setDragUid] = useState<string | null>(null);
+  const [dropGroup, setDropGroup] = useState<string | null>(null);
 
   // Typed query syntax (t:, tag:, is:fav…) runs through the local search engine; plain text stays a substring filter.
   const text = filter.text ?? '';
@@ -71,7 +94,10 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
   const queryWarnings = parsed?.warnings ?? [];
   const onTagClick = (scope: TagScope, t: string) => setFilter({ ...filter, text: `${SCOPE_META[scope].key}:${/\s/.test(t) ? `"${t}"` : t}` });
 
-  const groups = useMemo(() => {
+  const tagSrc = useMemo(() => ({ global: globalTags, scryfall: stags }), [globalTags, stags]);
+  const groups = useMemo((): { type: string; entries: DeckEntry[]; scryfall?: boolean }[] => {
+    if (groupBy === 'tag') return groupByTag(deck, entries, tagSrc).map((g) => ({ type: g.key, entries: g.entries, scryfall: g.scryfall }));
+    if (groupBy === 'mv') return groupByManaValue(deck, entries).map((g) => ({ type: g.key, entries: g.entries }));
     const m = new Map<TypeCategory, DeckEntry[]>();
     for (const e of entries) {
       const t = entryCategory(deck, e);
@@ -79,7 +105,12 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
       m.get(t)!.push(e);
     }
     return TYPE_ORDER.filter((t) => m.has(t)).map((t) => ({ type: t, entries: m.get(t)! }));
-  }, [entries, deck]);
+  }, [entries, deck, groupBy, tagSrc]);
+
+  // Tag view: drag a row onto another tag it has to list it there (its main tag in this deck).
+  const dragging = dragUid ? deck.entries.find((e) => e.uid === dragUid) : undefined;
+  const dragTags = dragging ? entryTags(dragging, tagSrc).all : [];
+  const canDropOn = (group: string) => !!dragging && dragTags.includes(group) && mainGroup(deck, dragging, tagSrc) !== group;
 
   const hasFilter = filter.cmc != null || !!filter.type || !!filter.color || !!filter.producer || !!filter.text || favOnly;
   const shown = entries.reduce((n, e) => n + e.qty, 0);
@@ -170,6 +201,11 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
           onChange={(e) => setFilter({ ...filter, text: e.target.value || undefined })} aria-label="Filter deck list"
         />
         <SavedSearches query={filter.text ?? ''} onApply={(q) => setFilter({ ...filter, text: q })} />
+        <select className="input input-sm group-by-select" value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupBy)} aria-label="Group cards by">
+          <option value="type">Group: Type</option>
+          <option value="tag">Group: Tag</option>
+          <option value="mv">Group: Mana value</option>
+        </select>
         <button className={`chip ${favOnly ? 'chip-gold' : ''}`} onClick={() => setFavOnly((f) => !f)} aria-pressed={favOnly} title="Show favorites only">★</button>
         {board === 'main' && (
           <button className={`btn btn-sm ${showBasics ? 'btn-primary' : ''}`} onClick={() => setShowBasics((s) => !s)}>
@@ -190,6 +226,12 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
         </div>
       )}
       {queryWarnings.length > 0 && <div className="warn-text small">{queryWarnings.join(' · ')}</div>}
+      {groupBy === 'tag' && stagStatus.state === 'updating' && (
+        <div className="muted small">Downloading Scryfall tags… {stagStatus.done}/{stagStatus.total}</div>
+      )}
+      {groupBy === 'tag' && stagStatus.state !== 'updating' && stags.size === 0 && (
+        <div className="muted small">Scryfall tags haven't been downloaded yet. They download automatically when you're online.</div>
+      )}
 
       {hasFilter && (
         <div className="active-filters">
@@ -230,15 +272,38 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
           const count = g.entries.reduce((n, e) => n + e.qty, 0);
           const price = g.entries.reduce((n, e) => n + (cardPrice(e.card) ?? 0) * e.qty, 0);
           const isCollapsed = collapsed.has(g.type);
+          const droppable = canDropOn(g.type);
+          const isTagGroup = groupBy === 'tag' && !['Commander', 'Lands', 'Untagged'].includes(g.type);
           return (
-            <div key={g.type} className="deck-group">
+            <div
+              key={g.type}
+              className={`deck-group ${droppable ? 'tag-drop-ok' : ''} ${droppable && dropGroup === g.type ? 'tag-drop-hover' : ''}`}
+              onDragOver={(ev) => {
+                if (!droppable || !Array.from(ev.dataTransfer.types).includes(ENTRY_DRAG)) return;
+                ev.preventDefault();
+                ev.stopPropagation();
+                ev.dataTransfer.dropEffect = 'move';
+                if (dropGroup !== g.type) setDropGroup(g.type);
+              }}
+              onDrop={(ev) => {
+                if (!droppable || !dragUid) return;
+                ev.preventDefault();
+                ev.stopPropagation();
+                setMainTag(deck.id, dragUid, g.type);
+                setDragUid(null);
+                setDropGroup(null);
+              }}
+            >
               <button
                 className="group-head"
                 onClick={() => setCollapsed((s) => { const n = new Set(s); if (n.has(g.type)) n.delete(g.type); else n.add(g.type); return n; })}
                 aria-expanded={!isCollapsed}
               >
                 <span className="caret">{isCollapsed ? '▸' : '▾'}</span>
-                <span className="group-name">{g.type === 'Commander' && fmt.id === 'oathbreaker' ? 'Oathbreaker' : g.type}</span>
+                <span className="group-name">
+                  {isTagGroup && <span className={`tag-icon group-tag-icon ${g.scryfall ? 'scryfall' : ''}`} aria-hidden>{g.scryfall ? SCOPE_META.scryfall.icon : SCOPE_META.card.icon}</span>}
+                  {g.type === 'Commander' && fmt.id === 'oathbreaker' ? 'Oathbreaker' : isTagGroup ? g.type.replace(/^./, (c) => c.toUpperCase()) : g.type}
+                </span>
                 <span className="group-count">{count}</span>
                 <span className="group-price">{formatUSD(price)}</span>
               </button>
@@ -256,9 +321,18 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
                     return (
                       <li
                         key={e.uid}
-                        className={`entry ${problems ? 'has-problem' : ''}`}
+                        className={`entry ${problems ? 'has-problem' : ''} ${dragUid === e.uid ? 'dragging' : ''}`}
                         onMouseMove={(ev) => showPreview(ev, e)}
                         onMouseLeave={() => setPreview(null)}
+                        draggable={groupBy === 'tag' && !isCmd}
+                        onDragStart={groupBy === 'tag' && !isCmd ? (ev) => {
+                          ev.dataTransfer.setData(ENTRY_DRAG, e.uid);
+                          ev.dataTransfer.effectAllowed = 'move';
+                          setPreview(null);
+                          setDragUid(e.uid);
+                        } : undefined}
+                        onDragEnd={() => { setDragUid(null); setDropGroup(null); }}
+                        title={groupBy === 'tag' && !isCmd && entryTags(e, tagSrc).all.length > 1 ? 'Drag onto another of its tags to list it there' : undefined}
                       >
                         <div className="qty-ctrl">
                           <button className="icon-btn sm" onClick={() => setQty(deck.id, e.uid, e.qty - 1)} aria-label="Remove one">−</button>
@@ -277,7 +351,7 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
                             {e.favorite && <span className="fav-inline" title="Favorite">★</span>}
                             {problems && <span className="problem-icon" title={problems.join('\n')}>⚠</span>}
                           </button>
-                          <TagList groups={[{ scope: 'global', tags: globalTags.get(e.card.name) ?? [] }, { scope: 'card', tags: e.tags ?? [] }]} max={3} onTagClick={onTagClick} />
+                          <TagList groups={[{ scope: 'global', tags: globalTags.get(e.card.name) ?? [] }, { scope: 'card', tags: e.tags ?? [] }, { scope: 'scryfall', tags: entryTags(e, tagSrc).scryfall }]} max={3} onTagClick={onTagClick} />
                         </div>
                         <ManaCost cost={manaCost(e.card)} size={14} />
                         <span className="entry-price" title={p != null && e.qty > 1 ? `${formatUSD(p)} each` : undefined}>

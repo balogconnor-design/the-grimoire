@@ -98,6 +98,8 @@ export interface DeckEntry {
   favorite?: boolean;
   /** Per-deck card tags (role in this deck, e.g. "ramp", "wincon"); never shared across decks. */
   tags?: string[];
+  /** Tag this card is listed under when the deck list is grouped by tag (one of its tags; chosen by dragging). */
+  mainTag?: string;
 }
 
 export interface Deck {

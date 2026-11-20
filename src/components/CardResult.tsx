@@ -61,6 +61,7 @@ export function CardResult({ card, subject, onOpen, onTag, onTagClick, onCollect
           { scope: 'card', tags: subject.cardTags ?? [] },
           { scope: 'collection', tags: subject.collectionTags ?? [] },
           { scope: 'deck', tags: subject.deckTags ?? [] },
+          { scope: 'scryfall', tags: subject.scryfallTags ?? [] },
         ]}
         max={3}
         onTagClick={onTagClick}
