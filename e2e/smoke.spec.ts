@@ -225,6 +225,8 @@ test('backup and restore move a deck into a fresh browser', async ({ browser, pa
   await expect(p2.locator('.restore-summary')).toContainText('1 decks');
   await p2.getByLabel(/a backup of my current data first/).uncheck();
   await p2.getByRole('button', { name: 'Replace my data with this backup' }).click();
+  // Wait for the restore to finish: navigating away mid-restore would abort its transaction.
+  await expect(p2.getByText('Backup restored')).toBeVisible();
   await p2.goto('/');
   await expect(p2.locator('.deck-grid')).toContainText('Backed Up Deck');
   await fresh.close();
