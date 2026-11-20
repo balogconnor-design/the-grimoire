@@ -14,6 +14,9 @@ void loadAll().then(async () => {
 });
 void loadSymbology();
 
+// Branch preview builds only (see vite.config.ts): an on-page console, opened from the gear button.
+if (__PREVIEW_CONSOLE__) void import('eruda').then(({ default: eruda }) => eruda.init());
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ToastProvider>

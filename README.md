@@ -20,8 +20,24 @@ On Windows you can also double-click `Start The Grimoire.bat`, which installs de
 | `npm run build:web` | Tests, then the static build (what Cloudflare Pages runs) |
 | `npm run typecheck` | TypeScript check |
 | `npm test` | Vitest suite (unit, storage and import tests; no network needed) |
+| `npm run test:e2e` | Builds, then runs the Playwright smoke tests in Chromium, Firefox, WebKit and phone emulation (first time: `npx playwright install chromium firefox webkit`) |
 
 > Internal names: the IndexedDB database and the backup file's `app` key are still `deckforge` (the project's old name). They must not be renamed, or existing data and old backups stop loading.
+
+## Testing and CI
+
+- **Unit tests** (`npm test`, `tests/`): Vitest with an in-memory IndexedDB.
+- **Smoke tests** (`npm run test:e2e`, `e2e/`, `playwright.config.ts`): the production build served by `vite preview`, in
+  desktop Chromium, Firefox and WebKit (Safari's engine) plus Android and iPhone emulation. They cover loading, saving a deck,
+  card search, every collection tab, no sideways scrolling, backup → restore into a fresh browser, and working offline
+  (Chromium only, the one engine Playwright can run service workers in). Scryfall is mocked with a saved card
+  (`e2e/fixtures/sol-ring.json`), so no network is needed.
+- **GitHub Actions** (`.github/workflows/ci.yml`) runs typecheck, unit tests, build and smoke tests on every pull request and
+  push to `main`. A failed run uploads the Playwright report. It uses about 5 of the 2,000 free monthly minutes per run.
+- **Debug console on previews:** Cloudflare branch previews (not `main`, not local builds) include Eruda, an on-page console
+  opened from a gear button, for checking errors on a phone without a computer attached.
+- **Not automated:** real Safari on a Mac, real phones, and the installed app. Check those on a preview URL before merging
+  anything that changes layout, storage or installing.
 
 ## Web version (Cloudflare Pages)
 
@@ -148,6 +164,7 @@ drive, replace the `.exe` and `app\` and keep `data\`.
 | `vite.config.ts` | Build config, including the web app manifest and service worker caching rules |
 | `scripts/make-icons.ps1` | Makes the web app icons in `public/icons/` from the logo |
 | `src/components/` | Search, deck list, details panel, card modal, import/export, backup, transaction dialogs, etc. |
+| `e2e/` | Playwright smoke tests and the Scryfall mock they use |
 | `tests/` | Vitest unit, storage (fake-indexeddb), import and device/data-safety tests, with decklist fixtures |
 
 ## License
