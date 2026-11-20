@@ -54,6 +54,91 @@ test('card search shows results and opens a card', async ({ page }) => {
   expect(errors).toEqual([]);
 });
 
+test('advanced search builds a Scryfall query on the main page', async ({ page }) => {
+  const errors = watchErrors(page);
+  await open(page);
+  const sent: string[] = [];
+  page.on('request', (r) => { if (r.url().includes('/cards/search')) sent.push(new URL(r.url()).searchParams.get('q') ?? ''); });
+  await page.getByRole('button', { name: /Advanced/ }).first().click();
+  const adv = page.locator('.advanced');
+  await adv.getByRole('button', { name: 'Color: G' }).click();
+  await adv.getByLabel('Add a type').fill('Creature');
+  await adv.getByLabel('Add a type').press('Enter');
+  await adv.getByRole('button', { name: 'Arena' }).click();
+  await adv.getByLabel('Add a set').fill('c21');
+  await adv.getByLabel('Add a set').press('Enter');
+  await expect(page.locator('.query-preview')).toContainText('t:Creature c>=g game:arena s:c21');
+  await adv.getByRole('button', { name: 'Apply' }).click();
+  await expect(page.locator('.result-card').first()).toContainText('Sol Ring');
+  expect(sent.at(-1)).toBe('t:Creature c>=g game:arena s:c21');
+  expect(errors).toEqual([]);
+});
+
+test('deck search adds to the board shown, by + button and by drag and drop', async ({ page, isMobile, browserName }) => {
+  test.skip(!!isMobile, 'drag and drop is a desktop feature; phones show one column at a time');
+  const errors = watchErrors(page);
+  await open(page);
+  await createDeck(page, 'Board Test');
+  const search = page.locator('.search-panel');
+  await search.locator('.search-input').fill('sol ring');
+  await search.locator('.search-input').press('Enter');
+  const result = search.locator('.result-card').first();
+  await expect(result).toContainText('Sol Ring');
+  const tab = (name: string) => page.locator('.board-tabs .tab', { hasText: name });
+
+  // + adds to the board shown in the deck list.
+  await tab('Sideboard').click();
+  await result.hover();
+  await result.getByRole('button', { name: 'Add Sol Ring to sideboard' }).click();
+  await expect(tab('Sideboard').locator('.tab-count')).toHaveText('1');
+  await expect(tab('Main').locator('.tab-count')).toHaveText('0');
+
+  // Dropping on the list adds to the board shown; dropping on a tab adds to that board.
+  // (Playwright can't drive HTML drag and drop in WebKit on Windows/Linux; Safari itself supports it.)
+  if (browserName === 'webkit') return;
+  await tab('Main').click();
+  await result.locator('.result-art').dragTo(page.locator('.deck-groups'));
+  await expect(tab('Main').locator('.tab-count')).toHaveText('1');
+  await result.locator('.result-art').dragTo(tab('Maybeboard'));
+  await expect(tab('Maybeboard').locator('.tab-count')).toHaveText('1');
+  await expect(tab('Maybeboard')).toHaveAttribute('aria-selected', 'true');
+  expect(errors).toEqual([]);
+});
+
+test('#tag search and the tag browser find tagged cards', async ({ page, isMobile }) => {
+  const errors = watchErrors(page);
+  await open(page);
+  await createDeck(page, 'Tag Test');
+  if (isMobile) await page.locator('.mobile-tabs .tab', { hasText: 'Search' }).click();
+  const search = page.locator('.search-panel');
+  await search.locator('.search-input').fill('sol ring');
+  await search.locator('.search-input').press('Enter');
+  const result = search.locator('.result-card').first();
+  await result.hover();
+  await result.getByRole('button', { name: 'Add Sol Ring to main deck' }).click();
+  await result.getByRole('button', { name: 'Tag Sol Ring' }).click();
+  const tagBox = page.locator('.modal').getByPlaceholder('e.g. ramp, wincon, removal');
+  await tagBox.fill('ramp');
+  await tagBox.press('Enter');
+  await page.locator('.modal-close').click();
+
+  // The tag browser on the main page lists the tag and opens into its cards.
+  await page.goto('/');
+  await page.getByRole('button', { name: /All tags/ }).click();
+  const pick = page.locator('.tag-pick', { hasText: 'ramp' });
+  await expect(pick).toContainText('1');
+  await pick.click();
+  await expect(page.locator('.tag-group')).toContainText('Sol Ring');
+
+  // #ramp alone searches your own cards.
+  const box = page.locator('.search-form input').first();
+  await box.fill('#ramp');
+  await box.press('Enter');
+  await expect(page.locator('.results-meta')).toContainText('1 of your cards');
+  await expect(page.locator('.result-card')).toContainText('Sol Ring');
+  expect(errors).toEqual([]);
+});
+
 test('every collection tab renders', async ({ page }) => {
   const errors = watchErrors(page);
   await open(page, '/#/collection');
@@ -73,6 +158,11 @@ test('no sideways scrolling on the main screens', async ({ page }) => {
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow, `page wider than the screen on ${path}`).toBeLessThanOrEqual(1);
   }
+  await page.goto('/');
+  await page.getByRole('button', { name: /Advanced/ }).first().click();
+  await expect(page.locator('.advanced')).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow, 'page wider than the screen with advanced search open').toBeLessThanOrEqual(1);
 });
 
 test('backup and restore move a deck into a fresh browser', async ({ browser, page, isMobile }) => {

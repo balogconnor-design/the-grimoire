@@ -63,11 +63,25 @@ function trimList(list: ScryfallList<Record<string, unknown>>): ScryfallList<Car
   return { ...list, data: list.data.filter((c) => c.object === 'card' || c.object === undefined).map(trimCard) };
 }
 
-export type SortOrder = 'name' | 'cmc' | 'edhrec' | 'usd' | 'released' | 'rarity' | 'color' | 'power';
+export type SortOrder =
+  | 'name' | 'set' | 'released' | 'rarity' | 'color' | 'usd' | 'tix' | 'eur' | 'cmc'
+  | 'power' | 'toughness' | 'edhrec' | 'penny' | 'artist' | 'review';
+
+/** Every sort order Scryfall offers, labelled for the sort dropdowns. */
+export const SORT_ORDERS: { value: SortOrder; label: string }[] = [
+  { value: 'name', label: 'Name' }, { value: 'edhrec', label: 'Popularity (EDHREC)' }, { value: 'released', label: 'Release date' },
+  { value: 'set', label: 'Set / number' }, { value: 'rarity', label: 'Rarity' }, { value: 'color', label: 'Color' },
+  { value: 'cmc', label: 'Mana value' }, { value: 'power', label: 'Power' }, { value: 'toughness', label: 'Toughness' },
+  { value: 'usd', label: 'Price (USD)' }, { value: 'eur', label: 'Price (EUR)' }, { value: 'tix', label: 'Price (MTGO tix)' },
+  { value: 'artist', label: 'Artist' }, { value: 'penny', label: 'Penny Dreadful rank' }, { value: 'review', label: 'Set review' },
+];
+
+export type SortDir = 'auto' | 'asc' | 'desc';
+export type Unique = 'cards' | 'prints' | 'art';
 
 export async function searchCards(
   q: string,
-  opts: { order?: SortOrder; dir?: 'auto' | 'asc' | 'desc'; unique?: 'cards' | 'prints' | 'art' } = {},
+  opts: { order?: SortOrder; dir?: SortDir; unique?: Unique } = {},
 ): Promise<ScryfallList<Card>> {
   const params = new URLSearchParams({
     q,
@@ -137,6 +151,30 @@ export async function getPrints(card: Card): Promise<Card[]> {
     next = page.next_page;
   }
   return all.length ? all : [card];
+}
+
+// ---------- Sets (for the advanced search set picker) ----------
+
+export interface SetInfo { code: string; name: string; set_type: string; released_at?: string }
+const SETS_CACHE_KEY = 'grimoire.sets.v1';
+const SETS_TTL_MS = 24 * 60 * 60 * 1000;
+let setsPromise: Promise<SetInfo[]> | null = null;
+
+/** All Scryfall sets, newest first. Cached for a day; an empty list if offline. */
+export function getSets(): Promise<SetInfo[]> {
+  if (setsPromise) return setsPromise;
+  try {
+    const cached = JSON.parse(localStorage.getItem(SETS_CACHE_KEY) ?? 'null') as { at: number; sets: SetInfo[] } | null;
+    if (cached && Date.now() - cached.at < SETS_TTL_MS) return (setsPromise = Promise.resolve(cached.sets));
+  } catch { /* ignore */ }
+  setsPromise = request<{ data: SetInfo[] }>('/sets')
+    .then((res) => {
+      const sets = res.data.map(({ code, name, set_type, released_at }) => ({ code, name, set_type, released_at }));
+      try { localStorage.setItem(SETS_CACHE_KEY, JSON.stringify({ at: Date.now(), sets })); } catch { /* full or blocked */ }
+      return sets;
+    })
+    .catch(() => { setsPromise = null; return []; });
+  return setsPromise;
 }
 
 // ---------- Symbology (mana pip SVGs) ----------

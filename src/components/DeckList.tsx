@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState, type MouseEvent } from 'react';
+import { useEffect, useMemo, useState, type DragEvent, type MouseEvent } from 'react';
 import type { Board, Deck, DeckEntry, DeckFilter, TypeCategory } from '../types';
 import { getFormat } from '../lib/formats';
 import {
   boardCount, boardEntries, boardPrice, canBeCommander, cardImage, cardPrice, COLOR_NAMES, commanderEntry,
   entryCategory, formatUSD, manaCost, matchesFilter, sortEntries, TYPE_ORDER, type Validation,
 } from '../lib/rules';
-import { clearCommander, moveEntry, removeEntry, setCommander, setQty, toggleEntryFavorite } from '../lib/actions';
+import { addCard, clearCommander, moveEntry, removeEntry, setCommander, setQty, toggleEntryFavorite } from '../lib/actions';
 import { looksLikeQuery, parseQuery } from '../lib/query';
 import { usePool, useSubjects } from '../lib/hooks';
 import { nameKey } from '../lib/ownership';
@@ -17,19 +17,23 @@ import { AddToCollectionModal } from './CollectionModals';
 import { SavedSearches } from './SavedSearches';
 import { FavStar, TagList, SCOPE_META, type TagScope } from './TagEditor';
 import { useToast } from './Toast';
+import { isCardDrag, readCardDrag } from '../lib/dnd';
 
 interface Props {
   deck: Deck;
   validation: Validation;
   filter: DeckFilter;
   setFilter: (f: DeckFilter) => void;
+  board: Board;
+  setBoard: (b: Board) => void;
 }
 
 const BOARD_LABEL: Record<Board, string> = { main: 'Main', side: 'Sideboard', maybe: 'Maybeboard' };
 
-export function DeckList({ deck, validation, filter, setFilter }: Props) {
+export function DeckList({ deck, validation, filter, setFilter, board, setBoard }: Props) {
   const fmt = getFormat(deck.format);
-  const [board, setBoard] = useState<Board>('main');
+  const [dragOver, setDragOver] = useState(false);
+  const [dragTab, setDragTab] = useState<Board | null>(null);
   const [open, setOpen] = useState<DeckEntry | null>(null);
   const [preview, setPreview] = useState<{ src: string; x: number; y: number } | null>(null);
   const [showBasics, setShowBasics] = useState(false);
@@ -79,6 +83,29 @@ export function DeckList({ deck, validation, filter, setFilter }: Props) {
   const hasFilter = filter.cmc != null || !!filter.type || !!filter.color || !!filter.text || favOnly;
   const shown = entries.reduce((n, e) => n + e.qty, 0);
 
+  // Drop a search result on the list to add it to the board shown, or on a board tab to add it there.
+  const onDragOver = (e: DragEvent, tab?: Board) => {
+    if (!isCardDrag(e.dataTransfer)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    if (!dragOver) setDragOver(true);
+    if (tab !== undefined ? dragTab !== tab : dragTab !== null) setDragTab(tab ?? null);
+  };
+  const onDragLeave = (e: DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) { setDragOver(false); setDragTab(null); }
+  };
+  const onDrop = (e: DragEvent, tab?: Board) => {
+    setDragOver(false);
+    setDragTab(null);
+    const card = readCardDrag(e.dataTransfer);
+    if (!card) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const to = tab ?? board;
+    toast(addCard(deck.id, card, 1, to), 'success');
+    if (to !== board) setBoard(to);
+  };
+
   const showPreview = (e: MouseEvent, entry: DeckEntry) => {
     const src = cardImage(entry.card, 'normal');
     if (!src) return;
@@ -88,7 +115,10 @@ export function DeckList({ deck, validation, filter, setFilter }: Props) {
   };
 
   return (
-    <section className="panel deck-list-panel">
+    <section
+      className={`panel deck-list-panel ${dragOver ? 'drop-target' : ''}`}
+      onDragOver={(e) => onDragOver(e)} onDragLeave={onDragLeave} onDrop={(e) => onDrop(e)}
+    >
       {fmt.hasCommander && (
         <div className={`commander-showcase ${cmd ? '' : 'empty'}`}>
           {cmd ? (
@@ -121,12 +151,17 @@ export function DeckList({ deck, validation, filter, setFilter }: Props) {
 
       <div className="board-tabs" role="tablist">
         {(['main', 'side', 'maybe'] as Board[]).map((b) => (
-          <button key={b} role="tab" aria-selected={board === b} className={`tab ${board === b ? 'active' : ''}`} onClick={() => setBoard(b)}>
+          <button
+            key={b} role="tab" aria-selected={board === b} className={`tab ${board === b ? 'active' : ''} ${dragTab === b ? 'drop-hover' : ''}`} onClick={() => setBoard(b)}
+            onDragOver={(e) => { e.stopPropagation(); onDragOver(e, b); }} onDrop={(e) => onDrop(e, b)}
+          >
             {BOARD_LABEL[b]} <span className="tab-count">{boardCount(deck, b)}</span>
           </button>
         ))}
         <span className="board-price">{formatUSD(boardPrice(deck, board))}</span>
       </div>
+
+      {dragOver && <div className="drop-hint">Drop to add to {BOARD_LABEL[dragTab ?? board]}</div>}
 
       <div className="list-toolbar">
         <input
