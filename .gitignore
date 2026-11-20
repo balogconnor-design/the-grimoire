@@ -3,3 +3,7 @@ dist
 *.log
 Portable Build
 .wrangler
+
+# Playwright
+test-results
+playwright-report

@@ -2,9 +2,19 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 
+// Node's process.env, typed here so the app's tsconfig doesn't need Node types.
+declare const process: { env: Record<string, string | undefined> };
+
 const DAY = 24 * 60 * 60;
 
+// Cloudflare Pages sets CF_PAGES_BRANCH during its builds. Branch previews (anything but main) get an
+// on-page developer console (Eruda) for debugging on phones without a computer attached.
+// Production and local builds never include it.
+const branch = process.env.CF_PAGES_BRANCH;
+const previewConsole = !!branch && branch !== 'main';
+
 export default defineConfig({
+  define: { __PREVIEW_CONSOLE__: JSON.stringify(previewConsole) },
   plugins: [
     react(),
     // Installable web app + offline support. The service worker is only built for production
