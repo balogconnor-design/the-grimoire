@@ -18,6 +18,8 @@ export interface StatRow { stat: string; op: Op; value: string }
 export interface FormatRow { status: 'f' | 'banned' | 'restricted'; format: string }
 export interface PriceRow { currency: 'usd' | 'eur' | 'tix'; op: Op; value: string }
 
+export type TagMode = 'all' | 'any' | 'none';
+
 export interface Adv {
   name: string;
   oracle: string;
@@ -40,8 +42,9 @@ export interface Adv {
   lore: string;
   lang: string;
   owned: '' | 'owned' | 'unowned';
-  fav: boolean;
-  tag: string;
+  /** Tags of any kind (Scryfall's and yours), matched all / any / none. */
+  tags: string[];
+  tagMode: TagMode;
   unique: 'cards' | 'art' | 'prints';
   dir: 'auto' | 'asc' | 'desc';
   extras: boolean;
@@ -51,7 +54,7 @@ export const EMPTY_ADV: Adv = {
   name: '', oracle: '', types: [], typesAny: false, colors: [], colorMode: 'including', identity: [], mana: '',
   stats: [{ stat: 'mv', op: '=', value: '' }], games: [], formats: [{ status: 'f', format: '' }], sets: [], block: '',
   rarities: [], criteria: {}, prices: [{ currency: 'usd', op: '<=', value: '' }],
-  artist: '', flavor: '', lore: '', lang: '', owned: '', fav: false, tag: '',
+  artist: '', flavor: '', lore: '', lang: '', owned: '', tags: [], tagMode: 'all',
   unique: 'cards', dir: 'auto', extras: false,
 };
 
@@ -164,8 +167,12 @@ export function buildAdvanced(a: Adv): string {
 
   if (a.owned === 'owned') parts.push('is:owned');
   if (a.owned === 'unowned') parts.push('is:unowned');
-  if (a.fav) parts.push('is:fav');
-  if (a.tag.trim()) parts.push(`tag:${quote(a.tag.trim())}`);
+  const tags = a.tags.map((t) => `#${/\s/.test(t) ? `"${t}"` : t}`);
+  if (tags.length) {
+    if (a.tagMode === 'none') parts.push(...tags.map((t) => `-${t}`));
+    else if (a.tagMode === 'any') parts.push(anyOf(tags));
+    else parts.push(...tags);
+  }
   return parts.filter(Boolean).join(' ');
 }
 
@@ -186,11 +193,11 @@ export function countAdvanced(a: Adv): number {
   if (a.rarities.length) n++;
   n += Object.keys(a.criteria).length;
   n += a.prices.filter((p) => p.value.trim()).length;
-  [a.artist, a.flavor, a.lore, a.tag].forEach((s) => s.trim() && n++);
+  [a.artist, a.flavor, a.lore].forEach((s) => s.trim() && n++);
+  n += a.tags.length;
   if (a.lang) n++;
   if (a.extras) n++;
   if (a.owned) n++;
-  if (a.fav) n++;
   if (a.unique !== 'cards') n++;
   if (a.dir !== 'auto') n++;
   return n;

@@ -1,7 +1,9 @@
+import { useAllCardTags, useAllCollectionTags, useAllDeckTags, useAllGlobalTags } from '../lib/hooks';
+import { SCRYFALL_TAGS } from '../lib/scryfallTags';
 import { useEffect, useId, useState, type KeyboardEvent, type ReactNode } from 'react';
 import {
   COMMON_TYPES, CRITERIA, EMPTY_ADV, FORMATS, GAMES, LANGUAGES, OPS, RARITIES, STATS,
-  type Adv, type FormatRow, type Op, type PriceRow, type StatRow,
+  type Adv, type FormatRow, type TagMode, type Op, type PriceRow, type StatRow,
 } from '../lib/advanced';
 import { getSets, type SetInfo } from '../lib/scryfall';
 import { ManaSymbol } from './Mana';
@@ -124,8 +126,18 @@ export function AdvancedSearch({ value: a, onChange, collection = true }: {
 
   return (
     <div className="advanced">
+      {collection && <TagsSection value={a} set={set} />}
       <Section title="Card">
         <Field label="Card name"><input className="input" value={a.name} onChange={(e) => set({ name: e.target.value })} placeholder="Any words in the name" /></Field>
+        {collection && (
+          <Field label="Ownership">
+            <select className="input" value={a.owned} onChange={(e) => set({ owned: e.target.value as Adv['owned'] })}>
+              <option value="">Any</option>
+              <option value="owned">In my collection</option>
+              <option value="unowned">Not in my collection</option>
+            </select>
+          </Field>
+        )}
         <Field label="Rules text" hint="Use ~ for the card's own name.">
           <input className="input" value={a.oracle} onChange={(e) => set({ oracle: e.target.value })} placeholder='e.g. draw a card' />
         </Field>
@@ -314,22 +326,6 @@ export function AdvancedSearch({ value: a, onChange, collection = true }: {
         </Field>
       </Section>
 
-      {collection && (
-        <Section title="Your cards">
-          <Field label="Ownership">
-            <select className="input" value={a.owned} onChange={(e) => set({ owned: e.target.value as Adv['owned'] })}>
-              <option value="">Any</option>
-              <option value="owned">In my collection</option>
-              <option value="unowned">Not in my collection</option>
-            </select>
-          </Field>
-          <Field label="Tag"><input className="input" value={a.tag} onChange={(e) => set({ tag: e.target.value })} placeholder="Any of your tags" /></Field>
-          <label className="adv-check">
-            <input type="checkbox" checked={a.fav} onChange={(e) => set({ fav: e.target.checked })} /> Favorites only
-          </label>
-        </Section>
-      )}
-
       <Section title="Results">
         <Field label="Show">
           <select className="input" value={a.unique} onChange={(e) => set({ unique: e.target.value as Adv['unique'] })}>
@@ -356,5 +352,59 @@ export function AdvancedSearch({ value: a, onChange, collection = true }: {
         <button type="submit" className="btn btn-primary">Apply</button>
       </div>
     </div>
+  );
+}
+
+const TAG_MODES: { value: TagMode; label: string; hint: string }[] = [
+  { value: 'all', label: 'All', hint: 'Cards with every selected tag' },
+  { value: 'any', label: 'Any', hint: 'Cards with at least one selected tag' },
+  { value: 'none', label: 'None', hint: 'Cards with none of the selected tags' },
+];
+
+/**
+ * Pick tags to search by: Scryfall's automatic tags (in their colour) and every tag you've made
+ * (global, card, collection, deck). Click to select; match all, any or none of them.
+ */
+function TagsSection({ value: a, set }: { value: Adv; set: (patch: Partial<Adv>) => void }) {
+  const global = useAllGlobalTags();
+  const card = useAllCardTags();
+  const coll = useAllCollectionTags();
+  const deck = useAllDeckTags();
+  const scryfall = SCRYFALL_TAGS.map((t) => t.label);
+  const own = [...new Set([...global, ...card, ...coll, ...deck])].filter((t) => !scryfall.includes(t)).sort((x, y) => x.localeCompare(y));
+  const toggle = (t: string) => set({ tags: a.tags.includes(t) ? a.tags.filter((x) => x !== t) : [...a.tags, t] });
+  const chip = (t: string, kind: 'scryfall' | 'own') => {
+    const on = a.tags.includes(t);
+    return (
+      <button key={t} type="button" aria-pressed={on} onClick={() => toggle(t)}
+        className={`tag-pick-chip ${kind} ${on ? 'on' : ''} ${on && a.tagMode === 'none' ? 'not' : ''}`}>
+        {kind === 'scryfall' && <span aria-hidden>◆ </span>}{t}
+      </button>
+    );
+  };
+  return (
+    <fieldset className="adv-section adv-tags">
+      <legend>Tags</legend>
+      <div className="adv-tags-head">
+        <div className="status-toggle" role="radiogroup" aria-label="Match tags">
+          {TAG_MODES.map((m) => (
+            <button key={m.value} type="button" role="radio" aria-checked={a.tagMode === m.value} title={m.hint}
+              className={`seg ${a.tagMode === m.value ? 'on' : ''}`} onClick={() => set({ tagMode: m.value })}>{m.label}</button>
+          ))}
+        </div>
+        <span className="muted small">{a.tags.length ? `${a.tags.length} selected` : 'Click tags to search by them'}</span>
+        {a.tags.length > 0 && <button type="button" className="link-btn small" onClick={() => set({ tags: [] })}>Clear tags</button>}
+      </div>
+      <div className="tag-pick-group">
+        <span className="label">Scryfall</span>
+        <div className="tag-pick-chips">{scryfall.map((t) => chip(t, 'scryfall'))}</div>
+      </div>
+      <div className="tag-pick-group">
+        <span className="label">Yours</span>
+        <div className="tag-pick-chips">
+          {own.length ? own.map((t) => chip(t, 'own')) : <span className="muted small">No tags yet. Tag a card with 🏷 and it shows here.</span>}
+        </div>
+      </div>
+    </fieldset>
   );
 }

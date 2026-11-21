@@ -8,6 +8,7 @@ import { TagBrowser } from './TagBrowser';
 import { appendResults, hybridMore, hybridSearch } from '../lib/search';
 import { useSubjects } from '../lib/hooks';
 import { CardResult } from './CardResult';
+import { CardResultRow, readResultView, ResultViewSwitch, type ResultView } from './CardResultRow';
 import { CardModal } from './CardModal';
 import { TagModal } from './TagModal';
 import { AddToCollectionModal } from './CollectionModals';
@@ -36,6 +37,7 @@ export function GlobalSearch() {
   const [open, setOpen] = useState<Card | null>(null);
   const [tagging, setTagging] = useState<Card | null>(null);
   const [collecting, setCollecting] = useState<Card | null>(null);
+  const [view, setView] = useState<ResultView>(readResultView);
 
   const advQuery = buildAdvanced(adv);
   const fullQuery = [query.trim(), advQuery, favOnly ? 'is:fav' : ''].filter(Boolean).join(' ');
@@ -92,6 +94,12 @@ export function GlobalSearch() {
       onCollect={() => setCollecting(c)} onTagClick={onTagClick}
     />
   );
+  const renderRow = (c: Card) => (
+    <CardResultRow
+      key={c.id} card={c} subject={subjectFor(c)} view={view as 'list' | 'details'} onOpen={() => setOpen(c)} onTag={() => setTagging(c)}
+      onCollect={() => setCollecting(c)} onTagClick={onTagClick}
+    />
+  );
   const clear = () => { setQuery(''); setAdv(EMPTY_ADV); setFavOnly(false); setResults(null); setTotal(null); setNext(undefined); setError(''); setWarnings([]); };
 
   return (
@@ -135,6 +143,7 @@ export function GlobalSearch() {
         <TagBrowser subjectFor={(c) => subjectFor(c)} renderCard={renderCard} onSearch={apply} />
       ) : (<>
       {(error || warnings.length > 0 || results) && (
+        <div className="results-meta-row">
         <div className="results-meta">
           {error ? <span className="error-text">{error}</span> : (
             <>
@@ -145,13 +154,13 @@ export function GlobalSearch() {
             </>
           )}
         </div>
-      )}
-
-      {results && results.length > 0 && (
-        <div className="results-grid">
-          {results.map(renderCard)}
+        {results && results.length > 0 && <ResultViewSwitch value={view} onChange={setView} />}
         </div>
       )}
+
+      {results && results.length > 0 && (view === 'grid'
+        ? <div className="results-grid">{results.map(renderCard)}</div>
+        : <div className={`results-list ${view}`}>{results.map(renderRow)}</div>)}
       {loading && <div className="loading">Searching…</div>}
       {!loading && next && <button className="btn btn-ghost load-more" onClick={more}>Load more results</button>}
       {!loading && results?.length === 0 && !error && (

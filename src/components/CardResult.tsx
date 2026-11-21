@@ -7,7 +7,7 @@ import { setCardFavorite } from '../lib/actions';
 import { TagList, type TagScope } from './TagEditor';
 
 /** A search-result card tile with ownership + tag info and quick actions. */
-export function CardResult({ card, subject, onOpen, onTag, onTagClick, onCollect, addButton, badge, draggable }: {
+export function CardResult({ card, subject, onOpen, onTag, onTagClick, onCollect, addButton, badge, draggable, dim }: {
   card: Card;
   subject: Subject;
   onOpen: () => void;
@@ -19,6 +19,8 @@ export function CardResult({ card, subject, onOpen, onTag, onTagClick, onCollect
   badge?: ReactNode;
   /** Let the card be dragged onto a deck list. */
   draggable?: boolean;
+  /** Shown greyed out (e.g. already in the deck), still usable. */
+  dim?: boolean;
 }) {
   const owned = subject.ownedQty ?? 0;
   const decks = subject.decks ?? [];
@@ -29,7 +31,7 @@ export function CardResult({ card, subject, onOpen, onTag, onTagClick, onCollect
     if (pic) setDragPreview(e.dataTransfer, pic);
   };
   return (
-    <div className={`result-card ${draggable ? 'is-draggable' : ''}`}>
+    <div className={`result-card ${draggable ? 'is-draggable' : ''} ${dim ? 'is-dim' : ''}`} title={dim ? 'Already in this deck' : undefined}>
       <div className="result-art" draggable={draggable || undefined} onDragStart={draggable ? onDragStart : undefined}>
         <button className="result-img-btn" onClick={onOpen} title={draggable ? `${card.name} — drag onto the deck list to add it` : card.name}>
           {img ? <img src={img} alt={card.name} loading="lazy" draggable={false} /> : <div className="card-img-missing">{card.name}</div>}
