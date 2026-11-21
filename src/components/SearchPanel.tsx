@@ -12,6 +12,7 @@ import { appendResults, hybridMore, hybridSearch } from '../lib/search';
 import { useSubjects } from '../lib/hooks';
 import { CardModal } from './CardModal';
 import { CardResult } from './CardResult';
+import { CardResultRow, readResultView, ResultViewSwitch, type ResultView } from './CardResultRow';
 import { TagModal } from './TagModal';
 import { AddToCollectionModal } from './CollectionModals';
 import { SavedSearches } from './SavedSearches';
@@ -55,6 +56,7 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
   const [collecting, setCollecting] = useState<Card | null>(null);
   const [local, setLocal] = useState('');
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [view, setView] = useState<ResultView>(readResultView);
   const subjects = useSubjects();
   const subjectFor = (c: Card) => subjects(c, { deckId: deck.id });
 
@@ -141,6 +143,20 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
   const advCount = countAdvanced(adv);
   const target = BOARD_NAME[board];
 
+  const quickAdd = (c: Card) => (
+    <button className="quick-add" title={`Add 1 to ${target.full}`} aria-label={`Add ${c.name} to ${target.full}`} onClick={() => toast(addCard(deck.id, c, 1, board), 'success')}>+</button>
+  );
+  const renderRow = (c: Card) => {
+    const n = inDeck.get(c.name);
+    return (
+      <CardResultRow
+        key={c.id} card={c} subject={subjectFor(c)} view={view as 'list' | 'details'} draggable dim={inAnyBoard.has(c.name)}
+        onOpen={() => setSelected(c)} onTag={() => setTagging(c)} onCollect={() => setCollecting(c)} onTagClick={onTagClick}
+        badge={n ? <span className="in-deck-badge">{n} {target.short}</span> : null}
+        addButton={quickAdd(c)}
+      />
+    );
+  };
   const renderCard = (c: Card, subject = subjectFor(c)) => {
     const n = inDeck.get(c.name);
     return (
@@ -148,9 +164,7 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
         key={c.id} card={c} subject={subject} draggable dim={inAnyBoard.has(c.name)}
         onOpen={() => setSelected(c)} onTag={() => setTagging(c)} onCollect={() => setCollecting(c)} onTagClick={onTagClick}
         badge={n ? <span className="in-deck-badge">{n} {target.short}</span> : null}
-        addButton={
-          <button className="quick-add" title={`Add 1 to ${target.full}`} aria-label={`Add ${c.name} to ${target.full}`} onClick={() => toast(addCard(deck.id, c, 1, board), 'success')}>+</button>
-        }
+        addButton={quickAdd(c)}
       />
     );
   };
@@ -217,17 +231,22 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
         <TagBrowser subjectFor={(c) => subjects(c)} renderCard={(c) => renderCard(c, subjects(c))} onSearch={apply} />
       ) : (
         <>
-          <div className="results-meta">
-            {error ? <span className="error-text">{error}</span> : (
-              <>
-                {total != null ? <span>{total.toLocaleString()} cards</span> : results.length > 0 && <span>{results.length} matching so far</span>}
-                {local && <span className="muted"> · filtered by <code>{local}</code></span>}
-                {warnings.map((w) => <div key={w} className="warn-text">{w}</div>)}
-              </>
-            )}
+          <div className="results-meta-row">
+            <div className="results-meta">
+              {error ? <span className="error-text">{error}</span> : (
+                <>
+                  {total != null ? <span>{total.toLocaleString()} cards</span> : results.length > 0 && <span>{results.length} matching so far</span>}
+                  {local && <span className="muted"> · filtered by <code>{local}</code></span>}
+                  {warnings.map((w) => <div key={w} className="warn-text">{w}</div>)}
+                </>
+              )}
+            </div>
+            {results.length > 0 && <ResultViewSwitch value={view} onChange={setView} />}
           </div>
 
-          <div className="results-grid">{results.map((c) => renderCard(c))}</div>
+          {view === 'grid'
+            ? <div className="results-grid">{results.map((c) => renderCard(c))}</div>
+            : <div className={`results-list ${view}`}>{results.map(renderRow)}</div>}
 
           {loading && <div className="loading">Searching Scryfall…</div>}
           {!loading && next && (
