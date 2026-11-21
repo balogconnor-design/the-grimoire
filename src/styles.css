@@ -542,6 +542,16 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .odds-table th:nth-child(2), .odds-table td:nth-child(2) { width: 56px; }
 .odds-table th:nth-child(3), .odds-table td:nth-child(3) { width: 45%; }
 .odds-table td .truncate { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bracket-headline { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+.bracket-badge { font-size: 1.25rem; font-weight: 700; color: var(--accent); }
+.bracket-badge.bad { color: var(--bad); }
+.bracket-target { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
+.bracket-reasons { margin: 0 0 10px; padding-left: 18px; }
+.bracket-group { margin-bottom: 8px; }
+.bracket-group.info { opacity: 0.8; }
+.bracket-group-head { padding: 0; }
+.bracket-group-head.active { text-decoration: underline; }
+.bracket-cards { color: var(--text-2, var(--muted)); line-height: 1.5; }
 .producer-kinds { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .producer-table { margin-top: 8px; }
 .producer-table th:not(:first-child), .producer-table td:not(:first-child) { width: 1%; white-space: nowrap; }

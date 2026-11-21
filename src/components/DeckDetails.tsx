@@ -6,14 +6,15 @@ import {
   commanderEntry, computeManaBase, computeManaProducers, computeTypes, formatUSD, MANA_BASE_TOLERANCE, type ManaBaseStatus, type ProducerKind,
   type Validation,
 } from '../lib/rules';
-import { refreshPrices } from '../lib/actions';
+import { refreshPrices, setTargetBracket } from '../lib/actions';
+import { BRACKET_GC_LIMIT, BRACKETS, bracketName, estimateBracket, type BracketNumber } from '../lib/bracket';
 import { ManaSymbol } from './Mana';
 import { useToast } from './Toast';
 import { useGlobalTags, usePool } from '../lib/hooks';
 import { planAllocation, releaseAllocation } from '../lib/ownership';
 import { collectionT, useSettings } from '../lib/store';
 import { navigate } from '../lib/router';
-import { useScryfallTags } from '../lib/scryfallTags';
+import { useScryfallTags, useScryfallTagStatus } from '../lib/scryfallTags';
 import { atLeast, oddsGroups, SEEN_MAX, SEEN_MIN, turnHint, type OddsGroup } from '../lib/drawOdds';
 
 interface Props {
@@ -94,6 +95,8 @@ export function DeckDetails({ deck, validation, filter, setFilter }: Props) {
           ))}
         </ul>
       </div>
+
+      {fmt.hasCommander && <BracketSection deck={deck} filter={filter} setFilter={setFilter} />}
 
       {/* Price */}
       <div className="detail-section">
@@ -635,6 +638,85 @@ function DrawOdds({ deck, filter, setFilter }: ChartProps) {
         Chance of at least {prefs.min} card{prefs.min === 1 ? '' : 's'} of each kind among the first {seen} cards you see
         {' '}(a 7-card hand, then one draw a turn; no draw on turn 1 on the play).
         {' '}{commanderEntry(deck) ? 'The commander isn’t in the library. ' : ''}Ignores mulligans, tutors and extra draws. A card counts under each of its tags. Click a row to filter the deck list.
+      </div>
+    </div>
+  );
+}
+
+const bracketRange = (floor: BracketNumber) => (floor === 1 ? '1–2' : `${floor}+`);
+const bracketRangeName = (floor: BracketNumber) =>
+  floor === 1 ? 'Exhibition or Core' : floor === 4 ? 'Optimized or cEDH' : `${bracketName(floor)} or higher`;
+
+/** Lowest Commander bracket the cards allow, the cards behind it, and an optional target bracket. */
+function BracketSection({ deck, filter, setFilter }: ChartProps) {
+  const stags = useScryfallTags();
+  const stagStatus = useScryfallTagStatus();
+  const est = useMemo(() => estimateBracket(deck, stags), [deck, stags]);
+  const target = deck.targetBracket;
+  const over = target != null && est.floor > target;
+  const overReasons = target != null ? est.reasons.filter((r) => r.bracket > target) : [];
+
+  const groups: { label: string; query: string; cards: string[]; note?: string; info?: boolean }[] = [
+    { label: 'Game Changers', query: 'is:gamechanger', cards: est.gameChangers, note: `${est.gameChangers.length}/${BRACKET_GC_LIMIT} for Bracket 3` },
+    { label: 'Mass land denial', query: 'stag:mass-land-denial', cards: est.massLandDenial, note: 'Bracket 4+' },
+    { label: 'Extra turns', query: 'stag:extra-turn', cards: est.extraTurns, note: 'none in Bracket 1' },
+    { label: 'Land destruction', query: 'stag:land-removal', cards: est.landDestruction, note: 'no bracket rule', info: true },
+  ];
+
+  return (
+    <div className="detail-section">
+      <div className="section-head">
+        <h3>Bracket estimate</h3>
+        <span className="muted small">Commander Brackets (beta)</span>
+      </div>
+      <div className="bracket-headline">
+        <span className={`bracket-badge ${over ? 'bad' : ''}`}>Bracket {bracketRange(est.floor)}</span>
+        <span className="muted small">{bracketRangeName(est.floor)}</span>
+      </div>
+
+      <div className="bracket-target small" role="group" aria-label="Target bracket">
+        <span className="muted">Target:</span>
+        <button className={`chip ${target == null ? 'chip-on' : ''}`} aria-pressed={target == null} onClick={() => setTargetBracket(deck.id, undefined)}>None</button>
+        {BRACKETS.map((b) => (
+          <button key={b.n} className={`chip ${target === b.n ? 'chip-on' : ''}`} aria-pressed={target === b.n} title={`Bracket ${b.n}: ${b.name}`}
+            onClick={() => setTargetBracket(deck.id, target === b.n ? undefined : b.n)}>{b.n}</button>
+        ))}
+      </div>
+
+      {over ? (
+        <div className="mb-verdict bad">
+          Over your target, Bracket {target} ({bracketName(target)}):
+          <ul className="mb-moves">{overReasons.map((r) => <li key={r.text}>{r.text}</li>)}</ul>
+        </div>
+      ) : target != null ? (
+        <div className="mb-verdict ok">Cards fit Bracket {target} ({bracketName(target)}).</div>
+      ) : est.reasons.length > 0 && (
+        <ul className="bracket-reasons small">{est.reasons.map((r) => <li key={r.text}>{r.text}</li>)}</ul>
+      )}
+
+      {groups.filter((g) => g.cards.length > 0).map((g) => {
+        const active = filter.text === g.query;
+        return (
+          <div key={g.label} className={`bracket-group ${g.info ? 'info' : ''}`}>
+            <button className={`link-btn small bracket-group-head ${active ? 'active' : ''}`} aria-pressed={active}
+              title="Show these cards in the deck list" onClick={() => setFilter({ ...filter, text: active ? undefined : g.query })}>
+              <b>{g.label}</b> {g.cards.length}
+            </button>
+            {g.note && <span className="muted tiny"> · {g.note}</span>}
+            <div className="small bracket-cards">{g.cards.join(' · ')}</div>
+          </div>
+        );
+      })}
+      {stags.size === 0 && (
+        <div className="muted small">
+          {stagStatus.state === 'updating' ? `Downloading Scryfall tags… ${stagStatus.done}/${stagStatus.total}. ` : 'Scryfall tags aren’t downloaded yet, so '}
+          {stagStatus.state === 'updating' ? 'Extra turns and land denial are checked once that finishes.' : 'extra turns and land denial aren’t checked.'}
+        </div>
+      )}
+      <div className="muted tiny">
+        Brackets describe how a deck plays, so the cards only set the lowest bracket it fits. Bracket 1 vs 2 and 4 vs 5 depend on intent.
+        {' '}Rules as of Wizards’ February 9, 2026 update. Game Changer flags come from Scryfall (↻ Refresh prices updates them); extra turns and land denial use Scryfall tags.
+        {' '}Two-card combos aren’t checked yet.
       </div>
     </div>
   );

@@ -146,6 +146,26 @@ test('draw odds panel shows and updates the chance per card type', async ({ page
   expect(errors).toEqual([]);
 });
 
+test('bracket estimate shows the bracket and keeps a target bracket', async ({ page, isMobile }) => {
+  test.skip(!!isMobile, 'phones show the details panel on its own tab; the rules are covered by unit tests');
+  const errors = watchErrors(page);
+  await open(page);
+  await createDeck(page, 'Bracket Test');
+  const search = page.locator('.search-panel');
+  await search.locator('.search-input').fill('sol ring');
+  await search.locator('.search-input').press('Enter');
+  const result = search.locator('.result-card').first();
+  await result.hover();
+  await result.getByRole('button', { name: 'Add Sol Ring to main deck' }).click();
+  const panel = page.locator('.detail-section', { has: page.getByRole('heading', { name: 'Bracket estimate' }) });
+  await expect(panel.locator('.bracket-badge')).toHaveText('Bracket 1–2');
+  await panel.getByRole('button', { name: '2', exact: true }).click();
+  await expect(panel).toContainText('Cards fit Bracket 2 (Core)');
+  await page.reload();
+  await expect(panel.getByRole('button', { name: '2', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  expect(errors).toEqual([]);
+});
+
 test('#tag search and the tag browser find tagged cards', async ({ page, isMobile }) => {
   const errors = watchErrors(page);
   await open(page);
