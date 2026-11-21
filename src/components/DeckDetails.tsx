@@ -537,15 +537,16 @@ function TypeBreakdown({ deck, filter, setFilter }: ChartProps) {
 
 const ODDS_TAGS_SHOWN = 8;
 const ODDS_KEY = 'grimoire.drawOdds';
-interface OddsPrefs { min: number; seen: number }
+interface OddsPrefs { min: number; seen: number; onDraw: boolean }
 function readOddsPrefs(): OddsPrefs {
   try {
     const v = JSON.parse(localStorage.getItem(ODDS_KEY) ?? '{}');
     return {
       min: v.min >= 1 && v.min <= 4 ? v.min : 1,
       seen: Number.isInteger(v.seen) && v.seen >= SEEN_MIN && v.seen <= SEEN_MAX ? v.seen : SEEN_MIN,
+      onDraw: !!v.onDraw,
     };
-  } catch { return { min: 1, seen: SEEN_MIN }; }
+  } catch { return { min: 1, seen: SEEN_MIN, onDraw: false }; }
 }
 const tagQuery = (t: string) => `#${/\s/.test(t) ? `"${t}"` : t}`;
 const fmtChance = (p: number) => (p >= 0.995 && p < 1 ? '>99' : p > 0 && p < 0.005 ? '<1' : (p * 100).toFixed(0));
@@ -608,7 +609,10 @@ function DrawOdds({ deck, filter, setFilter }: ChartProps) {
                 {Array.from({ length: SEEN_MAX - SEEN_MIN + 1 }, (_, i) => SEEN_MIN + i).map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
             </label>
-            <span className="muted">{turnHint(seen)}</span>
+            <label className="odds-draw">
+              <input type="checkbox" checked={prefs.onDraw} onChange={(e) => setPrefs({ onDraw: e.target.checked })} /> On the draw
+            </label>
+            <span className="muted">= {turnHint(seen, prefs.onDraw)}</span>
           </div>
           <table className="color-table odds-table">
             <thead><tr><th>Type</th><th title="Copies in the library">Cards</th><th title={`Chance of at least ${prefs.min} in ${seen} cards`}>Chance</th></tr></thead>

@@ -537,6 +537,7 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .mb-chip.high { background: var(--panel-2); color: var(--muted); }
 .odds-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 8px; }
 .odds-controls select { width: auto; }
+.odds-draw { display: inline-flex; align-items: center; gap: 4px; }
 .odds-table { table-layout: fixed; margin-bottom: 8px; }
 .odds-table th:nth-child(2), .odds-table td:nth-child(2) { width: 56px; }
 .odds-table th:nth-child(3), .odds-table td:nth-child(3) { width: 45%; }

@@ -59,12 +59,14 @@ describe('odds groups', () => {
 });
 
 describe('turn hints', () => {
-  it('match cardsSeen', () => {
-    expect(turnHint(7)).toBe('opening hand');
-    expect(turnHint(8)).toBe('turn 2 on the play, turn 1 on the draw');
+  it('match cardsSeen on the play and on the draw', () => {
+    expect(turnHint(7, false)).toBe('opening hand');
+    expect(turnHint(7, true)).toBe('opening hand');
+    expect(turnHint(8, false)).toBe('turn 2');
+    expect(turnHint(8, true)).toBe('turn 1');
     for (let t = 2; t <= 10; t++) {
-      expect(turnHint(cardsSeen(t, false))).toContain(`turn ${t} on the play`);
-      expect(turnHint(cardsSeen(t, true))).toContain(`turn ${t} on the draw`);
+      expect(turnHint(cardsSeen(t, false), false)).toBe('turn ' + t);
+      expect(turnHint(cardsSeen(t, true), true)).toBe('turn ' + t);
     }
   });
 });
