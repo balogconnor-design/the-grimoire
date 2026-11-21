@@ -267,7 +267,7 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .legal-dot { width: 10px; height: 10px; border-radius: 50%; }
 .legal-dot.ok { background: var(--good); }
 .legal-dot.bad { background: var(--warn); }
-.header-actions { display: flex; gap: 6px; }
+.header-actions { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 
 .deck-workspace {
   --col-h: calc(100vh - var(--topbar-h) - 104px);
