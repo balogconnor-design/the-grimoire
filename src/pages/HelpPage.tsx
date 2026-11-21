@@ -65,6 +65,11 @@ export function HelpPage() {
             downloaded from <a href="https://edhrec.com" target="_blank" rel="noreferrer">EDHREC</a>: only the commander's name is sent,
             never your deck.
           </li>
+          <li>
+            Combo checks happen only when you click <b>Check combos</b> in a Commander deck. The deck's card names (nothing else) go to
+            The Grimoire's small server, which passes them to <a href="https://commanderspellbook.com" target="_blank" rel="noreferrer">Commander
+            Spellbook</a> and keeps nothing. The last result is saved in your browser.
+          </li>
           {!portable && <li>The website counts visits with Cloudflare Web Analytics: no cookies, no personal data, no tracking across sites.</li>}
         </ul>
       </Section>
@@ -79,7 +84,8 @@ export function HelpPage() {
       <Section title="Credits">
         <p>
           Card data and images come from <a href="https://scryfall.com" target="_blank" rel="noreferrer">Scryfall</a>. Salt scores and commander
-          suggestions (if you turn them on) come from <a href="https://edhrec.com" target="_blank" rel="noreferrer">EDHREC</a>. The Grimoire is unofficial
+          suggestions (if you turn them on) come from <a href="https://edhrec.com" target="_blank" rel="noreferrer">EDHREC</a>, and combos from
+          <a href="https://commanderspellbook.com" target="_blank" rel="noreferrer">Commander Spellbook</a>. The Grimoire is unofficial
           fan content permitted under the Wizards of the Coast Fan Content Policy. It is not approved or endorsed by Wizards. Portions of the
           materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.
         </p>

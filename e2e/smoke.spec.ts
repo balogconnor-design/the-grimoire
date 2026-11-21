@@ -325,6 +325,73 @@ test('collection lists show hover art, and the buy list opens cards', async ({ p
   expect(errors).toEqual([]);
 });
 
+test('combo check: nothing sent until asked, then combos, one card away, and the bracket', async ({ page, isMobile }) => {
+  test.skip(!!isMobile, 'phones show the details panel on its own tab');
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const errors = watchErrors(page);
+  await open(page);
+  const atraxa = { ...SOL_RING, id: 'atraxa-test', name: "Atraxa, Praetors' Voice", type_line: 'Legendary Creature — Phyrexian Angel Horror', mana_cost: '{G}{W}{U}{B}', cmc: 4 };
+  const horror = { ...SOL_RING, id: 'horror-test', name: 'Hullbreaker Horror', type_line: 'Creature — Kraken Horror', mana_cost: '{5}{U}{U}', cmc: 7 };
+  await page.route('https://api.scryfall.com/cards/search?**', (route) => {
+    const q = new URL(route.request().url()).searchParams;
+    if (q.get('format') === 'csv') return route.fallback();
+    const data = (q.get('q') ?? '').includes('sol') ? [SOL_RING] : [atraxa];
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ object: 'list', total_cards: 1, has_more: false, data }) });
+  });
+  await page.route('https://api.scryfall.com/cards/collection', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ object: 'list', data: [horror], not_found: [] }) }));
+  const sent: unknown[] = [];
+  const combo = (id: string, cards: string[], tag: string, missing: string[]) => ({
+    id, cards, commanderCards: [], produces: ['Infinite colorless mana'], tag, popularity: 10, mana: '', prerequisites: '', steps: 'Tap it.\nUntap it.', missing,
+  });
+  await page.route('**/api/combos', (route) => {
+    sent.push(route.request().postDataJSON());
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      included: [combo('1-2', ["Atraxa, Praetors' Voice", 'Sol Ring'], 'R', [])],
+      almost: [combo('3-4', ['Hullbreaker Horror', 'Sol Ring'], 'E', ['Hullbreaker Horror'])],
+    }) });
+  });
+
+  await createDeck(page, 'Combo Test');
+  const search = page.locator('.search-panel');
+  for (const [q, name] of [['atraxa', "Atraxa, Praetors' Voice"], ['sol ring', 'Sol Ring']]) {
+    await search.locator('.search-input').fill(q);
+    await search.locator('.search-input').press('Enter');
+    const result = search.locator('.result-card', { hasText: name }).first();
+    await result.hover();
+    await result.getByRole('button', { name: `Add ${name} to main deck` }).click();
+  }
+  await page.locator('.deck-groups').getByText("Atraxa, Praetors' Voice").first().hover();
+  await page.locator('.deck-groups').getByTitle('Set as commander').click();
+
+  const panel = page.locator('.combos-panel');
+  await expect(panel).toContainText('sends the deck’s card names');
+  expect(sent).toEqual([]);
+  await panel.getByRole('button', { name: 'Check combos' }).click();
+  await expect(panel.locator('.combo').first()).toContainText('Ruthless');
+  expect(sent).toEqual([{ commanders: ["Atraxa, Praetors' Voice"], main: ['Sol Ring'] }]);
+
+  // One card away: the missing card opens and can be added.
+  const almost = panel.locator('.combo', { hasText: 'Hullbreaker Horror' });
+  const missingLink = almost.locator('.card-link', { hasText: 'Hullbreaker Horror' });
+  await expect(missingLink).toHaveAttribute('draggable', 'true'); // its Scryfall data has loaded
+  await missingLink.click();
+  await expect(page.locator('.modal')).toContainText('Hullbreaker Horror');
+  await page.locator('.modal-close').click();
+
+  // The bracket estimate now counts the Ruthless combo.
+  const bracket = page.locator('.detail-section', { has: page.getByRole('heading', { name: 'Bracket estimate' }) });
+  await expect(bracket.locator('.bracket-badge')).toHaveText('Bracket 4+');
+  await expect(bracket).toContainText('Commander Spellbook rates Ruthless');
+
+  // Adding the missing card moves it out of "one card away".
+  await almost.getByRole('button', { name: '+ Add Hullbreaker Horror' }).click();
+  await expect(panel).toContainText('The deck has changed since this check');
+  await expect(panel.locator('.combo', { hasText: 'Hullbreaker Horror' })).toHaveCount(0);
+  if (test.info().project.name === 'chromium') await panel.screenshot({ path: 'test-results/combos-panel.png' });
+  expect(errors).toEqual([]);
+});
+
 test('#tag search and the tag browser find tagged cards', async ({ page, isMobile }) => {
   const errors = watchErrors(page);
   await open(page);
