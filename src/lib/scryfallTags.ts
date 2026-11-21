@@ -1,41 +1,19 @@
 import { useSyncExternalStore } from 'react';
-import { searchNamesPage } from './scryfall';
+import TAG_LIST from './scryfallTagList.json';
 import { db } from './store';
 
 /**
  * Scryfall tags: automatic, read-only tags from Scryfall Tagger (oracle tags, `otag:`).
  *
- * Scryfall can't say which tags a card has, only which cards have a tag, so Grimoire downloads the
- * card names for a fixed set of tags, keeps them in IndexedDB ('meta' store, key `stag:<otag>`) and
- * refreshes them weekly. Every card then gets its tags locally, offline too. Not part of backups:
- * the lists can always be downloaded again.
+ * Scryfall can't say which tags a card has, only which cards have a tag, so the card lists for a fixed
+ * set of 40 tags are collected once by `scripts/build-scryfall-tags.mjs` and shipped with the app in
+ * `src/data/scryfall-tags.json` (loaded as its own chunk, cached offline with the rest of the app).
+ * The app never asks Scryfall for tags at runtime. Re-run the script when new sets come out.
  *
- * Order matters: it is the priority used to pick a card's main tag when grouping a deck by tag.
+ * Order matters (`scryfallTagList.json`): it is the priority used to pick a card's section when a
+ * deck is grouped by tag.
  */
-export const SCRYFALL_TAGS: { otag: string; label: string }[] = [
-  { otag: 'ramp', label: 'ramp' },
-  { otag: 'mana-rock', label: 'mana rock' },
-  { otag: 'mana-dork', label: 'mana dork' },
-  { otag: 'draw', label: 'draw' },
-  { otag: 'draw-engine', label: 'draw engine' },
-  { otag: 'removal', label: 'removal' },
-  { otag: 'boardwipe', label: 'board wipe' },
-  { otag: 'counterspell', label: 'counterspell' },
-  { otag: 'tutor', label: 'tutor' },
-  { otag: 'recursion', label: 'recursion' },
-  { otag: 'reanimate', label: 'reanimate' },
-  { otag: 'protection', label: 'protection' },
-  { otag: 'repeatable-token-generator', label: 'tokens' },
-  { otag: 'lifegain', label: 'lifegain' },
-  { otag: 'burn', label: 'burn' },
-  { otag: 'sacrifice-outlet', label: 'sac outlet' },
-  { otag: 'graveyard-hate', label: 'graveyard hate' },
-  { otag: 'copy', label: 'copy' },
-  { otag: 'win-condition', label: 'win condition' },
-  { otag: 'extra-turn', label: 'extra turn' },
-  { otag: 'land-removal', label: 'land destruction' },
-  { otag: 'mass-land-denial', label: 'mass land denial' },
-];
+export const SCRYFALL_TAGS: { otag: string; label: string }[] = TAG_LIST;
 
 const LABEL_ORDER = new Map(SCRYFALL_TAGS.map((t, i) => [t.label, i]));
 /** True for the label of one of the fixed Scryfall tags (e.g. "mana rock"). */
@@ -54,113 +32,82 @@ export const scryfallTagMatches = (label: string, value: string, exact: boolean)
   return exact ? label === v : label.includes(v);
 };
 
-const REFRESH_MS = 7 * 24 * 3600 * 1000;
-/** Pause between tag-list pages (on top of Scryfall's ~1 s to answer each): about one request a second. */
-let PAGE_GAP_MS = 600;
-const pause = (ms: number) => (ms > 0 ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve());
-/** Tests: no pause between pages. */
-export function setTagPageGapForTests(ms: number) { PAGE_GAP_MS = ms; }
-const KEY = (otag: string) => `stag:${otag}`;
-
-interface Stored { key: string; value: { names: string[]; fetchedAt: number } }
+/** The shipped data: every card name once, and per tag the positions of its cards in `names`. */
+export interface TagData { generated: string; tags: string[]; names: string[]; cards: number[][] }
 
 export interface ScryfallTagStatus {
+  /** 'updating' while the bundled data loads (a moment on first use). */
   state: 'idle' | 'updating' | 'error';
-  /** Tags downloaded so far in the current update. */
-  done: number;
-  total: number;
-  /** Oldest download among the tags (0 = some tag never downloaded). */
-  updatedAt: number;
+  /** Date the bundled data was collected from Scryfall (YYYY-MM-DD), once loaded. */
+  generated?: string;
 }
 
-let lists = new Map<string, { names: Set<string>; fetchedAt: number }>(); // otag -> card names
 let byName = new Map<string, string[]>(); // card name -> labels, priority order
-let status: ScryfallTagStatus = { state: 'idle', done: 0, total: 0, updatedAt: 0 };
+let status: ScryfallTagStatus = { state: 'idle' };
 const listeners = new Set<() => void>();
 const emit = () => listeners.forEach((l) => l());
 const subscribe = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; };
 
-function rebuild() {
+/** Turn the shipped data (or test lists) into card name -> labels in priority order. */
+export function indexTagData(data: TagData): Map<string, string[]> {
+  const pos = new Map(data.tags.map((t, i) => [t, i]));
   const m = new Map<string, string[]>();
   for (const t of SCRYFALL_TAGS) {
-    const list = lists.get(t.otag);
-    if (!list) continue;
-    for (const n of list.names) {
+    const i = pos.get(t.otag);
+    if (i == null) continue;
+    for (const c of data.cards[i]) {
+      const n = data.names[c];
       const cur = m.get(n);
       if (cur) cur.push(t.label); else m.set(n, [t.label]);
     }
   }
-  byName = m;
-  const times = SCRYFALL_TAGS.map((t) => lists.get(t.otag)?.fetchedAt ?? 0);
-  status = { ...status, updatedAt: Math.min(...times) };
-  emit();
+  return m;
 }
 
-/** Read saved tag lists from IndexedDB. */
-export async function loadScryfallTags() {
-  const d = await db();
-  const rows = await Promise.all(SCRYFALL_TAGS.map((t) => d.get('meta', KEY(t.otag)) as Promise<Stored | undefined>));
-  const next = new Map<string, { names: Set<string>; fetchedAt: number }>();
-  rows.forEach((r, i) => r?.value && next.set(SCRYFALL_TAGS[i].otag, { names: new Set(r.value.names), fetchedAt: r.value.fetchedAt }));
-  lists = next;
-  rebuild();
-}
-
-/** Tests: put lists in memory without the database or the network. */
-export function setScryfallTagsForTests(data: Record<string, string[]>) {
-  lists = new Map(Object.entries(data).map(([otag, names]) => [otag, { names: new Set(names), fetchedAt: Date.now() }]));
-  rebuild();
-}
-
-let running: Promise<void> | null = null;
-
-/**
- * Download any tag list that is missing or older than a week, one page at a time through the
- * shared Scryfall queue (so the user's own searches still go through between pages). Stops quietly
- * when offline or on an error, and tries again next time.
- */
-export function refreshScryfallTags(force = false): Promise<void> {
-  running ??= (async () => {
-    const due = SCRYFALL_TAGS.filter((t) => force || Date.now() - (lists.get(t.otag)?.fetchedAt ?? 0) > REFRESH_MS);
-    if (!due.length || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
-    status = { ...status, state: 'updating', done: 0, total: due.length };
+let loading: Promise<void> | null = null;
+/** Load the bundled tag data. Also clears the per-tag lists older versions downloaded into IndexedDB. */
+export function loadScryfallTags(): Promise<void> {
+  loading ??= (async () => {
+    status = { state: 'updating' };
     emit();
     try {
-      const d = await db();
-      const fetchTag = async (t: (typeof SCRYFALL_TAGS)[number]) => {
-        const names: string[] = [];
-        for (let page = 1; page < 100; page++) {
-          if (page > 1 || status.done > 0) await pause(PAGE_GAP_MS);
-          const batch = await searchNamesPage(`otag:${t.otag}`, page);
-          if (!batch) break;
-          names.push(...batch);
-          if (batch.length < 175) break;
-        }
-        const value = { names, fetchedAt: Date.now() };
-        await d.put('meta', { key: KEY(t.otag), value });
-        lists.set(t.otag, { names: new Set(names), fetchedAt: value.fetchedAt });
-        status = { ...status, done: status.done + 1 };
-        rebuild();
-      };
-      // One page at a time with a pause between: Scryfall limits search requests more tightly than
-      // others (going faster gets refused), and the user's own searches go through in the pauses.
-      for (const t of due) await fetchTag(t);
-      status = { ...status, state: 'idle' };
+      const data = (await import('../data/scryfall-tags.json')).default as TagData;
+      byName = indexTagData(data);
+      status = { state: 'idle', generated: data.generated };
     } catch (e) {
-      console.warn('Scryfall tags: update stopped', e);
-      status = { ...status, state: 'error' };
+      console.warn('Scryfall tags: could not load the bundled data', e);
+      status = { state: 'error' };
+      loading = null;
     } finally {
       emit();
-      running = null;
     }
+    void clearOldDownloads();
   })();
-  return running;
+  return loading;
+}
+
+/** Versions before 2026-11-21 downloaded each tag list into IndexedDB (`stag:<otag>`); remove them. */
+export async function clearOldDownloads() {
+  try {
+    const d = await db();
+    const keys = (await d.getAllKeys('meta')) as string[];
+    await Promise.all(keys.filter((k) => typeof k === 'string' && k.startsWith('stag:')).map((k) => d.delete('meta', k)));
+  } catch { /* nothing to clear */ }
+}
+
+/** Tests: put lists (otag -> card names) in memory instead of the bundled data. */
+export function setScryfallTagsForTests(data: Record<string, string[]>) {
+  const names = [...new Set(Object.values(data).flat())];
+  const index = new Map(names.map((n, i) => [n, i]));
+  byName = indexTagData({ generated: 'test', tags: Object.keys(data), names, cards: Object.values(data).map((l) => l.map((n) => index.get(n)!)) });
+  status = { state: 'idle', generated: 'test' };
+  emit();
 }
 
 /** Scryfall tags of a card (by name), in priority order. */
 export const scryfallTagsOf = (name: string): string[] => byName.get(name) ?? [];
 
-/** card name -> Scryfall tags; re-renders when lists change. */
+/** card name -> Scryfall tags; re-renders when the data loads. */
 export function useScryfallTags(): Map<string, string[]> {
   return useSyncExternalStore(subscribe, () => byName);
 }

@@ -161,10 +161,13 @@ test('bracket estimate shows the bracket and keeps a target bracket', async ({ p
   await result.hover();
   await result.getByRole('button', { name: 'Add Sol Ring to main deck' }).click();
   const panel = page.locator('.detail-section', { has: page.getByRole('heading', { name: 'Bracket estimate' }) });
-  await expect(panel.locator('.bracket-badge')).toHaveText('Bracket 1–2');
+  await expect(panel.locator('.bracket-badge')).toHaveText('Bracket 1–2'); // shown while folded
+  await expect(panel.getByRole('button', { name: '2', exact: true })).toHaveCount(0);
+  await panel.getByRole('button', { name: 'Bracket estimate' }).click();
   await panel.getByRole('button', { name: '2', exact: true }).click();
   await expect(panel).toContainText('Cards fit Bracket 2 (Core)');
   await page.reload();
+  // The section stays open after a reload (your choice is remembered) and so does the target.
   await expect(panel.getByRole('button', { name: '2', exact: true })).toHaveAttribute('aria-pressed', 'true');
   expect(errors).toEqual([]);
 });
@@ -188,7 +191,8 @@ test('EDHREC stays off until turned on, then shows salt scores', async ({ page, 
   await result.getByRole('button', { name: 'Add Sol Ring to main deck' }).click();
 
   const panel = page.locator('.edhrec-panel');
-  await expect(panel).toContainText('Off until you turn it on');
+  await expect(panel.getByRole('button', { name: 'Turn on EDHREC' })).toBeVisible();
+  await expect(panel.locator('.edhrec-salty')).toHaveCount(0);
   expect(edhrec).toEqual([]); // nothing is fetched while it's off
   await panel.getByRole('button', { name: 'Turn on EDHREC' }).click();
   await expect(panel.locator('.edhrec-salty')).toContainText('Sol Ring');
@@ -271,6 +275,8 @@ test('cards in Deck Details open, and hover art waits then stays on screen', asy
 
   // Mana producers: the card name is a card link.
   const producers = page.locator('.detail-section', { has: page.getByRole('heading', { name: 'Mana producers' }) });
+  await expect(producers.getByRole('button', { name: 'Rocks 1' })).toBeVisible(); // pills show while folded
+  await producers.getByRole('button', { name: 'Mana producers' }).click();
   const link = producers.locator('.card-link', { hasText: 'Sol Ring' });
   await link.scrollIntoViewIfNeeded();
   await expect(link).toHaveAttribute('draggable', 'true');
@@ -365,7 +371,7 @@ test('combo check: nothing sent until asked, then combos, one card away, and the
   await page.locator('.deck-groups').getByTitle('Set as commander').click();
 
   const panel = page.locator('.combos-panel');
-  await expect(panel).toContainText('sends the deck’s card names');
+  await expect(panel.locator('.combo')).toHaveCount(0); // folded: just the heading and the button
   expect(sent).toEqual([]);
   await panel.getByRole('button', { name: 'Check combos' }).click();
   await expect(panel.locator('.combo').first()).toContainText('Ruthless');
@@ -382,6 +388,7 @@ test('combo check: nothing sent until asked, then combos, one card away, and the
   // The bracket estimate now counts the Ruthless combo.
   const bracket = page.locator('.detail-section', { has: page.getByRole('heading', { name: 'Bracket estimate' }) });
   await expect(bracket.locator('.bracket-badge')).toHaveText('Bracket 4+');
+  await bracket.getByRole('button', { name: 'Bracket estimate' }).click();
   await expect(bracket).toContainText('Commander Spellbook rates Ruthless');
 
   // Adding the missing card moves it out of "one card away".
@@ -453,6 +460,42 @@ test('deck search: popular staples, greyed in-deck cards, list and details views
   await expect(page.locator('.query-preview')).toContainText('-#ramp -#"mana rock"');
   await expect(page.locator('.advanced legend', { hasText: 'Your cards' })).toHaveCount(0);
   await expect(page.locator('.advanced').getByText('Ownership')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('group by tag: choose sections in the window, saved per deck, reset to the most common', async ({ page, isMobile }) => {
+  test.skip(!!isMobile, 'covered on desktop');
+  const errors = watchErrors(page);
+  await open(page);
+  await createDeck(page, 'Group Test');
+  const search = page.locator('.search-panel');
+  if (isMobile) await page.locator('.mobile-tabs .tab', { hasText: 'Search' }).click();
+  await search.locator('.search-input').fill('sol ring');
+  await search.locator('.search-input').press('Enter');
+  const result = search.locator('.result-card').first();
+  await result.hover();
+  await result.getByRole('button', { name: 'Add Sol Ring to main deck' }).click();
+
+  // The bundled Scryfall tags work straight away: no tag downloads from Scryfall.
+  await page.getByLabel('Group cards by').selectOption('tag');
+  const groups = page.locator('.deck-groups');
+  await expect(groups).toContainText(/ramp/i);
+  await page.getByRole('button', { name: 'Choose tags to group by' }).click();
+  const modal = page.locator('.modal');
+  await expect(modal).toContainText('Tick the tags that should become sections');
+  await modal.getByRole('button', { name: 'None' }).click();
+  await expect(modal.getByRole('button', { name: 'Group by selected tags' })).toBeDisabled();
+  await modal.getByLabel(/mana rock/).check();
+  await modal.getByRole('button', { name: 'Group by selected tags' }).click();
+  await expect(modal).toHaveCount(0);
+  await expect(groups.locator('.group-name').first()).toContainText(/mana rock/i);
+
+  // Kept for this deck after a reload; Reset tags goes back to the most common.
+  await page.reload();
+  await expect(groups).toContainText(/mana rock/i);
+  await page.getByRole('button', { name: 'Reset tags' }).click();
+  await expect(page.getByRole('button', { name: 'Reset tags' })).toHaveCount(0);
+  await expect(groups).toContainText(/ramp/i);
   expect(errors).toEqual([]);
 });
 

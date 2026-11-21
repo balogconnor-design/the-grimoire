@@ -461,8 +461,9 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .tab.active { color: var(--text); border-bottom-color: var(--accent); }
 .tab-count { margin-left: 4px; font-size: var(--fs-tiny); padding: 0 6px; border-radius: 999px; background: var(--panel-2); color: var(--muted); }
 .board-price { margin-left: auto; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--text-2); }
-.list-toolbar { display: flex; gap: 8px; margin-bottom: 10px; }
-.list-toolbar .input { flex: 1; }
+.list-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 10px; }
+.list-toolbar > .input { flex: 1 1 160px; min-width: 140px; }
+.list-toolbar > * { flex-shrink: 0; }
 .active-filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; padding: 8px 10px; background: var(--accent-soft); border-radius: var(--radius-sm); }
 
 .basic-adder { padding: 12px; margin-bottom: 12px; background: var(--bg-2); border: 1px solid var(--border); border-radius: var(--radius-sm); }
@@ -940,11 +941,36 @@ button.alert-row:hover { background: var(--panel-2); }
 .inv-card-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .inv-name { font-weight: 600; max-width: 280px; }
 .inv-sub { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+/* Header text on the right of a Metrics section (e.g. "54 mana symbols"): a step larger, and lighter in dark mode. */
+.section-meta { margin-left: auto; font-size: var(--fs-body); color: var(--text-2); font-variant-numeric: tabular-nums; text-align: right; }
+:root[data-theme='light'] .section-meta { color: var(--muted); }
+.section-meta .meta-strong { color: var(--text); font-weight: 700; }
+.section-head > .section-meta + * { margin-left: 10px; }
+.collapse-closed-body { margin-top: 2px; }
+.collapse-closed-body .producer-kinds, .collapse-closed-body .bracket-headline { margin-bottom: 0; }
+.color-pcts { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.mb-pct.low { color: var(--warn); }
+.mb-pct.critical { color: var(--bad); }
+.bracket-name { color: var(--text-2); font-size: var(--fs-body); }
+.bracket-over { color: var(--bad); font-size: var(--fs-small); font-weight: 600; }
+.sub-collapse { width: 100%; background: none; border-top: 0; border-right: 0; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+.sub-collapse .collapse-caret { width: auto; }
 .collapse-head { display: inline-flex; align-items: baseline; gap: 6px; background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; text-align: left; }
 .collapse-head:hover h3, .collapse-head:focus-visible h3 { color: var(--text); }
 .collapse-caret { color: var(--muted); font-size: var(--fs-small); width: 0.9em; }
 .collapsible.closed .section-head { margin-bottom: 0; }
 .collapse-summary { margin-left: auto; font-variant-numeric: tabular-nums; }
+.group-tags-btn { margin-left: 2px; }
+.group-tags-modal .help { margin-top: 0; }
+.group-tags-tools { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-bottom: 8px; }
+.group-tags-list { list-style: none; margin: 0; padding: 0; max-height: min(52vh, 460px); overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.group-tags-list li { border-top: 1px solid var(--border); }
+.group-tags-list li:first-child { border-top: 0; }
+.group-tags-list label { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 10px; cursor: pointer; }
+.group-tags-list label:hover { background: var(--panel-2); }
+.group-tags-list .scryfall-name { color: var(--tag-scryfall); }
+.group-tags-list .count { color: var(--muted); font-variant-numeric: tabular-nums; }
+.group-tags-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 .group-by { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-small); white-space: nowrap; }
 .row-actions { display: flex; gap: 4px; align-items: center; justify-content: flex-end; white-space: nowrap; }
 
