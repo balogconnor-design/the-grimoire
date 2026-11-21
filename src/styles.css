@@ -610,7 +610,10 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .edhrec-table th:nth-child(3), .edhrec-table td:nth-child(3) { width: 62px; }
 .edhrec-table th:nth-child(4), .edhrec-table td:nth-child(4) { width: 36px; text-align: right; }
 .edhrec-table td .truncate { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.edhrec-table .mini-btn { position: static; }
+.edhrec-table .result-card.is-dim .result-art img, .result-card.is-dim .card-img-missing { filter: grayscale(0.85) brightness(0.55); transition: filter 0.15s; }
+.result-card.is-dim:hover .result-art img { filter: grayscale(0.4) brightness(0.8); }
+.result-card.is-dim .result-foot { opacity: 0.6; }
+.mini-btn { position: static; }
 .producer-kinds { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .producer-table { margin-top: 8px; }
 .producer-table th:not(:first-child), .producer-table td:not(:first-child) { width: 1%; white-space: nowrap; }

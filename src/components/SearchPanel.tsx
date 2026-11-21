@@ -19,6 +19,12 @@ import { SCOPE_META, type TagScope } from './TagEditor';
 import { ColorPips } from './Mana';
 import { useToast } from './Toast';
 
+/** Quick searches for the most played cards (Scryfall's EDHREC order) within the deck's colours and format. */
+const POPULAR = {
+  staples: { label: '★ Popular staples', query: '-t:land', title: 'Most played nonland cards in your colours (by EDHREC popularity)' },
+  lands: { label: '★ Popular lands', query: 't:land -t:basic', title: 'Most played nonbasic lands in your colours (by EDHREC popularity)' },
+} as const;
+
 const BOARD_NAME: Record<Board, { full: string; short: string }> = {
   main: { full: 'main deck', short: 'in deck' },
   side: { full: 'sideboard', short: 'in side' },
@@ -67,15 +73,17 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
     deck.entries.forEach((e) => e.board === board && m.set(e.card.name, (m.get(e.card.name) ?? 0) + e.qty));
     return m;
   }, [deck.entries, board]);
+  // Cards already in the deck (any board) are shown greyed out rather than hidden.
+  const inAnyBoard = useMemo(() => new Set(deck.entries.map((e) => e.card.name)), [deck.entries]);
 
-  const run = async (base = userQuery, extra = constraints, fav = favOnly) => {
+  const run = async (base = userQuery, extra = constraints, fav = favOnly, sortBy: SortOrder = order) => {
     const q = [base.trim(), fav ? 'is:fav' : ''].filter(Boolean).join(' ');
     if (!q && !extra.trim()) return;
     setShowTags(false);
     setLoading(true);
     setError('');
     try {
-      const res = await hybridSearch(q, subjectFor, { order, extra, dir: adv.dir, unique: adv.unique });
+      const res = await hybridSearch(q, subjectFor, { order: sortBy, extra, dir: adv.dir, unique: adv.unique });
       setResults(res.cards);
       setTotal(res.total ?? null);
       setNext(res.next);
@@ -114,6 +122,13 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
     void run('is:commander', fmt.searchKey && useLegal ? `f:${fmt.searchKey}` : '');
   };
 
+  const popular = (kind: keyof typeof POPULAR) => {
+    const q = POPULAR[kind].query;
+    setQuery(q);
+    setOrder('edhrec');
+    void run([q, buildAdvanced(adv)].filter(Boolean).join(' '), undefined, undefined, 'edhrec');
+  };
+
   const apply = (q: string) => { setQuery(q); void run([q.trim(), buildAdvanced(adv)].filter(Boolean).join(' ')); };
   // 'Search' buttons in import results pre-fill this search.
   // Run exactly what was asked for: advanced filters could hide the card being looked for.
@@ -130,7 +145,7 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
     const n = inDeck.get(c.name);
     return (
       <CardResult
-        key={c.id} card={c} subject={subject} draggable
+        key={c.id} card={c} subject={subject} draggable dim={inAnyBoard.has(c.name)}
         onOpen={() => setSelected(c)} onTag={() => setTagging(c)} onCollect={() => setCollecting(c)} onTagClick={onTagClick}
         badge={n ? <span className="in-deck-badge">{n} {target.short}</span> : null}
         addButton={
@@ -187,6 +202,9 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
           {fmt.hasCommander && !identity && (
             <button type="button" className="chip chip-gold" onClick={findCommander}>★ Find a commander</button>
           )}
+          {fmt.hasCommander && (Object.keys(POPULAR) as (keyof typeof POPULAR)[]).map((k) => (
+            <button key={k} type="button" className="chip chip-gold" title={POPULAR[k].title} onClick={() => popular(k)}>{POPULAR[k].label}</button>
+          ))}
           {board !== 'main' && <span className="add-target" title="The + button and drag and drop add to the board shown in the deck list">Adding to the {target.full}</span>}
         </div>
 
