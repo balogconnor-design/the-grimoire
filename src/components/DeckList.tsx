@@ -1,5 +1,5 @@
 import { entrySorter, groupByColors, SORT_OPTIONS, type SortBy } from '../lib/deckGroups';
-import { useEffect, useMemo, useState, type DragEvent } from 'react';
+import { useEffect, useMemo, useState, type DragEvent, type PointerEvent as ReactPointerEvent } from 'react';
 import type { Board, Deck, DeckEntry, DeckFilter, TypeCategory } from '../types';
 import { getFormat } from '../lib/formats';
 import {
@@ -48,6 +48,21 @@ const readSetting = <T extends string>(k: string, allowed: readonly T[], fallbac
   try { const v = localStorage.getItem(k) as T | null; return v && allowed.includes(v) ? v : fallback; } catch { return fallback; }
 };
 const saveSetting = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* only this session remembers */ } };
+/** Table columns; widths you drag are saved in this browser and shared by every group's table. */
+const TABLE_COLS: { key: string; label: string; num?: boolean; title?: string }[] = [
+  { key: 'qty', label: 'Qty', num: true }, { key: 'card', label: 'Card' }, { key: 'cost', label: 'Cost' }, { key: 'type', label: 'Type' },
+  { key: 'tags', label: 'Tags' }, { key: 'price', label: 'Price', num: true }, { key: 'own', label: 'Own', title: 'Owned' },
+];
+const COL_KEY = 'grimoire.deckTableCols';
+const COL_MIN = 32;
+const COL_MAX = 640;
+const readColWidths = (): Record<string, number> => {
+  try {
+    const v = JSON.parse(localStorage.getItem(COL_KEY) ?? '{}') as Record<string, unknown>;
+    return Object.fromEntries(Object.entries(v).filter(([, w]) => typeof w === 'number' && w >= COL_MIN && w <= COL_MAX)) as Record<string, number>;
+  } catch { return {}; }
+};
+const saveColWidths = (w: Record<string, number>) => { try { localStorage.setItem(COL_KEY, JSON.stringify(w)); } catch { /* only this session remembers */ } };
 /** Tiles narrower than this show the card picture on hover too (it's hard to read small). */
 const GRID_HOVER_BELOW = 170;
 const ENTRY_DRAG = 'application/x-grimoire-entry';
@@ -82,6 +97,7 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
   const [view, setViewState] = useState<DeckView>(() => readSetting(VIEW_KEY, ['list', 'grid', 'table'] as const, 'list'));
   const setView = (v: DeckView) => { setViewState(v); saveSetting(VIEW_KEY, v); };
   const [sortBy, setSortByState] = useState<SortBy>(() => readSetting(SORT_KEY, SORT_OPTIONS.map((o) => o.value), 'mv'));
+  const [colWidths, setColWidths] = useState<Record<string, number>>(readColWidths);
   const setSortBy = (v: SortBy) => { setSortByState(v); saveSetting(SORT_KEY, v); };
   const setGroupBy = (g: GroupBy) => {
     setGroupByState(g);
@@ -225,11 +241,46 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
     </div>
   );
 
+  /** Drag a header's right edge to resize that column (all groups' tables share the widths). */
+  const startResize = (key: string) => (ev: ReactPointerEvent<HTMLSpanElement>) => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    const handle = ev.currentTarget;
+    const th = handle.parentElement as HTMLElement;
+    const startX = ev.clientX;
+    const startW = th.getBoundingClientRect().width;
+    handle.setPointerCapture(ev.pointerId);
+    let latest = startW;
+    const move = (m: PointerEvent) => {
+      latest = Math.round(Math.min(COL_MAX, Math.max(COL_MIN, startW + m.clientX - startX)));
+      setColWidths((w) => ({ ...w, [key]: latest }));
+    };
+    const up = () => {
+      handle.removeEventListener('pointermove', move);
+      handle.removeEventListener('pointerup', up);
+      handle.removeEventListener('pointercancel', up);
+      setColWidths((w) => { const next = { ...w, [key]: latest }; saveColWidths(next); return next; });
+    };
+    handle.addEventListener('pointermove', move);
+    handle.addEventListener('pointerup', up);
+    handle.addEventListener('pointercancel', up);
+  };
+  const resetColumn = (key: string) => setColWidths((w) => { const next = { ...w }; delete next[key]; saveColWidths(next); return next; });
+
   /** Table: one row per card with more columns; up to 3 tags. */
   const renderTable = (list: DeckEntry[]) => (
     <table className="color-table deck-table">
       <thead>
-        <tr><th className="num">Qty</th><th>Card</th><th>Cost</th><th>Type</th><th>Tags</th><th className="num">Price</th><th title="Owned">Own</th></tr>
+        <tr>
+          {TABLE_COLS.map((c) => (
+            <th key={c.key} className={c.num ? 'num' : undefined} title={c.title} style={colWidths[c.key] ? { width: colWidths[c.key] } : undefined}>
+              {c.label}
+              <span className="col-resizer" role="separator" aria-orientation="vertical" aria-label={`Resize the ${c.label} column`}
+                title="Drag to resize · double-click to reset" onPointerDown={startResize(c.key)} onDoubleClick={() => resetColumn(c.key)}
+                onClick={(ev) => ev.stopPropagation()} />
+            </th>
+          ))}
+        </tr>
       </thead>
       <tbody>
         {list.map((e) => {

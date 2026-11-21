@@ -639,6 +639,40 @@ test('deck list: list dividers, grid and table views, color identity grouping an
   expect(errors).toEqual([]);
 });
 
+test('deck table: drag a header edge to resize a column, kept after reload, double-click resets', async ({ page, isMobile }) => {
+  test.skip(!!isMobile, 'resizing columns is a desktop feature');
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const errors = watchErrors(page);
+  await open(page);
+  await createDeck(page, 'Columns Test');
+  const search = page.locator('.search-panel');
+  await search.locator('.search-input').fill('sol ring');
+  await search.locator('.search-input').press('Enter');
+  const r = search.locator('.result-card').first();
+  await r.hover();
+  await r.getByRole('button', { name: 'Add Sol Ring to main deck' }).click();
+  await page.locator('.col-deck').getByRole('radio', { name: 'Table' }).click();
+
+  const tagsHead = page.locator('.deck-table th', { hasText: 'Tags' }).first();
+  const width = async () => (await tagsHead.boundingBox())!.width;
+  const before = await width();
+  const handle = tagsHead.locator('.col-resizer');
+  const hb = (await handle.boundingBox())!;
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(hb.x + hb.width / 2 + 90, hb.y + hb.height / 2, { steps: 6 });
+  await page.mouse.up();
+  await expect.poll(width).toBeGreaterThan(before + 60);
+  const resized = await width();
+
+  await page.reload();
+  await expect.poll(width).toBeGreaterThan(resized - 3);
+
+  await page.locator('.deck-table th', { hasText: 'Tags' }).first().locator('.col-resizer').dblclick();
+  await expect.poll(width).toBeLessThan(resized - 60);
+  expect(errors).toEqual([]);
+});
+
 test('#tag search and the tag browser find tagged cards', async ({ page, isMobile }) => {
   const errors = watchErrors(page);
   await open(page);

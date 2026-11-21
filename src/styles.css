@@ -567,6 +567,13 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .deck-table th:nth-child(6), .deck-table td:nth-child(6) { width: 70px; }
 .deck-table th:nth-child(7), .deck-table td:nth-child(7) { width: 40px; text-align: center; }
 .deck-table td { vertical-align: middle; }
+/* Resizable columns: drag the right edge of a header. */
+.deck-table th { position: relative; }
+.col-resizer { position: absolute; top: 0; right: -4px; bottom: 0; width: 9px; cursor: col-resize; z-index: 1; touch-action: none; }
+.col-resizer::after { content: ''; position: absolute; top: 20%; bottom: 20%; left: 4px; width: 1px; background: var(--border-strong); }
+.deck-table th:hover .col-resizer::after, .col-resizer:active::after { background: var(--accent); width: 2px; }
+.deck-table th:last-child .col-resizer { right: 0; }
+.col-deck .deck-groups { overflow-x: auto; }
 .deck-table-name { display: flex; align-items: center; gap: 5px; min-width: 0; font-weight: 600; }
 .deck-table-name .truncate, .deck-table-type .truncate { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .deck-table-type { color: var(--text-2); font-size: var(--fs-small); }
