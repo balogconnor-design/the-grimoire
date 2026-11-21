@@ -945,6 +945,17 @@ button.alert-row:hover { background: var(--panel-2); }
 .collapse-caret { color: var(--muted); font-size: var(--fs-small); width: 0.9em; }
 .collapsible.closed .section-head { margin-bottom: 0; }
 .collapse-summary { margin-left: auto; font-variant-numeric: tabular-nums; }
+.group-tags-btn { margin-left: 2px; }
+.group-tags-modal .help { margin-top: 0; }
+.group-tags-tools { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-bottom: 8px; }
+.group-tags-list { list-style: none; margin: 0; padding: 0; max-height: min(52vh, 460px); overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.group-tags-list li { border-top: 1px solid var(--border); }
+.group-tags-list li:first-child { border-top: 0; }
+.group-tags-list label { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 10px; cursor: pointer; }
+.group-tags-list label:hover { background: var(--panel-2); }
+.group-tags-list .scryfall-name { color: var(--tag-scryfall); }
+.group-tags-list .count { color: var(--muted); font-variant-numeric: tabular-nums; }
+.group-tags-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
 .group-by { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-small); white-space: nowrap; }
 .row-actions { display: flex; gap: 4px; align-items: center; justify-content: flex-end; white-space: nowrap; }
 

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Deck, DeckEntry } from '../src/types';
 import { csvColumn } from '../src/lib/scryfall';
 import { parseQuery } from '../src/lib/query';
-import { deckmatesByTag, entryTags, groupByManaValue, groupByTag, mainGroup, type TagSources } from '../src/lib/deckTags';
+import { deckmatesByTag, deckTagCounts, defaultGroupTags, entryTags, groupByManaValue, groupByTag, mainGroup, type TagSources } from '../src/lib/deckTags';
 import { readFileSync } from 'node:fs';
 import { clearOldDownloads, indexTagData, loadScryfallTags, SCRYFALL_TAGS, scryfallTagsOf, setScryfallTagsForTests } from '../src/lib/scryfallTags';
 import { db } from '../src/lib/store';
@@ -101,6 +101,35 @@ describe('grouping a deck by tag', () => {
   it('groups by mana value with lands last', () => {
     const d = sampleDeck();
     expect(groupByManaValue(d, d.entries).map((g) => g.key)).toEqual(['Commander', 'Mana value 1', 'Mana value 2', 'Lands']);
+  });
+});
+
+describe('grouping by chosen tags', () => {
+  it('counts tags per main-deck card (commander left out), most common first', () => {
+    const d = sampleDeck();
+    d.entries.find((e) => e.uid === 'bolt')!.tags = ['ramp'];
+    expect(deckTagCounts(d, src()).map((t) => [t.tag, t.count])).toEqual([
+      ['ramp', 2], ['mana rock', 1], ['draw', 1], ['removal', 1], ['recursion', 1], ['burn', 1], // ties in priority order
+    ]);
+    expect(defaultGroupTags(d, src(), 2)).toEqual(['ramp', 'mana rock']);
+  });
+
+  it('uses only chosen tags, in Scryfall priority order; others go under Other, lands under Lands', () => {
+    const d = sampleDeck();
+    const chosen = { ...src(), chosen: ['draw', 'burn'] };
+    const rock = d.entries.find((e) => e.uid === 'rock')!; // ramp, mana rock, draw
+    const bolt = d.entries.find((e) => e.uid === 'bolt')!; // removal, burn
+    expect(mainGroup(d, rock, chosen)).toBe('draw');
+    expect(mainGroup(d, bolt, chosen)).toBe('burn');
+    expect(groupByTag(d, d.entries, chosen).map((g) => g.key)).toEqual(['Commander', 'draw', 'burn', 'Lands', 'Other']);
+  });
+
+  it('keeps a dragged main tag only while it is chosen', () => {
+    const d = sampleDeck();
+    const rock = d.entries.find((e) => e.uid === 'rock')!;
+    rock.mainTag = 'mana rock';
+    expect(mainGroup(d, rock, { ...src(), chosen: ['mana rock', 'ramp'] })).toBe('mana rock');
+    expect(mainGroup(d, rock, { ...src(), chosen: ['ramp'] })).toBe('ramp');
   });
 });
 

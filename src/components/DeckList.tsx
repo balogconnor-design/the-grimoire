@@ -20,7 +20,8 @@ import { useToast } from './Toast';
 import { hideArt, hoverArtProps } from './HoverArt';
 import { isCardDrag, readCardDrag } from '../lib/dnd';
 import { useScryfallTags, useScryfallTagStatus } from '../lib/scryfallTags';
-import { entryTags, groupByManaValue, groupByTag, mainGroup } from '../lib/deckTags';
+import { defaultGroupTags, entryTags, groupByManaValue, groupByTag, mainGroup, OTHER_GROUP } from '../lib/deckTags';
+import { GroupTagsModal, readGroupTags, saveGroupTags } from './GroupTagsModal';
 
 interface Props {
   deck: Deck;
@@ -94,7 +95,13 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
   const queryWarnings = parsed?.warnings ?? [];
   const onTagClick = (scope: TagScope, t: string) => setFilter({ ...filter, text: `${SCOPE_META[scope].key}:${/\s/.test(t) ? `"${t}"` : t}` });
 
-  const tagSrc = useMemo(() => ({ global: globalTags, scryfall: stags }), [globalTags, stags]);
+  // Grouping by tag uses the tags chosen for this deck (saved in this browser), else the deck's most common ones.
+  const [customTags, setCustomTags] = useState<string[] | null>(() => readGroupTags(deck.id));
+  const [pickingTags, setPickingTags] = useState(false);
+  const baseSrc = useMemo(() => ({ global: globalTags, scryfall: stags }), [globalTags, stags]);
+  const defaultTags = useMemo(() => defaultGroupTags(deck, baseSrc), [deck, baseSrc]);
+  const tagSrc = useMemo(() => ({ ...baseSrc, chosen: customTags ?? defaultTags }), [baseSrc, customTags, defaultTags]);
+  const chooseTags = (tags: string[] | null) => { saveGroupTags(deck.id, tags); setCustomTags(tags); };
   const groups = useMemo((): { type: string; entries: DeckEntry[]; scryfall?: boolean }[] => {
     if (groupBy === 'tag') return groupByTag(deck, entries, tagSrc).map((g) => ({ type: g.key, entries: g.entries, scryfall: g.scryfall }));
     if (groupBy === 'mv') return groupByManaValue(deck, entries).map((g) => ({ type: g.key, entries: g.entries }));
@@ -200,6 +207,12 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
             <option value="tag">Tag</option>
             <option value="mv">Mana value</option>
           </select>
+          {groupBy === 'tag' && (
+            <button type="button" className="icon-btn sm group-tags-btn" title="Choose which tags become sections" aria-label="Choose tags to group by" onClick={() => setPickingTags(true)}>⚙</button>
+          )}
+          {groupBy === 'tag' && customTags && (
+            <button type="button" className="link-btn small" title="Go back to the deck's most common tags" onClick={() => chooseTags(null)}>Reset tags</button>
+          )}
         </label>
         <button className={`chip ${favOnly ? 'chip-gold' : ''}`} onClick={() => setFavOnly((f) => !f)} aria-pressed={favOnly} title="Show favorites only">★</button>
         {board === 'main' && (
@@ -265,7 +278,7 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
           const price = g.entries.reduce((n, e) => n + (cardPrice(e.card) ?? 0) * e.qty, 0);
           const isCollapsed = collapsed.has(g.type);
           const droppable = canDropOn(g.type);
-          const isTagGroup = groupBy === 'tag' && !['Commander', 'Lands', 'Untagged'].includes(g.type);
+          const isTagGroup = groupBy === 'tag' && !['Commander', 'Lands', 'Untagged', OTHER_GROUP].includes(g.type);
           return (
             <div
               key={g.type}
@@ -383,6 +396,11 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
           );
         })}
       </div>
+
+      {pickingTags && (
+        <GroupTagsModal deck={deck} src={baseSrc} selected={tagSrc.chosen} defaults={defaultTags}
+          onApply={(tags) => { chooseTags(tags); setPickingTags(false); }} onClose={() => setPickingTags(false)} />
+      )}
 
       {open && (
         <CardModal card={open.card} deckId={deck.id} entryUid={open.uid} onClose={() => setOpen(null)} />
