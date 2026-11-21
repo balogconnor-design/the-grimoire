@@ -392,6 +392,70 @@ test('combo check: nothing sent until asked, then combos, one card away, and the
   expect(errors).toEqual([]);
 });
 
+test('deck search: popular staples, greyed in-deck cards, list and details views, tags in advanced search', async ({ page, isMobile, browserName }) => {
+  test.skip(!!isMobile, 'drag and drop is a desktop feature');
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const errors = watchErrors(page);
+  await open(page);
+  const sent: { q: string; order: string }[] = [];
+  page.on('request', (r) => {
+    const u = new URL(r.url());
+    if (u.pathname === '/cards/search' && u.searchParams.get('format') !== 'csv') sent.push({ q: u.searchParams.get('q') ?? '', order: u.searchParams.get('order') ?? '' });
+  });
+  await createDeck(page, 'Views Test');
+  const search = page.locator('.search-panel');
+  const tab = (name: string) => page.locator('.board-tabs .tab', { hasText: name });
+
+  // Popular staples: nonland cards, most played first, within the format.
+  await search.getByRole('button', { name: '★ Popular staples' }).click();
+  await expect(search.locator('.result-card').first()).toContainText('Sol Ring');
+  expect(sent.at(-1)).toEqual({ q: '-t:land f:commander', order: 'edhrec' });
+  await search.getByRole('button', { name: '★ Popular lands' }).click();
+  await expect.poll(() => sent.at(-1)?.q).toBe('t:land -t:basic f:commander');
+
+  // Adding a card greys it out in the results instead of hiding it.
+  const tile = search.locator('.result-card').first();
+  await tile.hover();
+  await tile.getByRole('button', { name: 'Add Sol Ring to main deck' }).click();
+  await expect(tile).toHaveClass(/is-dim/);
+
+  // List view: a row per card, with + and drag onto the deck list.
+  await search.getByRole('radio', { name: 'List' }).click();
+  const row = search.locator('.result-row').first();
+  await expect(row).toContainText('Sol Ring');
+  await expect(row).toContainText('1 in deck');
+  await expect(row).toHaveClass(/is-dim/);
+  // (Commander is singleton, so use the other boards.) + adds to the board shown in the deck list.
+  await tab('Sideboard').click();
+  await row.getByRole('button', { name: 'Add Sol Ring to sideboard' }).click();
+  await expect(tab('Sideboard').locator('.tab-count')).toHaveText('1');
+  if (browserName !== 'webkit') {
+    await row.dragTo(tab('Maybeboard'));
+    await expect(tab('Maybeboard').locator('.tab-count')).toHaveText('1');
+  }
+
+  // Details view adds rules text; the choice is remembered.
+  await search.getByRole('radio', { name: 'Details' }).click();
+  await expect(search.locator('.result-row.details').first()).toContainText('{T}: Add {C}{C}.');
+  await page.reload();
+  await search.getByRole('button', { name: '★ Popular staples' }).click();
+  await expect(search.locator('.result-row.details').first()).toBeVisible();
+
+  // Advanced search: Tags at the top; pick tags, match any or none; no "Your cards" section.
+  await search.getByRole('button', { name: /Advanced/ }).click();
+  const tags = page.locator('.adv-tags');
+  await tags.getByRole('button', { name: 'ramp', exact: false }).first().click();
+  await tags.getByRole('button', { name: /mana rock/ }).click();
+  await expect(page.locator('.query-preview')).toContainText('#ramp #"mana rock"');
+  await tags.getByRole('radio', { name: 'Any' }).click();
+  await expect(page.locator('.query-preview')).toContainText('(#ramp or #"mana rock")');
+  await tags.getByRole('radio', { name: 'None' }).click();
+  await expect(page.locator('.query-preview')).toContainText('-#ramp -#"mana rock"');
+  await expect(page.locator('.advanced legend', { hasText: 'Your cards' })).toHaveCount(0);
+  await expect(page.locator('.advanced').getByText('Ownership')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test('#tag search and the tag browser find tagged cards', async ({ page, isMobile }) => {
   const errors = watchErrors(page);
   await open(page);
