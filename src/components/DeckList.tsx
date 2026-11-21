@@ -193,11 +193,14 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
           onChange={(e) => setFilter({ ...filter, text: e.target.value || undefined })} aria-label="Filter deck list"
         />
         <SavedSearches query={filter.text ?? ''} onApply={(q) => setFilter({ ...filter, text: q })} />
-        <select className="input input-sm group-by-select" value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupBy)} aria-label="Group cards by">
-          <option value="type">Group: Type</option>
-          <option value="tag">Group: Tag</option>
-          <option value="mv">Group: Mana value</option>
-        </select>
+        <label className="group-by">
+          <span className="muted">Group by:</span>
+          <select className="input input-sm group-by-select" value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupBy)} aria-label="Group cards by">
+            <option value="type">Type</option>
+            <option value="tag">Tag</option>
+            <option value="mv">Mana value</option>
+          </select>
+        </label>
         <button className={`chip ${favOnly ? 'chip-gold' : ''}`} onClick={() => setFavOnly((f) => !f)} aria-pressed={favOnly} title="Show favorites only">★</button>
         {board === 'main' && (
           <button className={`btn btn-sm ${showBasics ? 'btn-primary' : ''}`} onClick={() => setShowBasics((s) => !s)}>

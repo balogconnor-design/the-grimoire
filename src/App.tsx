@@ -10,7 +10,7 @@ import { DataSafety } from './components/DataSafety';
 import { isPortable } from './lib/device';
 import logoUrl from './assets/grimoire-logo.png';
 
-const THEME_COLOR: Record<string, string> = { dark: '#0f1218', light: '#f3f5f8' };
+const THEME_COLOR: Record<string, string> = { dark: '#141414', light: '#f3f5f8' };
 
 function useHashRoute() {
   const [hash, setHash] = useState(() => window.location.hash.slice(1) || '/');
@@ -83,10 +83,12 @@ export function App() {
       {/* The portable launcher already works offline, so it skips the service worker (which would
           otherwise keep serving the old app after the portable app folder is replaced). */}
       {!isPortable() && <UpdatePrompt />}
+      {section === 'home' && (
       <footer className="app-footer muted small">
         <p className="footer-data">Your decks and collection are saved only in this browser on this device. Use <strong>Collection → Export &amp; backup</strong> to keep a copy or move them elsewhere. <button className="link-btn" onClick={() => navigate('/help')}>Help &amp; about</button></p>
         The Grimoire is unofficial fan content. It is not affiliated with, endorsed by, or sponsored by Wizards of the Coast. Magic: The Gathering, card names, text, symbols and artwork are the property of Wizards of the Coast LLC and the artists. Card images and data are provided by Scryfall.
       </footer>
+      )}
     </div>
   );
 }

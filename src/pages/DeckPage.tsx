@@ -96,7 +96,7 @@ export function DeckPage({ id }: { id: string }) {
             {count}/{fmt.deckSize}
           </span>
           <span className="header-price">{formatUSD(boardPrice(deck, 'main'))}</span>
-          <span className={`legal-dot ${validation.legal ? 'ok' : 'bad'}`} title={validation.legal ? 'Deck is legal' : 'Deck has issues — see Deck Details'} />
+          <span className={`legal-dot ${validation.legal ? 'ok' : 'bad'}`} title={validation.legal ? 'Deck is legal' : 'Deck has issues — see Metrics'} />
         </div>
         <div className="header-actions">
           <button className="btn btn-sm" onClick={() => setIe('import')}>Import</button>
@@ -123,7 +123,7 @@ export function DeckPage({ id }: { id: string }) {
       <nav className="mobile-tabs">
         {(['search', 'deck', 'details'] as MobileTab[]).map((t) => (
           <button key={t} className={`tab ${mobileTab === t ? 'active' : ''}`} onClick={() => setMobileTab(t)}>
-            {t === 'search' ? 'Search' : t === 'deck' ? `Deck (${count})` : 'Details'}
+            {t === 'search' ? 'Search' : t === 'deck' ? `Deck (${count})` : 'Metrics'}
           </button>
         ))}
       </nav>

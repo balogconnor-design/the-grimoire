@@ -56,6 +56,24 @@ describe('odds groups', () => {
     expect(g.types.map((t) => [t.key, t.count])).toEqual([['Creature', 1], ['Artifact', 1], ['Land', 30]]);
     expect(g.tags.map((t) => [t.key, t.count])).toEqual([['ramp', 2], ['mana dork', 1], ['mana rock', 1]]);
   });
+
+  it('counts colour sources: lands and spell // land cards, duals for each colour, WUBRG order', () => {
+    const land = (name: string, produced: string[]) => card(name, { type_line: 'Land', cmc: 0, produced_mana: produced });
+    const mdfc = card('Sink into Stupor // Soporific Springs', {
+      layout: 'modal_dfc', type_line: 'Instant // Land', produced_mana: ['U'],
+      card_faces: [{ name: 'Sink into Stupor', type_line: 'Instant' }, { name: 'Soporific Springs', type_line: 'Land' }],
+    });
+    const d = { ...deck, commanderUid: undefined, entries: [
+      e(land('Mountain', ['R']), 18), e(land('Island', ['U']), 17), e(land('Steam Vents', ['U', 'R']), 1), e(mdfc), e(land('Command Tower', ['W', 'U', 'B', 'R', 'G'])),
+      e(land('Wastes', ['C'])), e(card('Bolt'), 50),
+    ] } as Deck;
+    const g = oddsGroups(d, { global: new Map(), scryfall: new Map() });
+    expect(g.colors.map((c) => [c.key, c.count])).toEqual([['W', 1], ['U', 20], ['B', 1], ['R', 20], ['G', 1]]);
+    // Each colour is its own chance: 20 blue sources in 90 cards, 7 seen.
+    const blue = atLeast(g.library, 20, 7, 1);
+    expect(blue).toBeCloseTo(1 - exactly(g.library, 20, 7, 0), 10);
+    expect(blue).toBeGreaterThan(0.8);
+  });
 });
 
 describe('turn hints', () => {

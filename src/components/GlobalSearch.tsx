@@ -114,7 +114,7 @@ export function GlobalSearch() {
           </button>
           <SavedSearches query={query} onApply={apply} />
           <button type="button" className={`chip ${showTags ? 'chip-on' : ''}`} onClick={() => setShowTags((v) => !v)} aria-pressed={showTags}>
-            🏷 All tags
+            🏷 Tags
           </button>
           <button
             type="button" className={`chip ${favOnly ? 'chip-gold' : ''}`} aria-pressed={favOnly} title="Only favorite cards (owned or not)"
