@@ -1,6 +1,6 @@
 import type { Deck, DeckEntry } from '../types';
 import { commanderEntry, isLand, sortEntries } from './rules';
-import { byTagPriority } from './scryfallTags';
+import { byTagPriority, isScryfallTagLabel } from './scryfallTags';
 
 /** Tag lookups the deck views need: global tags and Scryfall tags, both by card name. */
 export interface TagSources {
@@ -10,12 +10,14 @@ export interface TagSources {
 
 /**
  * A deck entry's tags. `own` = tags you made (this deck's card tags, then global tags);
- * `scryfall` = automatic ones not already among them. `all` = own first, then Scryfall.
+ * `scryfall` = automatic ones not already among them (for showing as chips).
+ * `all` = every tag, Scryfall's first (in priority order), then yours.
  */
 export function entryTags(e: DeckEntry, src: TagSources): { own: string[]; scryfall: string[]; all: string[] } {
   const own = [...new Set([...(e.tags ?? []), ...(src.global.get(e.card.name) ?? [])])];
-  const scryfall = (src.scryfall.get(e.card.name) ?? []).filter((t) => !own.includes(t));
-  return { own, scryfall, all: [...own, ...scryfall] };
+  const auto = src.scryfall.get(e.card.name) ?? [];
+  const scryfall = auto.filter((t) => !own.includes(t));
+  return { own, scryfall, all: [...new Set([...auto, ...own])] };
 }
 
 export const COMMANDER_GROUP = 'Commander';
@@ -26,20 +28,19 @@ export const UNTAGGED_GROUP = 'Untagged';
  * The group a card is listed under when the deck is grouped by tag:
  * - the commander gets its own group;
  * - the tag you dragged it to (`mainTag`), while the card still has that tag;
- * - otherwise your own first tag, then its first Scryfall tag (in Scryfall-tag priority order);
- * - lands with no tag of yours and no chosen tag go under Lands (Scryfall tags would scatter them);
+ * - lands go under Lands unless you tagged them yourself (Scryfall tags would scatter them);
+ * - otherwise its first Scryfall tag (in Scryfall-tag priority order), then your own first tag;
  * - anything else: Untagged.
  */
 export function mainGroup(deck: Deck, e: DeckEntry, src: TagSources): string {
   if (e.uid === commanderEntry(deck)?.uid) return COMMANDER_GROUP;
   const { own, all } = entryTags(e, src);
   if (e.mainTag && all.includes(e.mainTag)) return e.mainTag;
-  if (own.length) return own[0];
-  if (isLand(e.card)) return LANDS_GROUP;
+  if (isLand(e.card)) return own[0] ?? LANDS_GROUP;
   return all[0] ?? UNTAGGED_GROUP;
 }
 
-/** Group entries by main tag: Commander, your tags (A–Z), Scryfall tags (priority order), Lands, Untagged. */
+/** Group entries by main tag: Commander, Scryfall tags (priority order), your tags (A–Z), Lands, Untagged. */
 export function groupByTag(deck: Deck, entries: DeckEntry[], src: TagSources): { key: string; entries: DeckEntry[]; scryfall: boolean }[] {
   const m = new Map<string, DeckEntry[]>();
   for (const e of entries) {
@@ -48,11 +49,10 @@ export function groupByTag(deck: Deck, entries: DeckEntry[], src: TagSources): {
     m.get(g)!.push(e);
   }
   const fixed = [COMMANDER_GROUP, LANDS_GROUP, UNTAGGED_GROUP];
-  const ownTags = new Set(entries.flatMap((e) => entryTags(e, src).own));
   const keys = [...m.keys()].filter((k) => !fixed.includes(k));
-  const mine = keys.filter((k) => ownTags.has(k)).sort((a, b) => a.localeCompare(b));
-  const auto = keys.filter((k) => !ownTags.has(k)).sort(byTagPriority);
-  return [COMMANDER_GROUP, ...mine, ...auto, LANDS_GROUP, UNTAGGED_GROUP]
+  const auto = keys.filter(isScryfallTagLabel).sort(byTagPriority);
+  const mine = keys.filter((k) => !isScryfallTagLabel(k)).sort((a, b) => a.localeCompare(b));
+  return [COMMANDER_GROUP, ...auto, ...mine, LANDS_GROUP, UNTAGGED_GROUP]
     .filter((k) => m.has(k))
     .map((k) => ({ key: k, entries: m.get(k)!.sort(sortEntries), scryfall: auto.includes(k) }));
 }

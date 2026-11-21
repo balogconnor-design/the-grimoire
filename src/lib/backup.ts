@@ -1,3 +1,4 @@
+import { cleanTargetBracket } from './bracket';
 import type { Card, CollectionItem, Deck, GlobalCardTags, PriceSnapshot, PurchasedDeck, SaleRecord, SavedSearch, TxKind, WatchItem } from '../types';
 import { allocatedQty, backfillLedgerTx, clampAllocations, FINISH_LABEL, intentLabel, itemPL, itemUnitValue, printBadges } from './collection';
 import {
@@ -233,6 +234,9 @@ export function parseBackup(text: string): { backup: Backup; summary: BackupSumm
     });
     const deck = { ...(d as unknown as Deck), name: typeof d.name === 'string' ? d.name : 'Untitled deck', entries };
     if (deck.commanderUid && !entries.some((e) => e.uid === deck.commanderUid)) deck.commanderUid = undefined;
+    const target = cleanTargetBracket(deck.targetBracket);
+    if (target) deck.targetBracket = target;
+    else delete deck.targetBracket;
     return deck;
   });
 

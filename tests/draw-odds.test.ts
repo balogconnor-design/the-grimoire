@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Card, Deck, DeckEntry } from '../src/types';
-import { atLeast, cardsSeen, exactly, oddsGroups } from '../src/lib/drawOdds';
+import { atLeast, cardsSeen, exactly, oddsGroups, turnHint } from '../src/lib/drawOdds';
 import type { TagSources } from '../src/lib/deckTags';
 import { card } from './helpers';
 
@@ -55,5 +55,18 @@ describe('odds groups', () => {
     expect(g.library).toBe(32);
     expect(g.types.map((t) => [t.key, t.count])).toEqual([['Creature', 1], ['Artifact', 1], ['Land', 30]]);
     expect(g.tags.map((t) => [t.key, t.count])).toEqual([['ramp', 2], ['mana dork', 1], ['mana rock', 1]]);
+  });
+});
+
+describe('turn hints', () => {
+  it('match cardsSeen on the play and on the draw', () => {
+    expect(turnHint(7, false)).toBe('opening hand');
+    expect(turnHint(7, true)).toBe('opening hand');
+    expect(turnHint(8, false)).toBe('turn 2');
+    expect(turnHint(8, true)).toBe('turn 1');
+    for (let t = 2; t <= 10; t++) {
+      expect(turnHint(cardsSeen(t, false), false)).toBe('turn ' + t);
+      expect(turnHint(cardsSeen(t, true), true)).toBe('turn ' + t);
+    }
   });
 });

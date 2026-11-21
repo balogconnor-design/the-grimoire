@@ -4,8 +4,11 @@ import { mockScryfall } from './scryfall';
 // Errors the app logs or throws fail the test (Scryfall is mocked, so there's no network noise).
 function watchErrors(page: Page) {
   const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
+  // WebKit reports the background Scryfall tag download (CSV) as an error when a test navigates
+  // away mid-request. The app already catches it, so it isn't a failure.
+  const cancelledTagDownload = (m: string) => /format=csv/.test(m) && /access control checks|cancelled|aborted/i.test(m);
+  page.on('pageerror', (e) => { if (!cancelledTagDownload(e.message)) errors.push(`pageerror: ${e.message}`); });
+  page.on('console', (m) => { if (m.type() === 'error' && !cancelledTagDownload(m.text())) errors.push(`console: ${m.text()}`); });
   return errors;
 }
 
@@ -137,9 +140,32 @@ test('draw odds panel shows and updates the chance per card type', async ({ page
   await expect(artifact).toContainText('100%');
   await odds.getByLabel('At least this many').selectOption('2');
   await expect(artifact).toContainText('0%');
-  await odds.getByLabel('By turn').selectOption('4');
+  await odds.getByLabel('By card').selectOption('10');
+  await expect(odds).toContainText('= turn 4');
+  await odds.getByLabel('On the draw').check();
+  await expect(odds).toContainText('= turn 3');
   await expect(odds).toContainText('10 cards seen');
   await page.screenshot({ path: 'test-results/draw-odds.png', fullPage: true });
+  expect(errors).toEqual([]);
+});
+
+test('bracket estimate shows the bracket and keeps a target bracket', async ({ page, isMobile }) => {
+  test.skip(!!isMobile, 'phones show the details panel on its own tab; the rules are covered by unit tests');
+  const errors = watchErrors(page);
+  await open(page);
+  await createDeck(page, 'Bracket Test');
+  const search = page.locator('.search-panel');
+  await search.locator('.search-input').fill('sol ring');
+  await search.locator('.search-input').press('Enter');
+  const result = search.locator('.result-card').first();
+  await result.hover();
+  await result.getByRole('button', { name: 'Add Sol Ring to main deck' }).click();
+  const panel = page.locator('.detail-section', { has: page.getByRole('heading', { name: 'Bracket estimate' }) });
+  await expect(panel.locator('.bracket-badge')).toHaveText('Bracket 1–2');
+  await panel.getByRole('button', { name: '2', exact: true }).click();
+  await expect(panel).toContainText('Cards fit Bracket 2 (Core)');
+  await page.reload();
+  await expect(panel.getByRole('button', { name: '2', exact: true })).toHaveAttribute('aria-pressed', 'true');
   expect(errors).toEqual([]);
 });
 
@@ -168,11 +194,22 @@ test('#tag search and the tag browser find tagged cards', async ({ page, isMobil
   await pick.click();
   await expect(page.locator('.tag-group')).toContainText('Sol Ring');
 
-  // #ramp alone searches your own cards.
+  // A tag of yours that isn't a Scryfall tag searches your own cards.
   const box = page.locator('.search-form input').first();
+  await box.fill('#ramp-ish');
+  await box.press('Enter');
+  await expect(page.locator('.empty')).toContainText('No cards match');
+
+  // #ramp is also a Scryfall tag: Scryfall is asked for every card with it (otag:ramp).
+  const asked = page.waitForRequest((r) => {
+    const u = new URL(r.url());
+    return u.pathname === '/cards/search' && u.searchParams.get('format') !== 'csv' && (u.searchParams.get('q') ?? '').includes('otag:ramp');
+  });
   await box.fill('#ramp');
   await box.press('Enter');
-  await expect(page.locator('.results-meta')).toContainText('1 of your cards');
+  await asked;
+  await expect(page.locator('.results-meta')).toContainText('1 cards');
+  await expect(page.locator('.result-card')).toHaveCount(1);
   await expect(page.locator('.result-card')).toContainText('Sol Ring');
   expect(errors).toEqual([]);
 });

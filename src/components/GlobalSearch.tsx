@@ -5,7 +5,7 @@ import { SORT_ORDERS, type SortOrder } from '../lib/scryfall';
 import { buildAdvanced, countAdvanced, EMPTY_ADV, type Adv } from '../lib/advanced';
 import { AdvancedSearch } from './AdvancedSearch';
 import { TagBrowser } from './TagBrowser';
-import { hybridMore, hybridSearch } from '../lib/search';
+import { appendResults, hybridMore, hybridSearch } from '../lib/search';
 import { useSubjects } from '../lib/hooks';
 import { CardResult } from './CardResult';
 import { CardModal } from './CardModal';
@@ -68,7 +68,7 @@ export function GlobalSearch() {
     setLoading(true);
     try {
       const r = await hybridMore(next, local, (c) => subjectFor(c));
-      setResults((xs) => [...(xs ?? []), ...r.cards]);
+      setResults((xs) => appendResults(xs ?? [], r.cards, adv.unique));
       setNext(r.next);
     } catch (e) {
       setError((e as Error).message);

@@ -6,15 +6,16 @@ import {
   commanderEntry, computeManaBase, computeManaProducers, computeTypes, formatUSD, MANA_BASE_TOLERANCE, type ManaBaseStatus, type ProducerKind,
   type Validation,
 } from '../lib/rules';
-import { refreshPrices } from '../lib/actions';
+import { refreshPrices, setTargetBracket } from '../lib/actions';
+import { BRACKET_GC_LIMIT, BRACKETS, bracketName, estimateBracket, type BracketNumber } from '../lib/bracket';
 import { ManaSymbol } from './Mana';
 import { useToast } from './Toast';
 import { useGlobalTags, usePool } from '../lib/hooks';
 import { planAllocation, releaseAllocation } from '../lib/ownership';
 import { collectionT, useSettings } from '../lib/store';
 import { navigate } from '../lib/router';
-import { useScryfallTags } from '../lib/scryfallTags';
-import { atLeast, cardsSeen, oddsGroups, type OddsGroup } from '../lib/drawOdds';
+import { useScryfallTags, useScryfallTagStatus } from '../lib/scryfallTags';
+import { atLeast, oddsGroups, SEEN_MAX, SEEN_MIN, turnHint, type OddsGroup } from '../lib/drawOdds';
 
 interface Props {
   deck: Deck;
@@ -94,6 +95,8 @@ export function DeckDetails({ deck, validation, filter, setFilter }: Props) {
           ))}
         </ul>
       </div>
+
+      {fmt.hasCommander && <BracketSection deck={deck} filter={filter} setFilter={setFilter} />}
 
       {/* Price */}
       <div className="detail-section">
@@ -537,12 +540,16 @@ function TypeBreakdown({ deck, filter, setFilter }: ChartProps) {
 
 const ODDS_TAGS_SHOWN = 8;
 const ODDS_KEY = 'grimoire.drawOdds';
-interface OddsPrefs { min: number; turn: number; onDraw: boolean }
+interface OddsPrefs { min: number; seen: number; onDraw: boolean }
 function readOddsPrefs(): OddsPrefs {
   try {
     const v = JSON.parse(localStorage.getItem(ODDS_KEY) ?? '{}');
-    return { min: v.min >= 1 && v.min <= 4 ? v.min : 1, turn: v.turn >= 1 && v.turn <= 10 ? v.turn : 1, onDraw: !!v.onDraw };
-  } catch { return { min: 1, turn: 1, onDraw: false }; }
+    return {
+      min: v.min >= 1 && v.min <= 4 ? v.min : 1,
+      seen: Number.isInteger(v.seen) && v.seen >= SEEN_MIN && v.seen <= SEEN_MAX ? v.seen : SEEN_MIN,
+      onDraw: !!v.onDraw,
+    };
+  } catch { return { min: 1, seen: SEEN_MIN, onDraw: false }; }
 }
 const tagQuery = (t: string) => `#${/\s/.test(t) ? `"${t}"` : t}`;
 const fmtChance = (p: number) => (p >= 0.995 && p < 1 ? '>99' : p > 0 && p < 0.005 ? '<1' : (p * 100).toFixed(0));
@@ -559,7 +566,7 @@ function DrawOdds({ deck, filter, setFilter }: ChartProps) {
     try { localStorage.setItem(ODDS_KEY, JSON.stringify(next)); } catch { /* storage unavailable: only this session remembers */ }
   };
   const g = useMemo(() => oddsGroups(deck, { global: globalTags, scryfall: stags }), [deck, globalTags, stags]);
-  const seen = cardsSeen(prefs.turn, prefs.onDraw);
+  const seen = prefs.seen;
   const tags = allTags ? g.tags : g.tags.slice(0, ODDS_TAGS_SHOWN);
 
   const row = (r: OddsGroup) => {
@@ -600,15 +607,15 @@ function DrawOdds({ deck, filter, setFilter }: ChartProps) {
                 {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
             </label>
-            <label>by{' '}
-              <select className="input input-sm" value={prefs.turn} onChange={(e) => setPrefs({ turn: Number(e.target.value) })} aria-label="By turn">
-                <option value={1}>opening hand</option>
-                {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((t) => <option key={t} value={t}>turn {t}</option>)}
+            <label>by card{' '}
+              <select className="input input-sm" value={seen} onChange={(e) => setPrefs({ seen: Number(e.target.value) })} aria-label="By card">
+                {Array.from({ length: SEEN_MAX - SEEN_MIN + 1 }, (_, i) => SEEN_MIN + i).map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
             </label>
             <label className="odds-draw">
               <input type="checkbox" checked={prefs.onDraw} onChange={(e) => setPrefs({ onDraw: e.target.checked })} /> On the draw
             </label>
+            <span className="muted">= {turnHint(seen, prefs.onDraw)}</span>
           </div>
           <table className="color-table odds-table">
             <thead><tr><th>Type</th><th title="Copies in the library">Cards</th><th title={`Chance of at least ${prefs.min} in ${seen} cards`}>Chance</th></tr></thead>
@@ -628,9 +635,88 @@ function DrawOdds({ deck, filter, setFilter }: ChartProps) {
         </>
       )}
       <div className="muted tiny">
-        Chance of at least {prefs.min} card{prefs.min === 1 ? '' : 's'} of each kind in your first {seen} cards: a 7-card hand
-        {prefs.turn > 1 ? ` plus one draw a turn${prefs.onDraw ? '' : ' (none on turn 1 on the play)'}` : prefs.onDraw ? ' plus your first draw' : ''}.
+        Chance of at least {prefs.min} card{prefs.min === 1 ? '' : 's'} of each kind among the first {seen} cards you see
+        {' '}(a 7-card hand, then one draw a turn; no draw on turn 1 on the play).
         {' '}{commanderEntry(deck) ? 'The commander isn’t in the library. ' : ''}Ignores mulligans, tutors and extra draws. A card counts under each of its tags. Click a row to filter the deck list.
+      </div>
+    </div>
+  );
+}
+
+const bracketRange = (floor: BracketNumber) => (floor === 1 ? '1–2' : `${floor}+`);
+const bracketRangeName = (floor: BracketNumber) =>
+  floor === 1 ? 'Exhibition or Core' : floor === 4 ? 'Optimized or cEDH' : `${bracketName(floor)} or higher`;
+
+/** Lowest Commander bracket the cards allow, the cards behind it, and an optional target bracket. */
+function BracketSection({ deck, filter, setFilter }: ChartProps) {
+  const stags = useScryfallTags();
+  const stagStatus = useScryfallTagStatus();
+  const est = useMemo(() => estimateBracket(deck, stags), [deck, stags]);
+  const target = deck.targetBracket;
+  const over = target != null && est.floor > target;
+  const overReasons = target != null ? est.reasons.filter((r) => r.bracket > target) : [];
+
+  const groups: { label: string; query: string; cards: string[]; note?: string; info?: boolean }[] = [
+    { label: 'Game Changers', query: 'is:gamechanger', cards: est.gameChangers, note: `${est.gameChangers.length}/${BRACKET_GC_LIMIT} for Bracket 3` },
+    { label: 'Mass land denial', query: 'stag:mass-land-denial', cards: est.massLandDenial, note: 'Bracket 4+' },
+    { label: 'Extra turns', query: 'stag:extra-turn', cards: est.extraTurns, note: 'none in Bracket 1' },
+    { label: 'Land destruction', query: 'stag:land-removal', cards: est.landDestruction, note: 'no bracket rule', info: true },
+  ];
+
+  return (
+    <div className="detail-section">
+      <div className="section-head">
+        <h3>Bracket estimate</h3>
+        <span className="muted small">Commander Brackets (beta)</span>
+      </div>
+      <div className="bracket-headline">
+        <span className={`bracket-badge ${over ? 'bad' : ''}`}>Bracket {bracketRange(est.floor)}</span>
+        <span className="muted small">{bracketRangeName(est.floor)}</span>
+      </div>
+
+      <div className="bracket-target small" role="group" aria-label="Target bracket">
+        <span className="muted">Target:</span>
+        <button className={`chip ${target == null ? 'chip-on' : ''}`} aria-pressed={target == null} onClick={() => setTargetBracket(deck.id, undefined)}>None</button>
+        {BRACKETS.map((b) => (
+          <button key={b.n} className={`chip ${target === b.n ? 'chip-on' : ''}`} aria-pressed={target === b.n} title={`Bracket ${b.n}: ${b.name}`}
+            onClick={() => setTargetBracket(deck.id, target === b.n ? undefined : b.n)}>{b.n}</button>
+        ))}
+      </div>
+
+      {over ? (
+        <div className="mb-verdict bad">
+          Over your target, Bracket {target} ({bracketName(target)}):
+          <ul className="mb-moves">{overReasons.map((r) => <li key={r.text}>{r.text}</li>)}</ul>
+        </div>
+      ) : target != null ? (
+        <div className="mb-verdict ok">Cards fit Bracket {target} ({bracketName(target)}).</div>
+      ) : est.reasons.length > 0 && (
+        <ul className="bracket-reasons small">{est.reasons.map((r) => <li key={r.text}>{r.text}</li>)}</ul>
+      )}
+
+      {groups.filter((g) => g.cards.length > 0).map((g) => {
+        const active = filter.text === g.query;
+        return (
+          <div key={g.label} className={`bracket-group ${g.info ? 'info' : ''}`}>
+            <button className={`link-btn small bracket-group-head ${active ? 'active' : ''}`} aria-pressed={active}
+              title="Show these cards in the deck list" onClick={() => setFilter({ ...filter, text: active ? undefined : g.query })}>
+              <b>{g.label}</b> {g.cards.length}
+            </button>
+            {g.note && <span className="muted tiny"> · {g.note}</span>}
+            <div className="small bracket-cards">{g.cards.join(' · ')}</div>
+          </div>
+        );
+      })}
+      {stags.size === 0 && (
+        <div className="muted small">
+          {stagStatus.state === 'updating' ? `Downloading Scryfall tags… ${stagStatus.done}/${stagStatus.total}. ` : 'Scryfall tags aren’t downloaded yet, so '}
+          {stagStatus.state === 'updating' ? 'Extra turns and land denial are checked once that finishes.' : 'extra turns and land denial aren’t checked.'}
+        </div>
+      )}
+      <div className="muted tiny">
+        Brackets describe how a deck plays, so the cards only set the lowest bracket it fits. Bracket 1 vs 2 and 4 vs 5 depend on intent.
+        {' '}Rules as of Wizards’ February 9, 2026 update. Game Changer flags come from Scryfall (↻ Refresh prices updates them); extra turns and land denial use Scryfall tags.
+        {' '}Two-card combos aren’t checked yet.
       </div>
     </div>
   );

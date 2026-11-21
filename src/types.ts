@@ -115,6 +115,8 @@ export interface Deck {
   pricesUpdatedAt?: number;
   favorite?: boolean;
   tags?: string[];
+  /** Commander bracket you aim for (1–5); the bracket estimate warns when the cards go over it. */
+  targetBracket?: 1 | 2 | 3 | 4 | 5;
 }
 
 // ---------- Collection ----------

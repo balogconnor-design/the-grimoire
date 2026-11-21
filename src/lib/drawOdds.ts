@@ -62,3 +62,13 @@ export function oddsGroups(deck: Deck, src: TagSources): { library: number; type
       .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key)),
   };
 }
+
+/** The first and last "by card N" choices: the opening hand up to turn 14 on the play. */
+export const SEEN_MIN = 7;
+export const SEEN_MAX = 20;
+
+/** The turn on which you see your Nth card: 7 → "opening hand", 9 → "turn 3" on the play or "turn 2" on the draw. */
+export function turnHint(seen: number, onDraw: boolean): string {
+  const turn = seen - (onDraw ? 7 : 6);
+  return seen <= 7 ? 'opening hand' : 'turn ' + turn;
+}

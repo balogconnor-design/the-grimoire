@@ -390,3 +390,11 @@ export function exportDecklist(deck: Deck, withSets = false): string {
   if (maybe.length) sections.push(`Maybeboard\n${maybe.map(line).join('\n')}`);
   return sections.join('\n\n') + '\n';
 }
+
+/** Set or clear the Commander bracket a deck aims for. */
+export function setTargetBracket(deckId: string, bracket: 1 | 2 | 3 | 4 | 5 | undefined) {
+  updateDeck(deckId, (d) => {
+    if (bracket) d.targetBracket = bracket;
+    else delete d.targetBracket;
+  });
+}

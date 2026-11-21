@@ -51,12 +51,33 @@ describe('grouping a deck by tag', () => {
     ]);
   });
 
-  it('your own tags win over Scryfall tags and sort before them', () => {
+  it('Scryfall tags win over your own tags and sort before them', () => {
     const d = sampleDeck();
     d.entries.find((e) => e.uid === 'bolt')!.tags = ['interaction'];
+    d.entries.find((e) => e.uid === 'rock')!.tags = ['artifact'];
     const s = src({ 'Grizzly Bears': ['beater'] });
-    expect(mainGroup(d, d.entries.find((e) => e.uid === 'bolt')!, s)).toBe('interaction');
-    expect(groupByTag(d, d.entries, s).map((g) => g.key)).toEqual(['Commander', 'beater', 'interaction', 'ramp', 'Lands']);
+    expect(mainGroup(d, d.entries.find((e) => e.uid === 'bolt')!, s)).toBe('removal');
+    expect(mainGroup(d, d.entries.find((e) => e.uid === 'rock')!, s)).toBe('ramp');
+    // Your own tag is used when the card has no Scryfall tag.
+    expect(groupByTag(d, d.entries, s).map((g) => g.key)).toEqual(['Commander', 'ramp', 'removal', 'beater', 'Lands']);
+  });
+
+  it('lands stay under Lands unless you tagged them', () => {
+    const d = sampleDeck();
+    const ruins = d.entries.find((e) => e.uid === 'ruins')!;
+    expect(mainGroup(d, ruins, src())).toBe('Lands'); // has the Scryfall tag "recursion"
+    ruins.tags = ['utility land'];
+    expect(mainGroup(d, ruins, src())).toBe('utility land');
+    ruins.mainTag = 'recursion';
+    expect(mainGroup(d, ruins, src())).toBe('recursion');
+  });
+
+  it('a section for a Scryfall tag is a Scryfall section even when you also use that tag', () => {
+    const d = sampleDeck();
+    d.entries.find((e) => e.uid === 'vanilla')!.tags = ['ramp'];
+    const ramp = groupByTag(d, d.entries, src()).find((g) => g.key === 'ramp')!;
+    expect(ramp.scryfall).toBe(true);
+    expect(ramp.entries.map((e) => e.uid).sort()).toEqual(['rock', 'vanilla']);
   });
 
   it('a dragged main tag is used while the card still has it', () => {
