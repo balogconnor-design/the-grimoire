@@ -218,6 +218,11 @@ export function getSets(): Promise<SetInfo[]> {
   return setsPromise;
 }
 
+/** True for a request that never reached the server (offline, blocked, refused): browsers word these differently. */
+export function isNetworkError(e: unknown): boolean {
+  return e instanceof TypeError && /load failed|failed to fetch|networkerror|network request failed/i.test(e.message);
+}
+
 // ---------- Symbology (mana pip SVGs) ----------
 
 const SYMBOL_CACHE_KEY = 'deckforge.symbology.v1';
@@ -241,9 +246,14 @@ export async function loadSymbology(): Promise<void> {
   }
 }
 
-/** "{W/U}" -> svg url. Falls back to Scryfall's file naming convention. */
+/** The colour pips ship with the app (public/symbols, copies of Scryfall's files): they load offline and can't go stale. */
+const LOCAL_SYMBOLS = new Set(['W', 'U', 'B', 'R', 'G', 'C']);
+
+/** "{W/U}" -> svg url. Colour pips are local; others come from Scryfall (falling back to its file naming). */
 export function symbolUrl(symbol: string): string {
   const key = symbol.startsWith('{') ? symbol : `{${symbol}}`;
+  const bare = key.slice(1, -1);
+  if (LOCAL_SYMBOLS.has(bare)) return `/symbols/${bare}.svg`;
   if (symbolMap?.[key]) return symbolMap[key];
   const file = key.slice(1, -1).replace(/\//g, '').replace('∞', 'INFINITY').replace('½', 'HALF');
   return `https://svgs.scryfall.io/card-symbols/${encodeURIComponent(file)}.svg`;

@@ -1,3 +1,5 @@
+import { ViewPanel } from '../components/ViewPanel';
+import { hostViewPanel, usePinned } from '../lib/viewPanel';
 import { useEffect, useMemo, useState } from 'react';
 import type { Board, DeckFilter } from '../types';
 import { useDeck, updateDeck, deleteDeck } from '../lib/store';
@@ -6,7 +8,7 @@ import { boardCount, boardPrice, commanderEntry, formatUSD, validateDeck } from 
 import { refreshPrices, setDeckTags, toggleDeckFavorite } from '../lib/actions';
 import { useAllDeckTags } from '../lib/hooks';
 import { FavStar, TagEditor } from '../components/TagEditor';
-import { SearchPanel } from '../components/SearchPanel';
+import { SearchPanel, type SearchMode } from '../components/SearchPanel';
 import { DeckList } from '../components/DeckList';
 import { DeckDetails } from '../components/DeckDetails';
 import { ImportExportModal } from '../components/ImportExportModal';
@@ -27,6 +29,21 @@ export function DeckPage({ id }: { id: string }) {
   const [ie, setIe] = useState<'import' | 'export' | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>('deck');
+  // Card Search can be hidden to give the deck list and Metrics more room (remembered in this browser).
+  const [searchMode, setSearchModeState] = useState<SearchMode>(() => {
+    try {
+      const m = localStorage.getItem('grimoire.searchMode');
+      if (m === 'expanded' || m === 'collapsed' || m === 'hidden') return m;
+      return localStorage.getItem('grimoire.searchHidden') === '1' ? 'hidden' : 'expanded';
+    } catch { return 'expanded'; }
+  });
+  const setSearchMode = (m: SearchMode) => {
+    setSearchModeState(m);
+    try { localStorage.setItem('grimoire.searchMode', m); localStorage.removeItem('grimoire.searchHidden'); } catch { /* session only */ }
+  };
+  const searchHidden = searchMode === 'hidden';
+  const pinned = usePinned();
+  useEffect(() => hostViewPanel(), []);
   const validation = useMemo(() => (deck ? validateDeck(deck) : null), [deck]);
   const allDeckTags = useAllDeckTags();
   // Result of a main-menu import that created this deck (only shown when cards were missing).
@@ -128,8 +145,15 @@ export function DeckPage({ id }: { id: string }) {
         ))}
       </nav>
 
-      <div className={`deck-workspace show-${mobileTab}`}>
-        <div className="col col-search"><SearchPanel deck={deck} board={board} /></div>
+      <div className={`deck-workspace show-${mobileTab} search-${searchMode} ${pinned ? 'has-view' : ''}`}>
+        <div className="col col-search">
+          {searchHidden ? (
+            <button type="button" className="search-rail" onClick={() => setSearchMode('collapsed')} title="Show Card Search" aria-label="Show Card Search">
+              <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 4l4 4-4 4" /></svg><span className="search-rail-label">Card Search</span>
+            </button>
+          ) : <SearchPanel deck={deck} board={board} mode={searchMode} onMode={setSearchMode} />}
+          <ViewPanel deck={deck} />
+        </div>
         <div className="col col-deck"><DeckList deck={deck} validation={validation} filter={filter} setFilter={setFilter} board={board} setBoard={setBoard} /></div>
         <div className="col col-details"><DeckDetails deck={deck} validation={validation} filter={filter} setFilter={setFilterAndShow} /></div>
       </div>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { setCardDrag } from '../lib/dnd';
 import type { Board, Card, DeckEntry } from '../types';
 import { Modal } from './Modal';
 import { ColorPips, ManaCost, OracleText } from './Mana';
@@ -19,6 +20,7 @@ import { Tag, TagList } from './TagEditor';
 import { useScryfallTags } from '../lib/scryfallTags';
 import { deckmatesByTag, mainGroup } from '../lib/deckTags';
 import { setMainTag } from '../lib/actions';
+import { pinCard, useCanPin } from '../lib/viewPanel';
 
 interface Props {
   card: Card;
@@ -35,21 +37,48 @@ const LEGALITY_TEXT: Record<string, string> = {
   legal: 'Legal', not_legal: 'Not legal', banned: 'Banned', restricted: 'Restricted',
 };
 
+/** A card in a list the card window can step through with the arrow keys. */
+export interface CardRef { card: Card; entryUid?: string }
+
 /**
  * Card window. Clicking another card under "Also in this deck" replaces this window with that card's
- * (the body is keyed by card, so all of its state starts fresh).
+ * (the body is keyed by card, so all of its state starts fresh). With `siblings` (the list the card was
+ * opened from), the left and right arrow keys move to the previous and next card in that list.
  */
-export function CardModal({ card, deckId, entryUid, onClose }: Props) {
-  const [cur, setCur] = useState({ card, entryUid });
+export function CardModal({ card, deckId, entryUid, onClose, siblings }: Props & { siblings?: CardRef[] }) {
+  const [cur, setCur] = useState<CardRef>({ card, entryUid });
+  const index = siblings ? siblings.findIndex((s) => (cur.entryUid ? s.entryUid === cur.entryUid : s.card.id === cur.card.id)) : -1;
+  const step = siblings && index >= 0 && siblings.length > 1
+    ? (dir: -1 | 1) => setCur(siblings[(index + dir + siblings.length) % siblings.length])
+    : undefined;
   return (
     <CardModalBody
       key={cur.entryUid ?? cur.card.id} card={cur.card} deckId={deckId} entryUid={cur.entryUid} onClose={onClose}
       onNavigate={(e) => setCur({ card: e.card, entryUid: e.uid })}
+      step={step} position={step ? { index, total: siblings!.length } : undefined}
     />
   );
 }
 
-function CardModalBody({ card: initial, deckId, entryUid, onClose, onNavigate }: Props & { onNavigate: (e: DeckEntry) => void }) {
+/** The card details shown inline, in the deck page's view panel. */
+export function CardView({ card, deckId, entryUid }: { card: Card; deckId?: string; entryUid?: string }) {
+  const [cur, setCur] = useState<CardRef>({ card, entryUid });
+  return (
+    <CardModalBody
+      key={cur.entryUid ?? cur.card.id} card={cur.card} deckId={deckId} entryUid={cur.entryUid} onClose={() => undefined}
+      onNavigate={(e) => setCur({ card: e.card, entryUid: e.uid })} inline
+    />
+  );
+}
+
+function CardModalBody({ card: initial, deckId, entryUid, onClose, onNavigate, step, position, inline }: Props & {
+  onNavigate: (e: DeckEntry) => void;
+  /** Move to the previous (-1) or next (1) card of the list the window was opened from. */
+  step?: (dir: -1 | 1) => void;
+  position?: { index: number; total: number };
+  /** Render in place (view panel) instead of in a window. */
+  inline?: boolean;
+}) {
   const [card, setCard] = useState(initial);
   const [face, setFace] = useState(0);
   const [prints, setPrints] = useState<Card[] | null>(null);
@@ -90,6 +119,21 @@ function CardModalBody({ card: initial, deckId, entryUid, onClose, onNavigate }:
     setFace(0);
   }, [card.id]);
 
+  // Left / right arrows step through the list this window was opened from (not while typing or in a sub-window).
+  useEffect(() => {
+    if (!step || inline) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (sub || e.altKey || e.ctrlKey || e.metaKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
+      if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
+      if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [step, sub, inline]);
+  const canPin = useCanPin();
+
   const loadPrints = async () => {
     setLoadingPrints(true);
     try {
@@ -106,11 +150,26 @@ function CardModalBody({ card: initial, deckId, entryUid, onClose, onNavigate }:
   const price = cardPrice(card);
   const shownFaces = faces ?? [card];
 
-  return (
-    <Modal onClose={onClose} wide title={card.name}>
+  const body = (
+    <>
       <div className="card-modal">
         <div className="card-modal-image">
-          {img ? <img src={img} alt={card.name} className="card-img-large" /> : <div className="card-img-missing">{card.name}</div>}
+          {step && position && (
+            <div className="card-step">
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => step(-1)} aria-label="Previous card" title="Previous card (←)">‹</button>
+              <span className="muted small">{position.index + 1} of {position.total}</span>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => step(1)} aria-label="Next card" title="Next card (→)">›</button>
+            </div>
+          )}
+          {img ? (
+            <img src={img} alt={card.name} className="card-img-large" draggable={inline || undefined}
+              onDragStart={inline ? (e) => setCardDrag(e.dataTransfer, card) : undefined}
+              title={inline ? 'Drag onto the deck list to add a copy' : undefined} />
+          ) : <div className="card-img-missing">{card.name}</div>}
+          {!inline && canPin && (
+            <button type="button" className="btn btn-ghost btn-sm pin-btn" onClick={() => { pinCard(card, entryUid); onClose(); }}
+              title="Keep this card on show under Card Search (or right-click any card)">📌 Pin to view panel</button>
+          )}
           {hasBackFaceImage(card) && (
             <button className="btn btn-ghost flip-btn" onClick={() => setFace((f) => (f ? 0 : 1))}>
               ⟲ Show {face ? 'front' : 'back'} face
@@ -340,6 +399,7 @@ function CardModalBody({ card: initial, deckId, entryUid, onClose, onNavigate }:
       {sub === 'watch' && <WatchModal card={card} onClose={() => setSub(null)} />}
       {sub === 'tag' && <TagModal card={card} context={tagContext} onClose={() => setSub(null)} />}
       {sub && typeof sub === 'object' && <ItemModal itemId={sub.item} onClose={() => setSub(null)} />}
-    </Modal>
+    </>
   );
+  return inline ? <div className="card-view-inline">{body}</div> : <Modal onClose={onClose} wide title={card.name}>{body}</Modal>;
 }

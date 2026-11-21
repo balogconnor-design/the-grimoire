@@ -1,3 +1,4 @@
+import { isNetworkError } from '../lib/scryfall';
 import { useEffect, useRef, useMemo, useState, type FormEvent } from 'react';
 import { onCardSearchRequest } from '../lib/searchBus';
 import type { Board, Card, Deck } from '../types';
@@ -33,7 +34,16 @@ const BOARD_NAME: Record<Board, { full: string; short: string }> = {
 };
 
 /** Card search on the deck page. The + button and drag and drop add to the board shown in the deck list. */
-export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Board }) {
+export type SearchMode = 'expanded' | 'collapsed' | 'hidden';
+
+export function SearchPanel({ deck, board = 'main', mode = 'expanded', onMode }: {
+  deck: Deck; board?: Board;
+  /** Collapsed keeps just the search bar and the first row of buttons; searching expands it again. */
+  mode?: Exclude<SearchMode, 'hidden'>;
+  onMode?: (m: SearchMode) => void;
+}) {
+  const collapsed = mode === 'collapsed';
+  const expand = () => { if (collapsed) onMode?.('expanded'); };
   const fmt = getFormat(deck.format);
   const identity = deckIdentity(deck);
   const toast = useToast();
@@ -79,6 +89,7 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
   const inAnyBoard = useMemo(() => new Set(deck.entries.map((e) => e.card.name)), [deck.entries]);
 
   const run = async (base = userQuery, extra = constraints, fav = favOnly, sortBy: SortOrder = order) => {
+    expand();
     const q = [base.trim(), fav ? 'is:fav' : ''].filter(Boolean).join(' ');
     if (!q && !extra.trim()) return;
     setShowTags(false);
@@ -92,7 +103,7 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
       setLocal(res.local);
       setWarnings(res.warnings);
     } catch (e) {
-      setError((e as Error).message);
+      setError(isNetworkError(e) ? 'Couldn’t reach Scryfall. Check your connection and try again.' : (e as Error).message);
       setResults([]);
       setTotal(null);
     } finally {
@@ -108,7 +119,7 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
       setResults((r) => appendResults(r, res.cards, adv.unique));
       setNext(res.next);
     } catch (e) {
-      setError((e as Error).message);
+      setError(isNetworkError(e) ? 'Couldn’t reach Scryfall. Check your connection and try again.' : (e as Error).message);
     } finally {
       setLoading(false);
     }
@@ -170,10 +181,21 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
   };
 
   return (
-    <section className="panel search-panel">
+    <section className={`panel search-panel ${collapsed ? 'collapsed' : ''}`}>
       <div className="panel-head">
         <h2>Card Search</h2>
-        <a className="muted small" href="https://scryfall.com/docs/syntax" target="_blank" rel="noreferrer">Syntax guide ↗</a>
+        <span className="panel-head-tools">
+          <a className="muted small" href="https://scryfall.com/docs/syntax" target="_blank" rel="noreferrer">Syntax guide ↗</a>
+          {onMode && !collapsed && (
+            <button type="button" className="icon-btn sm search-mode-btn" onClick={() => onMode('collapsed')} title="Collapse Card Search to just the search bar" aria-label="Collapse Card Search"><Chevron dir="up" /></button>
+          )}
+          {onMode && collapsed && (
+            <>
+              <button type="button" className="icon-btn sm search-mode-btn" onClick={() => onMode('expanded')} title="Expand Card Search" aria-label="Expand Card Search"><Chevron dir="down" /></button>
+              <button type="button" className="icon-btn sm search-mode-btn hide-search-btn" onClick={() => onMode('hidden')} title="Hide Card Search for more room" aria-label="Hide Card Search"><Chevron dir="left" /></button>
+            </>
+          )}
+        </span>
       </div>
 
       <form onSubmit={onSubmit} className="search-form">
@@ -189,11 +211,12 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
         </div>
 
         <div className="search-options">
-          <button type="button" className={`chip ${showAdv ? 'chip-on' : ''}`} onClick={() => setShowAdv((s) => !s)} aria-expanded={showAdv}>
+          {/* Collapsed shows only the first four: Advanced, Saved, Tags, Favorites (see .search-panel.collapsed). */}
+          <button type="button" className={`chip ${showAdv ? 'chip-on' : ''}`} onClick={() => { expand(); setShowAdv((s) => !s); }} aria-expanded={showAdv}>
             ⚙ Advanced{advCount > 0 && <span className="adv-count">{advCount}</span>}
           </button>
           <SavedSearches query={query} onApply={apply} />
-          <button type="button" className={`chip ${showTags ? 'chip-on' : ''}`} onClick={() => setShowTags((v) => !v)} aria-pressed={showTags}>🏷 Tags</button>
+          <button type="button" className={`chip ${showTags ? 'chip-on' : ''}`} onClick={() => { expand(); setShowTags((v) => !v); }} aria-pressed={showTags}>🏷 Tags</button>
           <button
             type="button" className={`chip ${favOnly ? 'chip-gold' : ''}`} aria-pressed={favOnly} title="Only favorite cards (owned or not)"
             onClick={() => { const on = !favOnly; setFavOnly(on); if (on || userQuery || results.length) void run(undefined, undefined, on); }}
@@ -227,13 +250,19 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
         {fullQuery && <div className="query-preview" title="Query sent to Scryfall"><code>{fullQuery}</code></div>}
       </form>
 
+      <div className="search-body">
       {showTags ? (
         <TagBrowser subjectFor={(c) => subjects(c)} renderCard={(c) => renderCard(c, subjects(c))} onSearch={apply} />
       ) : (
         <>
           <div className="results-meta-row">
             <div className="results-meta">
-              {error ? <span className="error-text">{error}</span> : (
+{error ? (
+                <span className="search-error">
+                  <span className="error-text">{error}</span>
+                  <button type="button" className="btn btn-sm" onClick={() => void run()}>Try again</button>
+                </span>
+              ) : (
                 <>
                   {total != null ? <span>{total.toLocaleString()} cards</span> : results.length > 0 && <span>{results.length} matching so far</span>}
                   {local && <span className="muted"> · filtered by <code>{local}</code></span>}
@@ -267,9 +296,19 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
         </>
       )}
 
-      {selected && <CardModal card={selected} deckId={deck.id} onClose={() => setSelected(null)} />}
+      </div>
+
+      {selected && <CardModal card={selected} deckId={deck.id} onClose={() => setSelected(null)} siblings={results.map((c) => ({ card: c }))} />}
       {tagging && <TagModal card={tagging} context={{ kind: 'deck', deckId: deck.id }} onClose={() => setTagging(null)} />}
       {collecting && <AddToCollectionModal card={collecting} deckId={deck.id} onClose={() => setCollecting(null)} />}
     </section>
+  );
+}
+
+/** A small chevron icon pointing the way the panel moves. */
+function Chevron({ dir }: { dir: 'up' | 'down' | 'left' }) {
+  const d = dir === 'up' ? 'M4 10l4-4 4 4' : dir === 'down' ? 'M4 6l4 4 4-4' : 'M10 4l-4 4 4 4';
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
   );
 }

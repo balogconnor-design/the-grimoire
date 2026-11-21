@@ -499,6 +499,99 @@ test('group by tag: choose sections in the window, saved per deck, reset to the 
   expect(errors).toEqual([]);
 });
 
+test('view panel: right-click to pin, drag a copy from it, Pin button, arrow keys, hide Card Search', async ({ page, isMobile, browserName }) => {
+  test.skip(!!isMobile, 'right-click and the three-column layout are desktop features');
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const errors = watchErrors(page);
+  await open(page);
+  const counter = { ...SOL_RING, id: 'counter-test', name: 'Counterspell', type_line: 'Instant', mana_cost: '{U}{U}', cmc: 2, oracle_text: 'Counter target spell.' };
+  await page.route('https://api.scryfall.com/cards/search?**', (route) => {
+    if (new URL(route.request().url()).searchParams.get('format') === 'csv') return route.fallback();
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ object: 'list', total_cards: 2, has_more: false, data: [SOL_RING, counter] }) });
+  });
+  await createDeck(page, 'Pin Test');
+  const search = page.locator('.search-panel');
+  await search.locator('.search-input').fill('anything');
+  await search.locator('.search-input').press('Enter');
+  const sol = search.locator('.result-card', { hasText: 'Sol Ring' });
+  await sol.hover();
+  await sol.getByRole('button', { name: 'Add Sol Ring to main deck' }).click();
+
+  // Right-click a deck row: it shows in the view panel.
+  const view = page.locator('.view-panel');
+  await expect(view).toHaveCount(0);
+  await page.locator('.deck-groups .entry', { hasText: 'Sol Ring' }).click({ button: 'right' });
+  await expect(view).toContainText('Sol Ring');
+  // Right-clicking another card replaces it.
+  await search.locator('.result-card', { hasText: 'Counterspell' }).click({ button: 'right' });
+  await expect(view).toContainText('Counterspell');
+  await expect(view).not.toContainText('Artifact'); // Sol Ring's details are gone
+
+  // Dragging the picture adds a copy without removing anything.
+  const tab = (name: string) => page.locator('.board-tabs .tab', { hasText: name });
+  if (browserName !== 'webkit') {
+    await view.locator('.card-img-large').dragTo(tab('Sideboard'));
+    await expect(tab('Sideboard').locator('.tab-count')).toHaveText('1');
+    await expect(tab('Main').locator('.tab-count')).toHaveText('1');
+  }
+  await view.getByRole('button', { name: 'Close the view panel' }).click();
+  await expect(view).toHaveCount(0);
+
+  // Card window: arrow keys move through the search results; Pin puts the card in the panel.
+  await search.locator('.result-card', { hasText: 'Sol Ring' }).locator('.result-img-btn').click();
+  const modal = page.locator('.modal');
+  await expect(modal).toContainText('1 of 2');
+  await page.keyboard.press('ArrowRight');
+  await expect(modal).toContainText('Counterspell');
+  await expect(modal).toContainText('2 of 2');
+  await page.keyboard.press('ArrowRight'); // wraps around
+  await expect(modal).toContainText('1 of 2');
+  await modal.getByRole('button', { name: '📌 Pin to view panel' }).click();
+  await expect(modal).toHaveCount(0);
+  await expect(view).toContainText('Sol Ring');
+
+  // Collapse Card Search: just the search bar and the first row of buttons; searching opens the results again.
+  await expect(search.getByRole('button', { name: 'Hide Card Search' })).toHaveCount(0); // two steps to hide
+  await search.getByRole('button', { name: 'Collapse Card Search' }).click();
+  await expect(search.locator('.search-input')).toBeVisible();
+  await expect(search.getByRole('button', { name: /Advanced/ })).toBeVisible();
+  await expect(search.locator('.result-card').first()).toBeHidden();
+  await expect(search.getByRole('button', { name: '★ Popular staples' })).toBeHidden();
+  await search.locator('.search-input').press('Enter');
+  await expect(search.locator('.result-card').first()).toBeVisible();
+  await expect(search.getByRole('button', { name: 'Collapse Card Search' })).toBeVisible();
+  await search.getByRole('button', { name: 'Collapse Card Search' }).click();
+
+  // Then hide it: a rail brings it back; the choice survives a reload; the pinned card keeps the column.
+  await search.getByRole('button', { name: 'Hide Card Search' }).click();
+  await expect(page.locator('.search-panel')).toHaveCount(0);
+  await expect(view).toBeVisible();
+  await page.reload();
+  await expect(page.locator('.search-panel')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Show Card Search' }).click();
+  await expect(page.locator('.search-panel')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('a search that can not reach Scryfall says so and offers Try again', async ({ page }) => {
+  await open(page);
+  let fail = true;
+  await page.route('https://api.scryfall.com/cards/search?**', (route) => {
+    if (new URL(route.request().url()).searchParams.get('format') === 'csv') return route.fallback();
+    if (fail) return route.abort('failed');
+    return route.fallback();
+  });
+  const box = page.locator('.search-form input').first();
+  await box.fill('sol ring');
+  await box.press('Enter');
+  const err = page.locator('.search-error');
+  await expect(err).toContainText('Couldn’t reach Scryfall');
+  fail = false;
+  await err.getByRole('button', { name: 'Try again' }).click();
+  await expect(page.locator('.result-card').first()).toContainText('Sol Ring');
+  await expect(err).toHaveCount(0);
+});
+
 test('#tag search and the tag browser find tagged cards', async ({ page, isMobile }) => {
   const errors = watchErrors(page);
   await open(page);
