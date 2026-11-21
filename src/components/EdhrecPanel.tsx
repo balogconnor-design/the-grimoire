@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useState, type DragEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Card, Deck, DeckEntry } from '../types';
 import { addCard } from '../lib/actions';
-import { setCardDrag } from '../lib/dnd';
 import { getNamed } from '../lib/scryfall';
 import { commanderEntry, isLand } from '../lib/rules';
 import { setSettings, useSettings } from '../lib/store';
@@ -9,7 +8,9 @@ import {
   edhrecCommanderUrl, ensureSalt, getCommanderData, loadSuggestionCards, suggestionCard, useSalt, useSaltStatus,
   type CommanderData, type Suggestion,
 } from '../lib/edhrec';
+import { CardLink } from './CardLink';
 import { CardModal } from './CardModal';
+import { hoverArtProps } from './HoverArt';
 import { useToast } from './Toast';
 
 const SHOWN = 10;
@@ -94,9 +95,7 @@ function EdhrecData({ deck, onView }: { deck: Deck; onView: (v: Viewing) => void
           <ol className="edhrec-salty">
             {scored.slice(0, SALTY_SHOWN).map(({ entry, salt: s }) => (
               <li key={entry.uid}>
-                <button className="edhrec-card-btn" onClick={() => onView({ card: entry.card, entryUid: entry.uid })} title={`View ${entry.card.name}`}>
-                  <span className="truncate">{entry.card.name}</span>
-                </button>
+                <CardLink card={entry.card} name={entry.card.name} className="edhrec-card-btn" onOpen={() => onView({ card: entry.card, entryUid: entry.uid })} />
                 <span className="edhrec-salt-score" title="EDHREC salt score, 0–4">{s.toFixed(2)}</span>
               </li>
             ))}
@@ -166,11 +165,6 @@ function Suggestions({ deck, onView }: { deck: Deck; onView: (v: Viewing) => voi
   const view = async (s: Suggestion) => {
     try { onView({ card: await cardFor(s) }); } catch (e) { toast((e as Error).message, 'error'); }
   };
-  const onDragStart = (e: DragEvent, s: Suggestion) => {
-    const card = suggestionCard(s.name);
-    if (card) setCardDrag(e.dataTransfer, card);
-    else e.preventDefault(); // card data not here yet
-  };
 
   if (!name) return <div className="muted small edhrec-block">Choose a commander to see what its decks usually play.</div>;
   return (
@@ -204,14 +198,11 @@ function Suggestions({ deck, onView }: { deck: Deck; onView: (v: Viewing) => voi
                 </thead>
                 <tbody>
                   {shown.map((s) => {
-                    const ready = !!suggestionCard(s.name);
+                    const card = suggestionCard(s.name);
                     return (
-                      <tr key={s.name} className="clickable" onClick={() => view(s)} tabIndex={0}
-                        onKeyDown={(e) => e.key === 'Enter' && view(s)}
-                        title={ready ? `${s.name}: click to view, drag onto the deck list to add` : `${s.name}: click to view`}>
+                      <tr key={s.name} className="clickable" onClick={() => view(s)} {...hoverArtProps(card)}>
                         <td>
-                          <span className={`truncate edhrec-drag ${ready ? 'is-draggable' : ''}`} draggable={ready || undefined}
-                            onDragStart={(e) => onDragStart(e, s)}>{s.name}</span>
+                          <CardLink card={card} name={s.name} className="edhrec-drag" onOpen={() => void view(s)} />
                         </td>
                         <td>{pct(s.inclusion)}</td>
                         <td className={s.synergy <= 0 ? 'muted' : ''}>{signedPct(s.synergy)}</td>
