@@ -463,6 +463,42 @@ test('deck search: popular staples, greyed in-deck cards, list and details views
   expect(errors).toEqual([]);
 });
 
+test('group by tag: choose sections in the window, saved per deck, reset to the most common', async ({ page, isMobile }) => {
+  test.skip(!!isMobile, 'covered on desktop');
+  const errors = watchErrors(page);
+  await open(page);
+  await createDeck(page, 'Group Test');
+  const search = page.locator('.search-panel');
+  if (isMobile) await page.locator('.mobile-tabs .tab', { hasText: 'Search' }).click();
+  await search.locator('.search-input').fill('sol ring');
+  await search.locator('.search-input').press('Enter');
+  const result = search.locator('.result-card').first();
+  await result.hover();
+  await result.getByRole('button', { name: 'Add Sol Ring to main deck' }).click();
+
+  // The bundled Scryfall tags work straight away: no tag downloads from Scryfall.
+  await page.getByLabel('Group cards by').selectOption('tag');
+  const groups = page.locator('.deck-groups');
+  await expect(groups).toContainText(/ramp/i);
+  await page.getByRole('button', { name: 'Choose tags to group by' }).click();
+  const modal = page.locator('.modal');
+  await expect(modal).toContainText('Tick the tags that should become sections');
+  await modal.getByRole('button', { name: 'None' }).click();
+  await expect(modal.getByRole('button', { name: 'Group by selected tags' })).toBeDisabled();
+  await modal.getByLabel(/mana rock/).check();
+  await modal.getByRole('button', { name: 'Group by selected tags' }).click();
+  await expect(modal).toHaveCount(0);
+  await expect(groups.locator('.group-name').first()).toContainText(/mana rock/i);
+
+  // Kept for this deck after a reload; Reset tags goes back to the most common.
+  await page.reload();
+  await expect(groups).toContainText(/mana rock/i);
+  await page.getByRole('button', { name: 'Reset tags' }).click();
+  await expect(page.getByRole('button', { name: 'Reset tags' })).toHaveCount(0);
+  await expect(groups).toContainText(/ramp/i);
+  expect(errors).toEqual([]);
+});
+
 test('#tag search and the tag browser find tagged cards', async ({ page, isMobile }) => {
   const errors = watchErrors(page);
   await open(page);
