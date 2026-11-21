@@ -237,6 +237,7 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .status-badge.finished { background: var(--good); color: #062614; }
 .status-badge.in-progress { background: rgba(14, 14, 14, 0.75); color: #e9edf3; border: 1px solid rgba(255, 255, 255, 0.25); }
 .warn-badge { position: absolute; top: 9px; right: 10px; z-index: 1; background: rgba(14, 14, 14, 0.75); color: var(--warn); border-radius: 999px; width: 24px; height: 24px; display: grid; place-items: center; font-size: var(--fs-tiny); }
+.tile-colors { height: 6px; flex: none; }
 .tile-body { padding: 12px 14px 12px; display: flex; flex-direction: column; gap: 6px; }
 .tile-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 650; font-size: var(--fs-body); }
 .tile-stats { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }

@@ -5,12 +5,13 @@ import { deckTrend } from '../lib/collection';
 import { DeltaBadge } from '../components/Money';
 import type { PriceSnapshot } from '../types';
 import { FORMATS, getFormat } from '../lib/formats';
-import { boardCount, boardPrice, cardImage, commanderEntry, formatUSD, validateDeck } from '../lib/rules';
+import { boardCount, boardPrice, cardImage, COLOR_NAMES, commanderEntry, formatUSD, isLand, validateDeck } from '../lib/rules';
 import { defaultImportName, ImportError, importNewDeck, importSummary, newDeck, parseDecklist, toggleDeckFavorite, type ImportResult } from '../lib/actions';
 import { requestCardSearch, setPendingImport } from '../lib/searchBus';
 import { useToast } from '../components/Toast';
 import { ImportResultView } from '../components/ImportResult';
 import { ColorPips } from '../components/Mana';
+import { colorBarBackground, colorShares, frontPips } from '../lib/deckColors';
 import { Modal } from '../components/Modal';
 import { BackupModal } from '../components/BackupModal';
 import { GlobalSearch } from '../components/GlobalSearch';
@@ -158,7 +159,12 @@ function DeckTile({ deck, matches, coverage, snaps, onTagClick }: { deck: Deck; 
   const count = boardCount(deck, 'main');
   const legal = useMemo(() => validateDeck(deck).legal, [deck]);
   const cover = cmd?.card ?? [...deck.entries].sort((a, b) => (b.card.prices?.usd ? parseFloat(b.card.prices.usd) : 0) - (a.card.prices?.usd ? parseFloat(a.card.prices.usd) : 0))[0]?.card;
-  const identity = cmd?.card.color_identity ?? [...new Set(deck.entries.filter((e) => e.board === 'main').flatMap((e) => e.card.color_identity))];
+  // Colours the deck casts: front-face casting costs only (not colour identity). See lib/deckColors.ts.
+  const shares = useMemo(() => colorShares(frontPips(deck)), [deck]);
+  const hasSpells = deck.entries.some((e) => e.board === 'main' && !isLand(e.card));
+  const shareTitle = shares.length
+    ? shares.map((s) => `${COLOR_NAMES[s.color]} ${Math.round(s.share * 100)}%`).join(' · ')
+    : 'Colorless';
   const pct = Math.min(100, (count / fmt.deckSize) * 100);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -169,10 +175,11 @@ function DeckTile({ deck, matches, coverage, snaps, onTagClick }: { deck: Deck; 
         {!legal && <span className="warn-badge" title="Deck doesn't meet format requirements yet">⚠</span>}
         <span className="tile-fav"><FavStar on={!!deck.favorite} onToggle={() => toggleDeckFavorite(deck.id)} label="favorite deck" /></span>
       </div>
+      {hasSpells && <div className="tile-colors" style={{ background: colorBarBackground(shares) }} title={shareTitle} aria-label={`Deck colours: ${shareTitle}`} role="img" />}
       <div className="tile-body">
         <div className="tile-title">
           <span className="truncate">{deck.name}</span>
-          <ColorPips colors={identity} size={15} />
+          {hasSpells && <ColorPips colors={shares.map((s) => s.color)} size={15} />}
         </div>
         <div className="tile-sub muted small">
           {fmt.name}{cmd ? ` · ${cmd.card.name}` : ''}
