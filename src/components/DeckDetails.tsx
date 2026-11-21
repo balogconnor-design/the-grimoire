@@ -9,6 +9,7 @@ import {
 import { refreshPrices, setTargetBracket } from '../lib/actions';
 import { BRACKET_GC_LIMIT, BRACKETS, bracketName, estimateBracket, type BracketNumber } from '../lib/bracket';
 import { ManaSymbol } from './Mana';
+import { EdhrecPanel } from './EdhrecPanel';
 import { useToast } from './Toast';
 import { useGlobalTags, usePool } from '../lib/hooks';
 import { planAllocation, releaseAllocation } from '../lib/ownership';
@@ -97,6 +98,7 @@ export function DeckDetails({ deck, validation, filter, setFilter }: Props) {
       </div>
 
       {fmt.hasCommander && <BracketSection deck={deck} filter={filter} setFilter={setFilter} />}
+      {fmt.hasCommander && <EdhrecPanel deck={deck} />}
 
       {/* Price */}
       <div className="detail-section">

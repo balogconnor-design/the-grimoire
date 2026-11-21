@@ -169,6 +169,35 @@ test('bracket estimate shows the bracket and keeps a target bracket', async ({ p
   expect(errors).toEqual([]);
 });
 
+test('EDHREC stays off until turned on, then shows salt scores', async ({ page, isMobile }) => {
+  test.skip(!!isMobile, 'phones show the details panel on its own tab; the data handling is covered by unit tests');
+  const errors = watchErrors(page);
+  const edhrec: string[] = [];
+  await page.route('https://json.edhrec.com/**', (route) => {
+    edhrec.push(route.request().url());
+    const body = { container: { json_dict: { cardlists: [{ header: '', cardviews: [{ name: 'Sol Ring', salt: 1.59 }, { name: 'Stasis', salt: 3.05 }] }] } } };
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
+  });
+  await open(page);
+  await createDeck(page, 'Salt Test');
+  const search = page.locator('.search-panel');
+  await search.locator('.search-input').fill('sol ring');
+  await search.locator('.search-input').press('Enter');
+  const result = search.locator('.result-card').first();
+  await result.hover();
+  await result.getByRole('button', { name: 'Add Sol Ring to main deck' }).click();
+
+  const panel = page.locator('.edhrec-panel');
+  await expect(panel).toContainText('Off until you turn it on');
+  expect(edhrec).toEqual([]); // nothing is fetched while it's off
+  await panel.getByRole('button', { name: 'Turn on EDHREC' }).click();
+  await expect(panel.locator('.edhrec-salty')).toContainText('Sol Ring');
+  await expect(panel.locator('.edhrec-salty')).toContainText('1.59');
+  await expect(panel).toContainText('Choose a commander');
+  expect(edhrec).toEqual(['https://json.edhrec.com/pages/top/salt-1.json']);
+  expect(errors).toEqual([]);
+});
+
 test('#tag search and the tag browser find tagged cards', async ({ page, isMobile }) => {
   const errors = watchErrors(page);
   await open(page);

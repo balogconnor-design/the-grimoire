@@ -60,6 +60,11 @@ export function HelpPage() {
         <ul>
           <li>Everything you enter stays on your device. The app never uploads your decks or collection.</li>
           <li>Card searches, images and prices are requested straight from your browser to <a href="https://scryfall.com" target="_blank" rel="noreferrer">Scryfall</a>.</li>
+          <li>
+            EDHREC data is off until you turn it on in a Commander deck's details. Then salt scores and your commander's page are
+            downloaded from <a href="https://edhrec.com" target="_blank" rel="noreferrer">EDHREC</a>: only the commander's name is sent,
+            never your deck.
+          </li>
           {!portable && <li>The website counts visits with Cloudflare Web Analytics: no cookies, no personal data, no tracking across sites.</li>}
         </ul>
       </Section>
@@ -73,7 +78,8 @@ export function HelpPage() {
 
       <Section title="Credits">
         <p>
-          Card data and images come from <a href="https://scryfall.com" target="_blank" rel="noreferrer">Scryfall</a>. The Grimoire is unofficial
+          Card data and images come from <a href="https://scryfall.com" target="_blank" rel="noreferrer">Scryfall</a>. Salt scores and commander
+          suggestions (if you turn them on) come from <a href="https://edhrec.com" target="_blank" rel="noreferrer">EDHREC</a>. The Grimoire is unofficial
           fan content permitted under the Wizards of the Coast Fan Content Policy. It is not approved or endorsed by Wizards. Portions of the
           materials used are property of Wizards of the Coast. ©Wizards of the Coast LLC.
         </p>
