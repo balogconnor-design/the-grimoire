@@ -897,6 +897,11 @@ button.alert-row:hover { background: var(--panel-2); }
 .inv-card-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .inv-name { font-weight: 600; max-width: 280px; }
 .inv-sub { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+.collapse-head { display: inline-flex; align-items: baseline; gap: 6px; background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; text-align: left; }
+.collapse-head:hover h3, .collapse-head:focus-visible h3 { color: var(--text); }
+.collapse-caret { color: var(--muted); font-size: var(--fs-small); width: 0.9em; }
+.collapsible.closed .section-head { margin-bottom: 0; }
+.collapse-summary { margin-left: auto; font-variant-numeric: tabular-nums; }
 .group-by { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-small); white-space: nowrap; }
 .row-actions { display: flex; gap: 4px; align-items: center; justify-content: flex-end; white-space: nowrap; }
 

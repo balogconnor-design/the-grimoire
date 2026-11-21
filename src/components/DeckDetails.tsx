@@ -1,8 +1,8 @@
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useState, type ReactNode } from 'react';
 import type { Deck, DeckEntry, DeckFilter, TypeCategory } from '../types';
 import { getFormat } from '../lib/formats';
 import {
-  averageMV, boardCount, boardEntries, boardPrice, cardPrice, COLOR_NAMES, computeColorStats, computeCurve,
+  averageMV, boardEntries, boardPrice, cardPrice, COLOR_NAMES, computeColorStats, computeCurve,
   commanderEntry, computeManaBase, computeManaProducers, computeTypes, formatUSD, MANA_BASE_TOLERANCE, type ManaBaseStatus, type ProducerKind,
   type Validation,
 } from '../lib/rules';
@@ -32,17 +32,13 @@ interface Props {
 export function DeckDetails({ deck, validation, filter, setFilter }: Props) {
   const fmt = getFormat(deck.format);
   const main = useMemo(() => boardEntries(deck, 'main'), [deck]);
-  const mainCount = boardCount(deck, 'main');
   const toast = useToast();
   const [refreshing, setRefreshing] = useState(false);
   // Card window for cards named in the panels below (mana producers, bracket flags).
   const [viewing, setViewing] = useState<DeckEntry | null>(null);
 
-  const pct = Math.min(100, (mainCount / fmt.deckSize) * 100);
-  const over = fmt.exact && mainCount > fmt.deckSize;
-
   const topCards = useMemo(
-    () => [...main].map((e) => ({ e, total: (cardPrice(e.card) ?? 0) * e.qty })).sort((a, b) => b.total - a.total).slice(0, 5),
+    () => [...main].map((e) => ({ e, total: (cardPrice(e.card) ?? 0) * e.qty })).sort((a, b) => b.total - a.total).slice(0, 10),
     [main],
   );
 
@@ -61,35 +57,14 @@ export function DeckDetails({ deck, validation, filter, setFilter }: Props) {
   return (
     <aside className="panel details-panel">
       <div className="panel-head">
-        <h2>Deck Details</h2>
+        <h2>Metrics</h2>
         <span className={`legal-badge ${validation.legal ? 'ok' : 'bad'}`}>
           {validation.legal ? '✓ Legal' : '⚠ Not legal yet'}
         </span>
       </div>
 
-      {/* Counter */}
-      <div className="detail-section">
-        <div className="counter">
-          <span className={`counter-num ${over ? 'over' : mainCount === fmt.deckSize ? 'done' : ''}`}>{mainCount}</span>
-          <span className="counter-den">/ {fmt.deckSize}{fmt.exact ? '' : '+'}</span>
-        </div>
-        <div className="progress" role="progressbar" aria-valuenow={mainCount} aria-valuemax={fmt.deckSize}>
-          <div className={`progress-fill ${over ? 'over' : ''}`} style={{ width: `${pct}%` }} />
-        </div>
-        <div className="muted small">
-          {fmt.exact
-            ? mainCount < fmt.deckSize
-              ? `${fmt.deckSize - mainCount} more card${fmt.deckSize - mainCount === 1 ? '' : 's'} needed`
-              : mainCount > fmt.deckSize ? `${mainCount - fmt.deckSize} over the limit` : 'Deck size complete'
-            : mainCount < fmt.deckSize ? `${fmt.deckSize - mainCount} more to reach the minimum` : 'Minimum size met'}
-          {' · '}Side {boardCount(deck, 'side')} · Maybe {boardCount(deck, 'maybe')}
-        </div>
-      </div>
-
-      {/* Requirements */}
-      <div className="detail-section">
-        <h3>{fmt.name} requirements</h3>
-        <p className="muted small">{fmt.description}</p>
+      <Collapsible id="requirements" title={`${fmt.name} requirements`} titleHint={fmt.description}
+        summary={`${validation.requirements.filter((r) => r.ok).length}/${validation.requirements.length} met`}>
         <ul className="requirements">
           {validation.requirements.map((r) => (
             <li key={r.label} className={r.ok ? 'req-ok' : 'req-bad'}>
@@ -101,18 +76,14 @@ export function DeckDetails({ deck, validation, filter, setFilter }: Props) {
             </li>
           ))}
         </ul>
-      </div>
+      </Collapsible>
 
       {fmt.hasCommander && <BracketSection deck={deck} filter={filter} setFilter={setFilter} onView={setViewing} />}
       {fmt.hasCommander && <CombosPanel deck={deck} />}
       {fmt.hasCommander && <EdhrecPanel deck={deck} />}
 
-      {/* Price */}
-      <div className="detail-section">
-        <div className="section-head">
-          <h3>Price</h3>
-          <button className="link-btn small" onClick={doRefresh} disabled={refreshing}>{refreshing ? 'Refreshing…' : '↻ Refresh'}</button>
-        </div>
+      <Collapsible id="price" title="Price" summary={formatUSD(boardPrice(deck, 'main'))}
+        right={<button className="link-btn small" onClick={doRefresh} disabled={refreshing}>{refreshing ? 'Refreshing…' : '↻ Refresh'}</button>}>
         <div className="price-total">{formatUSD(boardPrice(deck, 'main'))}</div>
         <div className="muted small">
           Main deck (TCGplayer market) · Sideboard {formatUSD(boardPrice(deck, 'side'))} · Maybe {formatUSD(boardPrice(deck, 'maybe'))}
@@ -127,7 +98,7 @@ export function DeckDetails({ deck, validation, filter, setFilter }: Props) {
             ))}
           </ol>
         )}
-      </div>
+      </Collapsible>
 
       <CollectionSection deck={deck} />
 
@@ -164,11 +135,8 @@ function CollectionSection({ deck }: { deck: Deck }) {
   };
 
   return (
-    <div className="detail-section">
-      <div className="section-head">
-        <h3>Collection</h3>
-        <button className="link-btn small" onClick={() => navigate('/collection/buy')}>Buy list →</button>
-      </div>
+    <Collapsible id="collection" title="Collection" summary={`${cov.covered}/${cov.totalNeed} owned`}
+      right={<button className="link-btn small" onClick={() => navigate('/collection/buy')}>Buy list →</button>}>
       <div className="own-headline">
         <span className={`own-dot ${cov.complete ? 'full' : cov.covered ? 'part' : 'none'}`} aria-hidden />
         <b>{cov.covered}/{cov.totalNeed}</b> owned {cov.complete ? '· ready to build ✓' : `· ${cov.missing} missing`}
@@ -185,7 +153,7 @@ function CollectionSection({ deck }: { deck: Deck }) {
         <button className="btn btn-sm" onClick={commit} title="Reserve owned copies for this deck so other decks can't use them">Commit owned copies</button>
         {committed > 0 && <button className="btn btn-sm btn-ghost" onClick={release}>Release</button>}
       </div>
-    </div>
+    </Collapsible>
   );
 }
 
@@ -238,7 +206,6 @@ function ManaCurve({ deck, filter, setFilter }: ChartProps) {
           );
         })}
       </div>
-      <div className="muted tiny">Click a bar to show those cards in the deck list. Lands excluded.</div>
     </div>
   );
 }
@@ -406,12 +373,7 @@ function ManaBaseCheck({ deck, filter, setFilter }: ChartProps) {
               })}
             </tbody>
           </table>
-          <div className="muted tiny">
-            Green = within ±{MANA_BASE_TOLERANCE} pts, amber = {MANA_BASE_TOLERANCE}–{MANA_BASE_TOLERANCE * 2} pts short, red = more than {MANA_BASE_TOLERANCE * 2} short, grey = surplus.
-            {' '}Counts lands only (not rocks/dorks); fetch lands without listed mana aren't counted.
-            {mdfcLands > 0 && <> Spell // land MDFCs count as full sources and are shown as “+N”.</>}
-            {offColorLands > 0 && <> {offColorLands} land{offColorLands === 1 ? '' : 's'} make none of your spell colors.</>}
-          </div>
+          {offColorLands > 0 && <div className="muted small">{offColorLands} land{offColorLands === 1 ? '' : 's'} make none of your spell colors.</div>}
         </>
       )}
     </div>
@@ -545,7 +507,6 @@ function TypeBreakdown({ deck, filter, setFilter }: ChartProps) {
           })}
         </div>
       )}
-      <div className="muted tiny">Each card is counted once under its primary type. Click a type to filter.</div>
     </div>
   );
 }
@@ -764,6 +725,38 @@ function BracketSection({ deck, filter, setFilter, onView }: ChartProps & ViewPr
         {' '}Rules as of Wizards’ February 9, 2026 update. Game Changer flags come from Scryfall (↻ Refresh prices updates them); extra turns and land denial use Scryfall tags.
         {' '}{saved ? 'Combos come from your last Commander Spellbook check (Combos panel).' : 'Combos count once you run Check combos in the Combos panel.'}
       </div>
+    </div>
+  );
+}
+
+const COLLAPSED_KEY = 'grimoire.metricsCollapsed';
+const readCollapsed = (): Set<string> => {
+  try { return new Set(JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? '[]') as string[]); } catch { return new Set(); }
+};
+
+/** A Metrics section that folds away to its heading (and a one-line summary). Remembered in this browser. */
+function Collapsible({ id, title, titleHint, summary, right, children }: {
+  id: string; title: string; titleHint?: string; summary?: ReactNode; right?: ReactNode; children: ReactNode;
+}) {
+  const [open, setOpen] = useState(() => !readCollapsed().has(id));
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    const set = readCollapsed();
+    if (next) set.delete(id); else set.add(id);
+    try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...set])); } catch { /* storage unavailable: only this session remembers */ }
+  };
+  return (
+    <div className={`detail-section collapsible ${open ? 'open' : 'closed'}`}>
+      <div className="section-head">
+        <button className="collapse-head" onClick={toggle} aria-expanded={open} title={titleHint}>
+          <span className="collapse-caret" aria-hidden>{open ? '▾' : '▸'}</span>
+          <h3>{title}</h3>
+        </button>
+        {!open && summary != null && <span className="muted small collapse-summary">{summary}</span>}
+        {open && right}
+      </div>
+      {open && children}
     </div>
   );
 }
