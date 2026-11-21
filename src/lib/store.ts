@@ -198,6 +198,8 @@ export interface Settings {
   conditionAdjust: boolean;
   lastBackupAt?: number;
   lastCollectionRefresh?: number;
+  /** Opt-in: fetch public EDHREC data (salt scores, commander suggestions). Off by default. */
+  edhrec?: boolean;
   /** Existing lots were written into the transaction ledger as "bought" rows. */
   ledgerBackfilled?: boolean;
 }

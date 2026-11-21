@@ -552,6 +552,14 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .bracket-group-head { padding: 0; }
 .bracket-group-head.active { text-decoration: underline; }
 .bracket-cards { color: var(--text-2, var(--muted)); line-height: 1.5; }
+.edhrec-salt, .edhrec-suggest { margin-bottom: 10px; }
+.edhrec-salt .section-head, .edhrec-suggest .section-head { margin-bottom: 4px; }
+.edhrec-table { table-layout: fixed; margin-bottom: 6px; }
+.edhrec-table th:nth-child(2), .edhrec-table td:nth-child(2) { width: 52px; }
+.edhrec-table th:nth-child(3), .edhrec-table td:nth-child(3) { width: 62px; }
+.edhrec-table th:nth-child(4), .edhrec-table td:nth-child(4) { width: 36px; text-align: right; }
+.edhrec-table td .truncate { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.edhrec-table .mini-btn { position: static; }
 .producer-kinds { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 .producer-table { margin-top: 8px; }
 .producer-table th:not(:first-child), .producer-table td:not(:first-child) { width: 1%; white-space: nowrap; }

@@ -1,11 +1,12 @@
 # Cloudflare Pages response headers (https://developers.cloudflare.com/pages/configuration/headers/).
 # Only the hosted web version uses this file; the portable build removes it.
-# The app itself talks only to Scryfall: api.scryfall.com for data, *.scryfall.io for card images and mana symbols.
+# The app talks to Scryfall: api.scryfall.com for data, *.scryfall.io for card images and mana symbols.
+# When the user turns on EDHREC (off by default) it also reads public JSON from json.edhrec.com.
 # connect-src also lists *.scryfall.io because the service worker fetches card images and symbols to cache them.
 # Cloudflare Web Analytics (cookie-free visit counts, switched on in the Pages dashboard) injects a script from
 # static.cloudflareinsights.com that reports to cloudflareinsights.com.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.scryfall.io; connect-src 'self' https://api.scryfall.com https://*.scryfall.io https://cloudflareinsights.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.scryfall.io; connect-src 'self' https://api.scryfall.com https://*.scryfall.io https://json.edhrec.com https://cloudflareinsights.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
