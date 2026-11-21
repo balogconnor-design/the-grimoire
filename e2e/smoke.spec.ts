@@ -573,6 +573,25 @@ test('view panel: right-click to pin, drag a copy from it, Pin button, arrow key
   expect(errors).toEqual([]);
 });
 
+test('a search that can not reach Scryfall says so and offers Try again', async ({ page }) => {
+  await open(page);
+  let fail = true;
+  await page.route('https://api.scryfall.com/cards/search?**', (route) => {
+    if (new URL(route.request().url()).searchParams.get('format') === 'csv') return route.fallback();
+    if (fail) return route.abort('failed');
+    return route.fallback();
+  });
+  const box = page.locator('.search-form input').first();
+  await box.fill('sol ring');
+  await box.press('Enter');
+  const err = page.locator('.search-error');
+  await expect(err).toContainText('Couldn’t reach Scryfall');
+  fail = false;
+  await err.getByRole('button', { name: 'Try again' }).click();
+  await expect(page.locator('.result-card').first()).toContainText('Sol Ring');
+  await expect(err).toHaveCount(0);
+});
+
 test('#tag search and the tag browser find tagged cards', async ({ page, isMobile }) => {
   const errors = watchErrors(page);
   await open(page);

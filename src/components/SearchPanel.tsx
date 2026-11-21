@@ -1,3 +1,4 @@
+import { isNetworkError } from '../lib/scryfall';
 import { useEffect, useRef, useMemo, useState, type FormEvent } from 'react';
 import { onCardSearchRequest } from '../lib/searchBus';
 import type { Board, Card, Deck } from '../types';
@@ -102,7 +103,7 @@ export function SearchPanel({ deck, board = 'main', mode = 'expanded', onMode }:
       setLocal(res.local);
       setWarnings(res.warnings);
     } catch (e) {
-      setError((e as Error).message);
+      setError(isNetworkError(e) ? 'Couldn’t reach Scryfall. Check your connection and try again.' : (e as Error).message);
       setResults([]);
       setTotal(null);
     } finally {
@@ -118,7 +119,7 @@ export function SearchPanel({ deck, board = 'main', mode = 'expanded', onMode }:
       setResults((r) => appendResults(r, res.cards, adv.unique));
       setNext(res.next);
     } catch (e) {
-      setError((e as Error).message);
+      setError(isNetworkError(e) ? 'Couldn’t reach Scryfall. Check your connection and try again.' : (e as Error).message);
     } finally {
       setLoading(false);
     }
@@ -256,7 +257,12 @@ export function SearchPanel({ deck, board = 'main', mode = 'expanded', onMode }:
         <>
           <div className="results-meta-row">
             <div className="results-meta">
-              {error ? <span className="error-text">{error}</span> : (
+{error ? (
+                <span className="search-error">
+                  <span className="error-text">{error}</span>
+                  <button type="button" className="btn btn-sm" onClick={() => void run()}>Try again</button>
+                </span>
+              ) : (
                 <>
                   {total != null ? <span>{total.toLocaleString()} cards</span> : results.length > 0 && <span>{results.length} matching so far</span>}
                   {local && <span className="muted"> · filtered by <code>{local}</code></span>}

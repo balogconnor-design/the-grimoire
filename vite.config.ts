@@ -103,10 +103,11 @@ export default defineConfig({
             },
           },
           {
+            // Stale-while-revalidate: a bad copy is replaced on the next view instead of sticking for a year.
             urlPattern: /^https:\/\/svgs\.scryfall\.io\//,
-            handler: 'CacheFirst',
+            handler: 'StaleWhileRevalidate',
             options: {
-              cacheName: 'scryfall-symbols',
+              cacheName: 'scryfall-symbols-v2',
               fetchOptions: { mode: 'cors', credentials: 'omit' },
               cacheableResponse: { statuses: [200] },
               expiration: { maxEntries: 300, maxAgeSeconds: 365 * DAY, purgeOnQuotaError: true },

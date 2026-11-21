@@ -1,8 +1,12 @@
-import { Fragment } from 'react';
+import { Fragment, useState } from 'react';
 import { symbolUrl } from '../lib/scryfall';
 import { parseSymbols, COLOR_NAMES } from '../lib/rules';
 
 export function ManaSymbol({ symbol, size = 16 }: { symbol: string; size?: number }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return <span className="mana-symbol mana-symbol-text" style={{ minWidth: size, height: size, fontSize: Math.max(9, size * 0.62) }} title={`{${symbol}}`}>{symbol}</span>;
+  }
   return (
     <img
       className="mana-symbol"
@@ -13,6 +17,7 @@ export function ManaSymbol({ symbol, size = 16 }: { symbol: string; size?: numbe
       height={size}
       loading="lazy"
       draggable={false}
+      onError={() => setFailed(true)}
     />
   );
 }

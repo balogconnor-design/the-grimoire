@@ -15,6 +15,8 @@ void loadAll().then(async () => {
 });
 // Scryfall tags: saved lists first, then a background download of any list that is missing or a week old.
 void loadScryfallTags();
+// Symbols used to be cached for a year without re-checking; drop that cache so a bad copy can't stick.
+if (typeof caches !== 'undefined') void caches.delete('scryfall-symbols').catch(() => undefined);
 void loadSymbology();
 
 // Branch preview builds only (see vite.config.ts): an on-page console, opened from the gear button.

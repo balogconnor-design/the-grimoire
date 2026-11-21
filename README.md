@@ -70,7 +70,7 @@ calls Scryfall directly and saves everything in that browser, as in the other ve
   says so. Nothing about users' decks or collections is ever sent anywhere.
 - **Installable app and offline (PWA):** `vite-plugin-pwa` (config in `vite.config.ts`) builds `manifest.webmanifest` and a
   service worker (`sw.js`). The service worker precaches the app so it opens offline, and caches Scryfall card images (up to 600,
-  60 days) and mana symbols as they're viewed. The Scryfall API is never cached, so search results and prices are always live.
+  60 days) and other mana symbols as they're viewed (refreshed in the background, so a bad copy fixes itself). The six colour pips (W U B R G C) ship with the app in `public/symbols/` (copies of Scryfall's files), so they always load, offline too; a symbol that still fails to load shows as a text pip. A search that can't reach Scryfall says so with a **Try again** button. The Scryfall API is never cached, so search results and prices are always live.
   `src/components/UpdatePrompt.tsx` registers it and shows "A new version is available" with a Reload button when a deploy lands
   (it also checks hourly). The dev server never registers a service worker, and the portable build (port 47823) skips it too,
   because the launcher already works offline. To try it locally: `npm run build`, then `npx wrangler pages dev dist`.

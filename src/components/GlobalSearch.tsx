@@ -1,3 +1,4 @@
+import { isNetworkError } from '../lib/scryfall';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { onCardSearchRequest } from '../lib/searchBus';
 import type { Card } from '../types';
@@ -58,7 +59,7 @@ export function GlobalSearch() {
       setLocalOnly(r.localOnly);
       setWarnings(r.warnings);
     } catch (e) {
-      setError((e as Error).message);
+      setError(isNetworkError(e) ? 'Couldn’t reach Scryfall. Check your connection and try again.' : (e as Error).message);
       setResults([]);
     } finally {
       setLoading(false);
@@ -73,7 +74,7 @@ export function GlobalSearch() {
       setResults((xs) => appendResults(xs ?? [], r.cards, adv.unique));
       setNext(r.next);
     } catch (e) {
-      setError((e as Error).message);
+      setError(isNetworkError(e) ? 'Couldn’t reach Scryfall. Check your connection and try again.' : (e as Error).message);
     } finally {
       setLoading(false);
     }
@@ -145,7 +146,12 @@ export function GlobalSearch() {
       {(error || warnings.length > 0 || results) && (
         <div className="results-meta-row">
         <div className="results-meta">
-          {error ? <span className="error-text">{error}</span> : (
+{error ? (
+            <span className="search-error">
+              <span className="error-text">{error}</span>
+              <button type="button" className="btn btn-sm" onClick={() => void run()}>Try again</button>
+            </span>
+          ) : (
             <>
               {results && <span>{localOnly ? `${results.length} of your cards` : total != null ? `${total.toLocaleString()} cards` : `${results.length} matching so far`}</span>}
               {localOnly && <span className="muted"> · searched your collection, decks and tagged cards (no Scryfall terms)</span>}
