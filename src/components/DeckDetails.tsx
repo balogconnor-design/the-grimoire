@@ -3,16 +3,18 @@ import type { Deck, DeckFilter, TypeCategory } from '../types';
 import { getFormat } from '../lib/formats';
 import {
   averageMV, boardCount, boardEntries, boardPrice, cardPrice, COLOR_NAMES, computeColorStats, computeCurve,
-  computeManaBase, computeManaProducers, computeTypes, formatUSD, MANA_BASE_TOLERANCE, type ManaBaseStatus, type ProducerKind,
+  commanderEntry, computeManaBase, computeManaProducers, computeTypes, formatUSD, MANA_BASE_TOLERANCE, type ManaBaseStatus, type ProducerKind,
   type Validation,
 } from '../lib/rules';
 import { refreshPrices } from '../lib/actions';
 import { ManaSymbol } from './Mana';
 import { useToast } from './Toast';
-import { usePool } from '../lib/hooks';
+import { useGlobalTags, usePool } from '../lib/hooks';
 import { planAllocation, releaseAllocation } from '../lib/ownership';
 import { collectionT, useSettings } from '../lib/store';
 import { navigate } from '../lib/router';
+import { useScryfallTags } from '../lib/scryfallTags';
+import { atLeast, cardsSeen, oddsGroups, type OddsGroup } from '../lib/drawOdds';
 
 interface Props {
   deck: Deck;
@@ -122,6 +124,7 @@ export function DeckDetails({ deck, validation, filter, setFilter }: Props) {
       <ManaBaseCheck deck={deck} filter={filter} setFilter={setFilter} />
       <ManaProducers deck={deck} filter={filter} setFilter={setFilter} />
       <TypeBreakdown deck={deck} filter={filter} setFilter={setFilter} />
+      <DrawOdds deck={deck} filter={filter} setFilter={setFilter} />
     </aside>
   );
 }
@@ -528,6 +531,107 @@ function TypeBreakdown({ deck, filter, setFilter }: ChartProps) {
         </div>
       )}
       <div className="muted tiny">Each card is counted once under its primary type. Click a type to filter.</div>
+    </div>
+  );
+}
+
+const ODDS_TAGS_SHOWN = 8;
+const ODDS_KEY = 'grimoire.drawOdds';
+interface OddsPrefs { min: number; turn: number; onDraw: boolean }
+function readOddsPrefs(): OddsPrefs {
+  try {
+    const v = JSON.parse(localStorage.getItem(ODDS_KEY) ?? '{}');
+    return { min: v.min >= 1 && v.min <= 4 ? v.min : 1, turn: v.turn >= 1 && v.turn <= 10 ? v.turn : 1, onDraw: !!v.onDraw };
+  } catch { return { min: 1, turn: 1, onDraw: false }; }
+}
+const tagQuery = (t: string) => `#${/\s/.test(t) ? `"${t}"` : t}`;
+const fmtChance = (p: number) => (p >= 0.995 && p < 1 ? '>99' : p > 0 && p < 0.005 ? '<1' : (p * 100).toFixed(0));
+
+/** Hypergeometric odds of seeing at least N cards of each type / tag by a given turn. */
+function DrawOdds({ deck, filter, setFilter }: ChartProps) {
+  const globalTags = useGlobalTags();
+  const stags = useScryfallTags();
+  const [prefs, setPrefsState] = useState<OddsPrefs>(readOddsPrefs);
+  const [allTags, setAllTags] = useState(false);
+  const setPrefs = (p: Partial<OddsPrefs>) => {
+    const next = { ...prefs, ...p };
+    setPrefsState(next);
+    try { localStorage.setItem(ODDS_KEY, JSON.stringify(next)); } catch { /* storage unavailable: only this session remembers */ }
+  };
+  const g = useMemo(() => oddsGroups(deck, { global: globalTags, scryfall: stags }), [deck, globalTags, stags]);
+  const seen = cardsSeen(prefs.turn, prefs.onDraw);
+  const tags = allTags ? g.tags : g.tags.slice(0, ODDS_TAGS_SHOWN);
+
+  const row = (r: OddsGroup) => {
+    const p = atLeast(g.library, r.count, seen, prefs.min);
+    const active = r.kind === 'type' ? filter.type === r.key : filter.text === tagQuery(r.key);
+    const toggle = () => setFilter(r.kind === 'type'
+      ? { ...filter, type: active ? undefined : (r.key as TypeCategory) }
+      : { ...filter, text: active ? undefined : tagQuery(r.key) });
+    return (
+      <tr key={`${r.kind}:${r.key}`} className={`clickable ${active ? 'active' : ''}`} onClick={toggle} tabIndex={0}
+        onKeyDown={(e) => e.key === 'Enter' && toggle()}
+        title={`${r.count} of ${g.library} cards · at least ${prefs.min} in ${seen} cards: ${(p * 100).toFixed(1)}%`}>
+        <td><span className="truncate">{r.kind === 'tag' ? `#${r.key}` : r.key}</span></td>
+        <td>{r.count}</td>
+        <td>
+          <div className="pct-cell">
+            <div className="pct-bar"><div style={{ width: `${p * 100}%`, background: 'var(--accent)' }} /></div>
+            <span>{fmtChance(p)}%</span>
+          </div>
+        </td>
+      </tr>
+    );
+  };
+
+  return (
+    <div className="detail-section">
+      <div className="section-head">
+        <h3>Draw odds</h3>
+        <span className="muted small">{g.library} in library · {seen} cards seen</span>
+      </div>
+      {g.library === 0 ? (
+        <div className="muted small">Add cards to see the odds of drawing them.</div>
+      ) : (
+        <>
+          <div className="odds-controls small">
+            <label>At least{' '}
+              <select className="input input-sm" value={prefs.min} onChange={(e) => setPrefs({ min: Number(e.target.value) })} aria-label="At least this many">
+                {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
+            <label>by{' '}
+              <select className="input input-sm" value={prefs.turn} onChange={(e) => setPrefs({ turn: Number(e.target.value) })} aria-label="By turn">
+                <option value={1}>opening hand</option>
+                {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((t) => <option key={t} value={t}>turn {t}</option>)}
+              </select>
+            </label>
+            <label className="odds-draw">
+              <input type="checkbox" checked={prefs.onDraw} onChange={(e) => setPrefs({ onDraw: e.target.checked })} /> On the draw
+            </label>
+          </div>
+          <table className="color-table odds-table">
+            <thead><tr><th>Type</th><th title="Copies in the library">Cards</th><th title={`Chance of at least ${prefs.min} in ${seen} cards`}>Chance</th></tr></thead>
+            <tbody>{g.types.map(row)}</tbody>
+          </table>
+          {g.tags.length > 0 && (
+            <table className="color-table odds-table">
+              <thead><tr><th>Tag</th><th>Cards</th><th>Chance</th></tr></thead>
+              <tbody>{tags.map(row)}</tbody>
+            </table>
+          )}
+          {g.tags.length > ODDS_TAGS_SHOWN && (
+            <button className="link-btn small" onClick={() => setAllTags(!allTags)}>
+              {allTags ? 'Show fewer tags' : `Show all ${g.tags.length} tags`}
+            </button>
+          )}
+        </>
+      )}
+      <div className="muted tiny">
+        Chance of at least {prefs.min} card{prefs.min === 1 ? '' : 's'} of each kind in your first {seen} cards: a 7-card hand
+        {prefs.turn > 1 ? ` plus one draw a turn${prefs.onDraw ? '' : ' (none on turn 1 on the play)'}` : prefs.onDraw ? ' plus your first draw' : ''}.
+        {' '}{commanderEntry(deck) ? 'The commander isn’t in the library. ' : ''}Ignores mulligans, tutors and extra draws. A card counts under each of its tags. Click a row to filter the deck list.
+      </div>
     </div>
   );
 }

@@ -119,6 +119,30 @@ test('deck search adds to the board shown, by + button and by drag and drop', as
   expect(errors).toEqual([]);
 });
 
+test('draw odds panel shows and updates the chance per card type', async ({ page, isMobile }) => {
+  test.skip(!!isMobile, 'phones show the details panel on its own tab; the math is covered by unit tests');
+  const errors = watchErrors(page);
+  await open(page);
+  await createDeck(page, 'Odds Test');
+  const search = page.locator('.search-panel');
+  await search.locator('.search-input').fill('sol ring');
+  await search.locator('.search-input').press('Enter');
+  const result = search.locator('.result-card').first();
+  await result.hover();
+  await result.getByRole('button', { name: 'Add Sol Ring to main deck' }).click();
+  const odds = page.locator('.detail-section', { has: page.getByRole('heading', { name: 'Draw odds' }) });
+  await odds.scrollIntoViewIfNeeded();
+  await expect(odds).toContainText('1 in library · 7 cards seen');
+  const artifact = odds.locator('tr', { hasText: 'Artifact' });
+  await expect(artifact).toContainText('100%');
+  await odds.getByLabel('At least this many').selectOption('2');
+  await expect(artifact).toContainText('0%');
+  await odds.getByLabel('By turn').selectOption('4');
+  await expect(odds).toContainText('10 cards seen');
+  await page.screenshot({ path: 'test-results/draw-odds.png', fullPage: true });
+  expect(errors).toEqual([]);
+});
+
 test('#tag search and the tag browser find tagged cards', async ({ page, isMobile }) => {
   const errors = watchErrors(page);
   await open(page);
