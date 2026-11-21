@@ -25,6 +25,15 @@ async function createDeck(page: Page, name: string) {
   await expect(page).toHaveURL(/#\/deck\//);
 }
 
+/** Scryfall oracle tags are opt-in: open their settings with `opener` and turn them on. */
+async function turnOnOracleTags(page: Page, opener: ReturnType<Page['locator']>) {
+  await opener.click();
+  const modal = page.locator('.modal', { hasText: 'Use Scryfall oracle tags' });
+  await modal.getByLabel('Use Scryfall oracle tags').check();
+  await modal.getByRole('button', { name: 'Done' }).click();
+  await expect(modal).toHaveCount(0);
+}
+
 test('loads, with the data notice and no errors', async ({ page }) => {
   const errors = watchErrors(page);
   await open(page);
@@ -451,6 +460,8 @@ test('deck search: popular staples, greyed in-deck cards, list and details views
   // Advanced search: Tags at the top; pick tags, match any or none; no "Your cards" section.
   await search.getByRole('button', { name: /Advanced/ }).click();
   const tags = page.locator('.adv-tags');
+  await expect(tags).toContainText('Scryfall oracle tags are off.');
+  await turnOnOracleTags(page, tags.getByRole('button', { name: 'Turn on…' }));
   await tags.getByRole('button', { name: 'ramp', exact: false }).first().click();
   await tags.getByRole('button', { name: /mana rock/ }).click();
   await expect(page.locator('.query-preview')).toContainText('#ramp #"mana rock"');
@@ -476,9 +487,12 @@ test('group by tag: choose sections in the window, saved per deck, reset to the 
   await result.hover();
   await result.getByRole('button', { name: 'Add Sol Ring to main deck' }).click();
 
-  // The bundled Scryfall tags work straight away: no tag downloads from Scryfall.
+  // Scryfall oracle tags are off until turned on; then the bundled tags work straight away (no downloads).
   await page.getByLabel('Group cards by').selectOption('tag');
   const groups = page.locator('.deck-groups');
+
+  await expect(groups).not.toContainText(/ramp/i);
+  await turnOnOracleTags(page, page.getByRole('button', { name: '◆ Turn on oracle tags' }));
   await expect(groups).toContainText(/ramp/i);
   await page.getByRole('button', { name: 'Choose tags to group by' }).click();
   const modal = page.locator('.modal');
@@ -496,6 +510,20 @@ test('group by tag: choose sections in the window, saved per deck, reset to the 
   await page.getByRole('button', { name: 'Reset tags' }).click();
   await expect(page.getByRole('button', { name: 'Reset tags' })).toHaveCount(0);
   await expect(groups).toContainText(/ramp/i);
+
+  // Hiding one oracle tag drops it from the deck list; the card moves to its next tag.
+  await page.getByRole('button', { name: '◆ Oracle tags' }).click();
+  const settings = page.locator('.modal', { hasText: 'Use Scryfall oracle tags' });
+  await settings.getByLabel('◆ ramp', { exact: true }).uncheck();
+  await settings.getByRole('button', { name: 'Done' }).click();
+  await expect(groups.locator('.group-name', { hasText: /ramp$/i })).toHaveCount(0);
+  await expect(groups.locator('.group-name').first()).toContainText(/mana rock/i);
+  // Turning them off leaves only your own tags.
+  await page.getByRole('button', { name: '◆ Oracle tags' }).click();
+  await settings.getByLabel('Use Scryfall oracle tags').uncheck();
+  await settings.getByRole('button', { name: 'Done' }).click();
+  await expect(groups).not.toContainText(/mana rock/i);
+
   expect(errors).toEqual([]);
 });
 
@@ -697,6 +725,7 @@ test('#tag search and the tag browser find tagged cards', async ({ page, isMobil
   await expect(pick).toContainText('1');
   await pick.click();
   await expect(page.locator('.tag-group')).toContainText('Sol Ring');
+  await turnOnOracleTags(page, page.locator('.tag-browser').getByRole('button', { name: '◆ Turn on oracle tags' }));
 
   // A tag of yours that isn't a Scryfall tag searches your own cards.
   const box = page.locator('.search-form input').first();
@@ -920,5 +949,59 @@ test('deck history: changelog, snapshots, compare and restore', async ({ page, i
   await modal.getByRole('button', { name: 'Close' }).click();
   if (isMobile) await page.locator('.mobile-tabs .tab', { hasText: 'Deck' }).click();
   await expect(page.locator('.board-tabs .tab', { hasText: 'Sideboard' }).locator('.tab-count')).toHaveText('0');
+  expect(errors).toEqual([]);
+});
+
+test('commander: drag onto the commander slot, and its color identity applies to the search straight away', async ({ page, isMobile, browserName }) => {
+  test.skip(!!isMobile, 'covered on desktop');
+  test.skip(browserName === 'webkit', "Playwright can't drive HTML drag and drop in WebKit on Windows/Linux");
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const errors = watchErrors(page);
+  await open(page);
+  const legend = (id: string, name: string, colors: string[]) => ({
+    ...SOL_RING, id, name, type_line: 'Legendary Creature — Test', mana_cost: colors.map((c) => `{${c}}`).join(''), cmc: colors.length,
+    colors, color_identity: colors, legalities: { ...SOL_RING.legalities, commander: 'legal' },
+  });
+  const atraxa = legend('atraxa-test', "Atraxa, Praetors' Voice", ['W', 'U', 'B', 'G']);
+  const breya = legend('breya-test', 'Breya, Etherium Shaper', ['W', 'U', 'B', 'R']);
+  const asked: string[] = [];
+  await page.route('https://api.scryfall.com/cards/search?**', (route) => {
+    const q = new URL(route.request().url()).searchParams.get('q') ?? '';
+    asked.push(q);
+    const data = /breya/i.test(q) ? [breya] : [atraxa];
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ object: 'list', total_cards: 1, has_more: false, data }) });
+  });
+
+  await createDeck(page, 'Commander Drag Test');
+  const search = page.locator('.search-panel');
+  const slot = page.locator('.commander-showcase');
+  await expect(slot).toContainText('No commander selected');
+
+  // Add Breya to the deck, then search for Atraxa and drag the result onto the commander slot.
+  await search.locator('.search-input').fill('breya');
+  await search.locator('.search-input').press('Enter');
+  await search.locator('.result-card').first().hover();
+  await search.locator('.result-card').first().getByRole('button', { name: 'Add Breya, Etherium Shaper to main deck' }).click();
+  await search.locator('.search-input').fill('atraxa');
+  await search.locator('.search-input').press('Enter');
+  await expect(search.locator('.result-card').first()).toContainText('Atraxa');
+  await search.locator('.result-card .result-art').first().dragTo(slot);
+  await expect(slot.locator('.commander-name')).toHaveText("Atraxa, Praetors' Voice");
+  // The search on screen ran again within Atraxa's colors, without clicking anything.
+  await expect.poll(() => asked.at(-1)).toContain('atraxa');
+  await expect.poll(() => asked.at(-1)).toContain('id<=wubg');
+  await expect(search.getByLabel(/Identity/)).toBeChecked();
+
+  // A deck row can be dragged onto the slot too (grouped by type, not only by tag).
+  await page.getByLabel('Group cards by').selectOption('type');
+  await page.locator('.deck-groups .entry', { hasText: 'Breya' }).dragTo(slot);
+  await expect(slot.locator('.commander-name')).toHaveText('Breya, Etherium Shaper');
+  await expect.poll(() => asked.at(-1)).toContain('id<=wubr');
+
+  // ★ on a row does the same.
+  await page.locator('.deck-groups .entry', { hasText: 'Atraxa' }).hover();
+  await page.locator('.deck-groups .entry', { hasText: 'Atraxa' }).getByTitle('Set as commander').click();
+  await expect(slot.locator('.commander-name')).toHaveText("Atraxa, Praetors' Voice");
+  await expect.poll(() => asked.at(-1)).toContain('id<=wubg');
   expect(errors).toEqual([]);
 });

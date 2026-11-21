@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { buildAdvanced, countAdvanced, EMPTY_ADV, type Adv } from '../src/lib/advanced';
 import { liftScryfallTags } from '../src/lib/query';
-import { scryfallOtagFor } from '../src/lib/scryfallTags';
+import { scryfallOtagFor, setScryfallTagVisibilityForTests } from '../src/lib/scryfallTags';
 import { splitForScryfall } from '../src/lib/query';
 
 const adv = (over: Partial<Adv>): Adv => ({ ...EMPTY_ADV, ...over });
+
+// Scryfall tags are opt-in; these tests are about how they work once turned on.
+beforeEach(() => setScryfallTagVisibilityForTests({ scryfallTags: true }));
 
 describe('advanced search builder', () => {
   it('builds nothing from an empty form', () => {

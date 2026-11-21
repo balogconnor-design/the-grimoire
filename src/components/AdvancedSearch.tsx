@@ -1,5 +1,6 @@
 import { useAllCardTags, useAllCollectionTags, useAllDeckTags, useAllGlobalTags } from '../lib/hooks';
-import { SCRYFALL_TAGS } from '../lib/scryfallTags';
+import { SCRYFALL_TAGS, useScryfallTagVisibility } from '../lib/scryfallTags';
+import { ManageScryfallTags } from './ScryfallTagSettings';
 import { useEffect, useId, useState, type KeyboardEvent, type ReactNode } from 'react';
 import {
   COMMON_TYPES, CRITERIA, EMPTY_ADV, FORMATS, GAMES, LANGUAGES, OPS, RARITIES, STATS,
@@ -370,7 +371,8 @@ function TagsSection({ value: a, set }: { value: Adv; set: (patch: Partial<Adv>)
   const card = useAllCardTags();
   const coll = useAllCollectionTags();
   const deck = useAllDeckTags();
-  const scryfall = SCRYFALL_TAGS.map((t) => t.label);
+  const vis = useScryfallTagVisibility();
+  const scryfall = vis.on ? SCRYFALL_TAGS.map((t) => t.label).filter((t) => !vis.hidden.has(t)) : [];
   const own = [...new Set([...global, ...card, ...coll, ...deck])].filter((t) => !scryfall.includes(t)).sort((x, y) => x.localeCompare(y));
   const toggle = (t: string) => set({ tags: a.tags.includes(t) ? a.tags.filter((x) => x !== t) : [...a.tags, t] });
   const chip = (t: string, kind: 'scryfall' | 'own') => {
@@ -397,7 +399,11 @@ function TagsSection({ value: a, set }: { value: Adv; set: (patch: Partial<Adv>)
       </div>
       <div className="tag-pick-group">
         <span className="label">Scryfall</span>
-        <div className="tag-pick-chips">{scryfall.map((t) => chip(t, 'scryfall'))}</div>
+        <div className="tag-pick-chips">
+          {scryfall.map((t) => chip(t, 'scryfall'))}
+          {!scryfall.length && <span className="muted small">{vis.on ? 'All Scryfall oracle tags are hidden.' : 'Scryfall oracle tags are off.'}</span>}
+          <ManageScryfallTags label={vis.on ? 'Manage…' : 'Turn on…'} />
+        </div>
       </div>
       <div className="tag-pick-group">
         <span className="label">Yours</span>

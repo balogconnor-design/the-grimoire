@@ -1,6 +1,6 @@
 import { entrySorter, groupByColors, SORT_OPTIONS, type SortBy } from '../lib/deckGroups';
 import { useEffect, useMemo, useState, type DragEvent, type PointerEvent as ReactPointerEvent } from 'react';
-import type { Board, Deck, DeckEntry, DeckFilter, TypeCategory } from '../types';
+import type { Board, Card, Deck, DeckEntry, DeckFilter, TypeCategory } from '../types';
 import { getFormat } from '../lib/formats';
 import {
   boardCount, boardEntries, boardPrice, canBeCommander, cardImage, cardPrice, COLOR_NAMES, commanderEntry,
@@ -21,6 +21,7 @@ import { useToast } from './Toast';
 import { hideArt, hoverArt, hoverArtProps } from './HoverArt';
 import { pinOnRightClick } from '../lib/viewPanel';
 import { isCardDrag, readCardDrag } from '../lib/dnd';
+import { ManageScryfallTags } from './ScryfallTagSettings';
 import { useScryfallTags, useScryfallTagStatus } from '../lib/scryfallTags';
 import { defaultGroupTags, entryTags, groupByManaValue, groupByTag, mainGroup, OTHER_GROUP } from '../lib/deckTags';
 import { GroupTagsModal, readGroupTags, saveGroupTags } from './GroupTagsModal';
@@ -105,6 +106,7 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
   };
   const [dragUid, setDragUid] = useState<string | null>(null);
   const [dropGroup, setDropGroup] = useState<string | null>(null);
+  const [cmdDrop, setCmdDrop] = useState(false);
 
   // Typed query syntax (t:, tag:, is:fav…) runs through the local search engine; plain text stays a substring filter.
   const text = filter.text ?? '';
@@ -156,7 +158,38 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
   // Tag view: drag a row onto another tag it has to list it there (its main tag in this deck).
   const dragging = dragUid ? deck.entries.find((e) => e.uid === dragUid) : undefined;
   const dragTags = dragging ? entryTags(dragging, tagSrc).all : [];
-  const canDropOn = (group: string) => !!dragging && dragTags.includes(group) && mainGroup(deck, dragging, tagSrc) !== group;
+  const canDropOn = (group: string) => groupBy === 'tag' && !!dragging && dragTags.includes(group) && mainGroup(deck, dragging, tagSrc) !== group;
+
+  // Commander formats: drag a main-deck card (or a search result) onto the commander slot to make it the commander.
+  const isCmdCandidate = (e: DeckEntry) => fmt.hasCommander && board === 'main' && e.uid !== cmd?.uid && canBeCommander(e.card, fmt);
+  const draggingCandidate = !!dragging && isCmdCandidate(dragging);
+  const makeCommander = (card: Card) => {
+    if (!canBeCommander(card, fmt)) { toast(`${card.name} can't be ${fmt.id === 'oathbreaker' ? 'an Oathbreaker' : 'a commander'} in ${fmt.name}.`, 'error'); return; }
+    toast(setCommander(deck.id, card), 'success');
+  };
+  const onCmdDragOver = (ev: DragEvent) => {
+    const fromSearch = isCardDrag(ev.dataTransfer);
+    if (!fromSearch && !(draggingCandidate && Array.from(ev.dataTransfer.types).includes(ENTRY_DRAG))) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    ev.dataTransfer.dropEffect = fromSearch ? 'copy' : 'move';
+    if (dragOver) setDragOver(false);
+    if (!cmdDrop) setCmdDrop(true);
+  };
+  const onCmdDragLeave = (ev: DragEvent) => {
+    if (!ev.currentTarget.contains(ev.relatedTarget as Node | null)) setCmdDrop(false);
+  };
+  const onCmdDrop = (ev: DragEvent) => {
+    setCmdDrop(false);
+    const card = readCardDrag(ev.dataTransfer) ?? (draggingCandidate ? dragging!.card : null);
+    if (!card) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    setDragOver(false);
+    setDragUid(null);
+    setDropGroup(null);
+    makeCommander(card);
+  };
 
   const hasFilter = filter.cmc != null || !!filter.type || !!filter.color || !!filter.producer || !!filter.text || favOnly;
   const shown = entries.reduce((n, e) => n + e.qty, 0);
@@ -196,17 +229,32 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
   const ownMark = (state: string, title: string) => state === 'skip' ? null : (
     <span className={`own-mark ${state}`} title={title} aria-label={title}>{state === 'full' ? '✓' : state === 'part' ? '◐' : '○'}</span>
   );
-  /** Grouping by tag lets you drag a card onto another of its tags (same in every view). */
-  const regroupDrag = (e: DeckEntry, isCmd: boolean) => ({
-    draggable: groupBy === 'tag' && !isCmd,
-    onDragStart: groupBy === 'tag' && !isCmd ? (ev: DragEvent) => {
-      ev.dataTransfer.setData(ENTRY_DRAG, e.uid);
-      ev.dataTransfer.effectAllowed = 'move';
-      hideArt();
-      setDragUid(e.uid);
-    } : undefined,
-    onDragEnd: () => { setDragUid(null); setDropGroup(null); },
-  });
+  /**
+   * Rows can be dragged (same in every view): onto another of the card's tags when grouping by tag,
+   * and onto the commander slot when the card can be the commander.
+   */
+  const regroupDrag = (e: DeckEntry, isCmd: boolean) => {
+    const can = !isCmd && (groupBy === 'tag' || isCmdCandidate(e));
+    return {
+      draggable: can,
+      onDragStart: can ? (ev: DragEvent) => {
+        ev.dataTransfer.setData(ENTRY_DRAG, e.uid);
+        ev.dataTransfer.effectAllowed = 'move';
+        hideArt();
+        setDragUid(e.uid);
+      } : undefined,
+      onDragEnd: () => { setDragUid(null); setDropGroup(null); setCmdDrop(false); },
+    };
+  };
+  const dragTitle = (e: DeckEntry, isCmd: boolean) => {
+    if (isCmd) return undefined;
+    const regroup = groupBy === 'tag' && entryTags(e, tagSrc).all.length > 1;
+    const toCmd = isCmdCandidate(e);
+    if (regroup && toCmd) return 'Drag onto another of its tags to list it there, or onto the commander slot';
+    if (regroup) return 'Drag onto another of its tags to list it there';
+    if (toCmd) return `Drag onto the ${fmt.id === 'oathbreaker' ? 'Oathbreaker' : 'commander'} slot to make it your ${fmt.id === 'oathbreaker' ? 'Oathbreaker' : 'commander'}`;
+    return undefined;
+  };
 
   /** Grid: full card pictures, several per row. The picture shows on hover only when tiles are small. */
   const renderGrid = (list: DeckEntry[]) => (
@@ -316,7 +364,9 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
       onDragOver={(e) => onDragOver(e)} onDragLeave={onDragLeave} onDrop={(e) => onDrop(e)}
     >
       {fmt.hasCommander && (
-        <div className={`commander-showcase ${cmd ? '' : 'empty'}`}>
+        <div className={`commander-showcase ${cmd ? '' : 'empty'} ${draggingCandidate ? 'cmd-drop-ok' : ''} ${cmdDrop ? 'cmd-drop-hover' : ''}`}
+          onDragOver={onCmdDragOver} onDragLeave={onCmdDragLeave} onDrop={onCmdDrop}>
+          {cmdDrop && <div className="cmd-drop-hint">Drop to make it your {fmt.id === 'oathbreaker' ? 'Oathbreaker' : 'commander'}</div>}
           {cmd ? (
             <>
               <img className="commander-art" src={cardImage(cmd.card, 'art_crop')} alt="" />
@@ -337,7 +387,7 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
             <div className="commander-empty">
               <span className="commander-label">★ No commander selected</span>
               <span className="muted small">
-                Open a legendary creature from search and click <b>Set as Commander</b>, or use ★ on a deck row.
+                Drag a legendary creature here from search or the deck list, open it and click <b>Set as Commander</b>, or use ★ on a deck row.
                 Its color identity will then limit search results and basic lands.
               </span>
             </div>
@@ -380,6 +430,7 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
           {groupBy === 'tag' && customTags && (
             <button type="button" className="link-btn small" title="Go back to the deck's most common tags" onClick={() => chooseTags(null)}>Reset tags</button>
           )}
+          {groupBy === 'tag' && <ManageScryfallTags />}
         </label>
         <label className="group-by">
           <span className="muted">Sort:</span>
@@ -510,15 +561,8 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
                         className={`entry ${problems ? 'has-problem' : ''} ${dragUid === e.uid ? 'dragging' : ''}`}
                         {...hoverArtProps(e.card)}
                         onContextMenu={pinOnRightClick(e.card, e.uid, hideArt)}
-                        draggable={groupBy === 'tag' && !isCmd}
-                        onDragStart={groupBy === 'tag' && !isCmd ? (ev) => {
-                          ev.dataTransfer.setData(ENTRY_DRAG, e.uid);
-                          ev.dataTransfer.effectAllowed = 'move';
-                          hideArt();
-                          setDragUid(e.uid);
-                        } : undefined}
-                        onDragEnd={() => { setDragUid(null); setDropGroup(null); }}
-                        title={groupBy === 'tag' && !isCmd && entryTags(e, tagSrc).all.length > 1 ? 'Drag onto another of its tags to list it there' : undefined}
+                        {...regroupDrag(e, isCmd)}
+                        title={dragTitle(e, isCmd)}
                       >
                         <div className="qty-ctrl">
                           <button className="icon-btn sm" onClick={() => setQty(deck.id, e.uid, e.qty - 1)} aria-label="Remove one">−</button>
@@ -553,7 +597,7 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
                             >🛒</button>
                           )}
                           {fmt.hasCommander && board === 'main' && !isCmd && canBeCommander(e.card, fmt) && (
-                            <button className="icon-btn sm" title="Set as commander" onClick={() => toast(setCommander(deck.id, e.card), 'success')}>★</button>
+                            <button className="icon-btn sm" title="Set as commander" onClick={() => makeCommander(e.card)}>★</button>
                           )}
                           {isCmd && (
                             <button className="icon-btn sm" title="Unset commander" onClick={() => clearCommander(deck.id)}>☆</button>

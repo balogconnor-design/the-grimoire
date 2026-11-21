@@ -3,6 +3,7 @@ import type { Card } from '../types';
 import type { Subject } from '../lib/query';
 import { collectionT, decksT, globalTagsT } from '../lib/store';
 import { SCOPE_META, type TagScope } from './TagEditor';
+import { ManageScryfallTags } from './ScryfallTagSettings';
 
 interface TagGroup { tag: string; scopes: Set<TagScope>; cards: Card[] }
 
@@ -55,7 +56,8 @@ export function TagBrowser({ subjectFor, renderCard, onSearch }: {
   if (!groups.length) {
     return (
       <div className="empty">
-        No tagged cards yet. Use 🏷 on a card to tag it, then search tags with <code>#tagname</code>.
+        No tagged cards yet. Use 🏷 on a card to tag it, then search tags with <code>#tagname</code>.{' '}
+        <ManageScryfallTags />
       </div>
     );
   }
@@ -68,6 +70,7 @@ export function TagBrowser({ subjectFor, renderCard, onSearch }: {
           <input className="input input-sm" value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter tags…" aria-label="Filter tags" />
         )}
         {open.length > 0 && <button type="button" className="link-btn small" onClick={() => setOpen([])}>Collapse all</button>}
+        <ManageScryfallTags />
       </div>
       <div className="tag-browser-list">
         {shown.map((g) => {

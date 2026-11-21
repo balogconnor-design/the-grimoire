@@ -4,9 +4,12 @@ import { csvColumn } from '../src/lib/scryfall';
 import { parseQuery } from '../src/lib/query';
 import { deckmatesByTag, deckTagCounts, defaultGroupTags, entryTags, groupByManaValue, groupByTag, mainGroup, type TagSources } from '../src/lib/deckTags';
 import { readFileSync } from 'node:fs';
-import { clearOldDownloads, indexTagData, loadScryfallTags, SCRYFALL_TAGS, scryfallTagsOf, setScryfallTagsForTests } from '../src/lib/scryfallTags';
+import { clearOldDownloads, indexTagData, loadScryfallTags, SCRYFALL_TAGS, scryfallTagsOf, setScryfallTagsForTests, setScryfallTagVisibilityForTests } from '../src/lib/scryfallTags';
 import { db } from '../src/lib/store';
 import { basic, card, freshDb } from './helpers';
+
+// Scryfall tags are opt-in; these tests are about how they work once turned on.
+beforeEach(() => setScryfallTagVisibilityForTests({ scryfallTags: true }));
 
 describe('csvColumn', () => {
   it('reads one column, with quoted commas, quotes and two-faced names', () => {
