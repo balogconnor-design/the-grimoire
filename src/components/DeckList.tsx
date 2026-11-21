@@ -1,9 +1,10 @@
+import { entrySorter, groupByColors, SORT_OPTIONS, type SortBy } from '../lib/deckGroups';
 import { useEffect, useMemo, useState, type DragEvent } from 'react';
 import type { Board, Deck, DeckEntry, DeckFilter, TypeCategory } from '../types';
 import { getFormat } from '../lib/formats';
 import {
   boardCount, boardEntries, boardPrice, canBeCommander, cardImage, cardPrice, COLOR_NAMES, commanderEntry,
-  entryCategory, formatUSD, manaCost, matchesFilter, sortEntries, TYPE_ORDER, type Validation,
+  entryCategory, formatUSD, frontTypeLine, manaCost, matchesFilter, sortEntries, TYPE_ORDER, type Validation,
 } from '../lib/rules';
 import { addCard, clearCommander, moveEntry, removeEntry, setCommander, setMainTag, setQty, toggleEntryFavorite } from '../lib/actions';
 import { looksLikeQuery, parseQuery } from '../lib/query';
@@ -17,7 +18,7 @@ import { AddToCollectionModal } from './CollectionModals';
 import { SavedSearches } from './SavedSearches';
 import { FavStar, TagList, SCOPE_META, type TagScope } from './TagEditor';
 import { useToast } from './Toast';
-import { hideArt, hoverArtProps } from './HoverArt';
+import { hideArt, hoverArt, hoverArtProps } from './HoverArt';
 import { pinOnRightClick } from '../lib/viewPanel';
 import { isCardDrag, readCardDrag } from '../lib/dnd';
 import { useScryfallTags, useScryfallTagStatus } from '../lib/scryfallTags';
@@ -35,13 +36,25 @@ interface Props {
 
 const BOARD_LABEL: Record<Board, string> = { main: 'Main', side: 'Sideboard', maybe: 'Maybeboard' };
 
-type GroupBy = 'type' | 'tag' | 'mv';
+type GroupBy = 'type' | 'tag' | 'mv' | 'identity' | 'color';
 const GROUP_BY_KEY = 'grimoire.deckGroupBy';
+type DeckView = 'list' | 'grid' | 'table';
+const VIEW_KEY = 'grimoire.deckView';
+const SORT_KEY = 'grimoire.deckSort';
+const DECK_VIEWS: { value: DeckView; label: string; icon: string }[] = [
+  { value: 'list', label: 'List', icon: '☰' }, { value: 'grid', label: 'Grid', icon: '▦' }, { value: 'table', label: 'Table', icon: '▤' },
+];
+const readSetting = <T extends string>(k: string, allowed: readonly T[], fallback: T): T => {
+  try { const v = localStorage.getItem(k) as T | null; return v && allowed.includes(v) ? v : fallback; } catch { return fallback; }
+};
+const saveSetting = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* only this session remembers */ } };
+/** Tiles narrower than this show the card picture on hover too (it's hard to read small). */
+const GRID_HOVER_BELOW = 170;
 const ENTRY_DRAG = 'application/x-grimoire-entry';
 function readGroupBy(): GroupBy {
   try {
     const v = localStorage.getItem(GROUP_BY_KEY);
-    return v === 'tag' || v === 'mv' ? v : 'type';
+    return v === 'tag' || v === 'mv' || v === 'identity' || v === 'color' ? v : 'type';
   } catch {
     return 'type';
   }
@@ -66,6 +79,10 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
   const stags = useScryfallTags();
   const stagStatus = useScryfallTagStatus();
   const [groupBy, setGroupByState] = useState<GroupBy>(readGroupBy);
+  const [view, setViewState] = useState<DeckView>(() => readSetting(VIEW_KEY, ['list', 'grid', 'table'] as const, 'list'));
+  const setView = (v: DeckView) => { setViewState(v); saveSetting(VIEW_KEY, v); };
+  const [sortBy, setSortByState] = useState<SortBy>(() => readSetting(SORT_KEY, SORT_OPTIONS.map((o) => o.value), 'mv'));
+  const setSortBy = (v: SortBy) => { setSortByState(v); saveSetting(SORT_KEY, v); };
   const setGroupBy = (g: GroupBy) => {
     setGroupByState(g);
     try { localStorage.setItem(GROUP_BY_KEY, g); } catch { /* storage unavailable: only this session remembers */ }
@@ -104,6 +121,11 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
   const tagSrc = useMemo(() => ({ ...baseSrc, chosen: customTags ?? defaultTags }), [baseSrc, customTags, defaultTags]);
   const chooseTags = (tags: string[] | null) => { saveGroupTags(deck.id, tags); setCustomTags(tags); };
   const groups = useMemo((): { type: string; entries: DeckEntry[]; scryfall?: boolean }[] => {
+    const sorter = entrySorter(sortBy);
+    return grouped().map((g) => ({ ...g, entries: [...g.entries].sort(sorter) }));
+  }, [entries, deck, groupBy, tagSrc, sortBy]); // eslint-disable-line react-hooks/exhaustive-deps
+  function grouped(): { type: string; entries: DeckEntry[]; scryfall?: boolean }[] {
+    if (groupBy === 'identity' || groupBy === 'color') return groupByColors(deck, entries, groupBy).map((g) => ({ type: g.key, entries: g.entries }));
     if (groupBy === 'tag') return groupByTag(deck, entries, tagSrc).map((g) => ({ type: g.key, entries: g.entries, scryfall: g.scryfall }));
     if (groupBy === 'mv') return groupByManaValue(deck, entries).map((g) => ({ type: g.key, entries: g.entries }));
     const m = new Map<TypeCategory, DeckEntry[]>();
@@ -113,7 +135,7 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
       m.get(t)!.push(e);
     }
     return TYPE_ORDER.filter((t) => m.has(t)).map((t) => ({ type: t, entries: m.get(t)! }));
-  }, [entries, deck, groupBy, tagSrc]);
+  }
 
   // Tag view: drag a row onto another tag it has to list it there (its main tag in this deck).
   const dragging = dragUid ? deck.entries.find((e) => e.uid === dragUid) : undefined;
@@ -145,6 +167,97 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
     toast(addCard(deck.id, card, 1, to), 'success');
     if (to !== board) setBoard(to);
   };
+
+  /** What every view needs to know about a row. */
+  const rowInfo = (e: DeckEntry) => {
+    const own = board === 'maybe' ? undefined : coverage?.needs.get(nameKey(e.card));
+    const ownState = !own ? 'skip' : own.missing === 0 ? 'full' : own.missing < own.need ? 'part' : 'none';
+    const ownTitle = !own ? '' : own.missing === 0
+      ? `Owned — ${own.manual ? `${own.manual} committed to this deck` : 'covered from your shared pool'}`
+      : `${own.need - own.missing}/${own.need} available for this deck (shared pool) — ${own.missing} missing`;
+    return { problems: validation.entryProblems[e.uid], isCmd: e.uid === cmd?.uid, price: cardPrice(e.card), ownState, ownTitle };
+  };
+  const ownMark = (state: string, title: string) => state === 'skip' ? null : (
+    <span className={`own-mark ${state}`} title={title} aria-label={title}>{state === 'full' ? '✓' : state === 'part' ? '◐' : '○'}</span>
+  );
+  /** Grouping by tag lets you drag a card onto another of its tags (same in every view). */
+  const regroupDrag = (e: DeckEntry, isCmd: boolean) => ({
+    draggable: groupBy === 'tag' && !isCmd,
+    onDragStart: groupBy === 'tag' && !isCmd ? (ev: DragEvent) => {
+      ev.dataTransfer.setData(ENTRY_DRAG, e.uid);
+      ev.dataTransfer.effectAllowed = 'move';
+      hideArt();
+      setDragUid(e.uid);
+    } : undefined,
+    onDragEnd: () => { setDragUid(null); setDropGroup(null); },
+  });
+
+  /** Grid: full card pictures, several per row. The picture shows on hover only when tiles are small. */
+  const renderGrid = (list: DeckEntry[]) => (
+    <div className="entry-grid">
+      {list.map((e) => {
+        const { problems, isCmd, price, ownState, ownTitle } = rowInfo(e);
+        const img = cardImage(e.card, 'normal');
+        return (
+          <div key={e.uid} className={`grid-tile ${problems ? 'has-problem' : ''} ${dragUid === e.uid ? 'dragging' : ''}`}
+            {...regroupDrag(e, isCmd)}
+            onContextMenu={pinOnRightClick(e.card, e.uid, hideArt)}
+            onMouseMove={(ev) => { if (ev.currentTarget.clientWidth < GRID_HOVER_BELOW) hoverArt(e.card, ev.clientX, ev.clientY); }}
+            onMouseLeave={hideArt}
+            title={`${e.card.name}${problems ? `\n⚠ ${problems.join('\n')}` : ''}`}>
+            <button type="button" className="grid-img-btn" onClick={() => { hideArt(); setOpen(e); }} aria-label={`Open ${e.card.name}`}>
+              {img ? <img src={img} alt={e.card.name} loading="lazy" draggable={false} /> : <span className="card-img-missing">{e.card.name}</span>}
+            </button>
+            <span className="grid-badges">
+              {e.qty > 1 && <span className="grid-qty">{e.qty}×</span>}
+              {isCmd && <span className="grid-cmd" title="Commander">★</span>}
+              {problems && <span className="grid-problem">⚠</span>}
+            </span>
+            <span className="grid-own">{ownMark(ownState, ownTitle)}</span>
+            <div className="grid-actions">
+              <button className="mini-btn" onClick={() => setQty(deck.id, e.uid, e.qty - 1)} aria-label={`Remove one ${e.card.name}`} title="Remove one">−</button>
+              <button className="mini-btn" onClick={() => setQty(deck.id, e.uid, e.qty + 1)} disabled={isCmd} aria-label={`Add one ${e.card.name}`} title="Add one">+</button>
+              <span className="grid-price">{formatUSD(price != null ? price * e.qty : null)}</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  /** Table: one row per card with more columns; up to 3 tags. */
+  const renderTable = (list: DeckEntry[]) => (
+    <table className="color-table deck-table">
+      <thead>
+        <tr><th className="num">Qty</th><th>Card</th><th>Cost</th><th>Type</th><th>Tags</th><th className="num">Price</th><th title="Owned">Own</th></tr>
+      </thead>
+      <tbody>
+        {list.map((e) => {
+          const { problems, isCmd, price, ownState, ownTitle } = rowInfo(e);
+          return (
+            <tr key={e.uid} className={`clickable ${problems ? 'has-problem' : ''}`} {...hoverArtProps(e.card)} {...regroupDrag(e, isCmd)}
+              onContextMenu={pinOnRightClick(e.card, e.uid, hideArt)} onClick={() => { hideArt(); setOpen(e); }}>
+              <td className="num">{e.qty}</td>
+              <td>
+                <span className="deck-table-name">
+                  {isCmd && <span className="cmd-star" title="Commander">★</span>}
+                  <span className="truncate">{e.card.name}</span>
+                  {problems && <span className="problem-icon" title={problems.join('\n')}>⚠</span>}
+                </span>
+              </td>
+              <td><ManaCost cost={manaCost(e.card)} size={13} /></td>
+              <td className="deck-table-type"><span className="truncate">{frontTypeLine(e.card)}</span></td>
+              <td onClick={(ev) => ev.stopPropagation()}>
+                <TagList groups={[{ scope: 'global', tags: globalTags.get(e.card.name) ?? [] }, { scope: 'card', tags: e.tags ?? [] }, { scope: 'scryfall', tags: entryTags(e, tagSrc).scryfall }]} max={3} onTagClick={onTagClick} />
+              </td>
+              <td className="num">{formatUSD(price != null ? price * e.qty : null)}</td>
+              <td>{ownMark(ownState, ownTitle)}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
 
   return (
     <section
@@ -207,6 +320,8 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
             <option value="type">Type</option>
             <option value="tag">Tag</option>
             <option value="mv">Mana value</option>
+            <option value="identity">Color identity</option>
+            <option value="color">Color</option>
           </select>
           {groupBy === 'tag' && (
             <button type="button" className="icon-btn sm group-tags-btn" title="Choose which tags become sections" aria-label="Choose tags to group by" onClick={() => setPickingTags(true)}>⚙</button>
@@ -215,6 +330,18 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
             <button type="button" className="link-btn small" title="Go back to the deck's most common tags" onClick={() => chooseTags(null)}>Reset tags</button>
           )}
         </label>
+        <label className="group-by">
+          <span className="muted">Sort:</span>
+          <select className="input input-sm group-by-select" value={sortBy} onChange={(e) => setSortBy(e.target.value as SortBy)} aria-label="Sort cards by">
+            {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </label>
+        <div className="status-toggle view-switch" role="radiogroup" aria-label="Show the deck as">
+          {DECK_VIEWS.map((v) => (
+            <button key={v.value} type="button" role="radio" aria-checked={view === v.value} title={v.label}
+              className={`seg ${view === v.value ? 'on' : ''}`} onClick={() => setView(v.value)}><span aria-hidden>{v.icon}</span> {v.label}</button>
+          ))}
+        </div>
         <button className={`chip ${favOnly ? 'chip-gold' : ''}`} onClick={() => setFavOnly((f) => !f)} aria-pressed={favOnly} title="Show favorites only">★</button>
         {board === 'main' && (
           <button className={`btn btn-sm ${showBasics ? 'btn-primary' : ''}`} onClick={() => setShowBasics((s) => !s)}>
@@ -313,7 +440,9 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
                 <span className="group-count">{count}</span>
                 <span className="group-price">{formatUSD(price)}</span>
               </button>
-              {!isCollapsed && (
+              {!isCollapsed && view === 'grid' && renderGrid(g.entries)}
+              {!isCollapsed && view === 'table' && renderTable(g.entries)}
+              {!isCollapsed && view === 'list' && (
                 <ul className="entries">
                   {g.entries.map((e) => {
                     const problems = validation.entryProblems[e.uid];

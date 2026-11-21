@@ -537,6 +537,42 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .entries { list-style: none; margin: 0; padding: 2px 0 0; }
 .entry { display: grid; grid-template-columns: auto minmax(0, 1fr) auto 64px auto; min-height: 30px; align-items: center; gap: 8px; padding: 3px 4px; border-radius: var(--radius-sm); }
 .entry:hover { background: var(--panel-2); }
+/* List view: a thin line between cards. */
+.entries > .entry + .entry { border-top: 1px solid var(--border); border-radius: 0; }
+/* Grid view: full card pictures, several per row in each group. */
+.entry-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; padding: 6px 0 8px; }
+.grid-tile { position: relative; border-radius: 4.75% / 3.5%; }
+.grid-tile.has-problem .grid-img-btn img { outline: 2px solid var(--bad); outline-offset: 1px; }
+.grid-tile.dragging { opacity: 0.5; }
+.grid-tile[draggable='true'] { cursor: grab; }
+.grid-img-btn { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: pointer; border-radius: inherit; }
+.grid-img-btn img, .grid-img-btn .card-img-missing { display: block; width: 100%; aspect-ratio: 488 / 680; object-fit: cover; border-radius: 4.75% / 3.5%; background: var(--bg-2); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35); }
+.grid-badges { position: absolute; top: 6px; left: 6px; display: flex; gap: 4px; pointer-events: none; }
+.grid-qty, .grid-cmd, .grid-problem { background: rgba(14, 14, 14, 0.85); color: #fff; font-size: var(--fs-tiny); font-weight: 700; padding: 1px 7px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, 0.25); }
+.grid-cmd { color: var(--gold); }
+.grid-problem { color: var(--warn); }
+.grid-own { position: absolute; top: 6px; right: 8px; pointer-events: none; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8); }
+.grid-actions { position: absolute; left: 6px; right: 6px; bottom: 6px; display: flex; align-items: center; gap: 4px; opacity: 0; transition: opacity 0.12s; }
+.grid-tile:hover .grid-actions, .grid-actions:focus-within { opacity: 1; }
+@media (hover: none) { .grid-actions { opacity: 1; } }
+.grid-price { margin-left: auto; background: rgba(14, 14, 14, 0.85); color: #fff; font-size: var(--fs-tiny); padding: 1px 7px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+/* Table view. */
+.deck-table { table-layout: fixed; margin: 2px 0 8px; }
+.deck-table th:nth-child(1), .deck-table td:nth-child(1) { width: 40px; }
+.deck-table th:nth-child(3), .deck-table td:nth-child(3) { width: 76px; }
+.deck-table th:nth-child(5), .deck-table td:nth-child(5) { width: 34%; }
+.deck-table .tag-list { flex-wrap: nowrap; overflow: hidden; max-width: 100%; }
+.col-deck > .panel { container-type: inline-size; }
+@container (max-width: 620px) { .deck-table th:nth-child(4), .deck-table td:nth-child(4) { display: none; } }
+.deck-table th:nth-child(6), .deck-table td:nth-child(6) { width: 70px; }
+.deck-table th:nth-child(7), .deck-table td:nth-child(7) { width: 40px; text-align: center; }
+.deck-table td { vertical-align: middle; }
+.deck-table-name { display: flex; align-items: center; gap: 5px; min-width: 0; font-weight: 600; }
+.deck-table-name .truncate, .deck-table-type .truncate { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.deck-table-type { color: var(--text-2); font-size: var(--fs-small); }
+.deck-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.deck-table tr.has-problem td:first-child { box-shadow: inset 3px 0 0 var(--bad); }
+@media (max-width: 900px) { .deck-table th:nth-child(4), .deck-table td:nth-child(4), .deck-table th:nth-child(5), .deck-table td:nth-child(5) { display: none; } }
 .entry.has-problem { background: var(--bad-soft); }
 .qty-ctrl { display: flex; align-items: center; gap: 1px; }
 .qty { min-width: 18px; text-align: center; font-weight: 650; font-variant-numeric: tabular-nums; }
