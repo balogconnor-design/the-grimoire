@@ -42,3 +42,12 @@ export function readCardDrag(dt: DataTransfer | null): Card | null {
     return null;
   }
 }
+
+/**
+ * Deck rows drag their entry id under their own type (moving between tag groups, onto the commander
+ * slot, or onto the view panel to pin it). Kept apart from search drags so the deck list never adds
+ * a copy of a card dragged out of itself.
+ */
+export const ENTRY_DRAG = 'application/x-grimoire-entry';
+export const isEntryDrag = (dt: DataTransfer | null) => !!dt && Array.from(dt.types).includes(ENTRY_DRAG);
+export const readEntryDrag = (dt: DataTransfer | null) => dt?.getData(ENTRY_DRAG) || null;

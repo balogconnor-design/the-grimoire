@@ -345,7 +345,7 @@ export function SearchPanel({ deck, board = 'main', mode = 'expanded', onMode }:
 }
 
 /** A small chevron icon pointing the way the panel moves. */
-function Chevron({ dir }: { dir: 'up' | 'down' | 'left' }) {
+export function Chevron({ dir }: { dir: 'up' | 'down' | 'left' }) {
   const d = dir === 'up' ? 'M4 10l4-4 4 4' : dir === 'down' ? 'M4 6l4 4 4-4' : 'M10 4l-4 4 4 4';
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>

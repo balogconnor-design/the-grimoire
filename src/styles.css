@@ -320,6 +320,34 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .card-step { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; }
 .card-step .btn { font-size: var(--fs-sub); line-height: 1; padding: 2px 12px; }
 .pin-btn { align-self: center; }
+/* View panel: pinned cards, collapse and hide like Card Search, drag a card onto it to pin it. */
+.view-panel:focus { outline: none; }
+.has-view.view-collapsed .col-search > .view-panel { flex: none; }
+.has-view.view-collapsed .col-search > .search-panel:not(.collapsed) { flex: 1 1 0; }
+.view-panel.collapsed .panel-head { margin-bottom: 0; }
+.view-panel h2 .tab-count { vertical-align: middle; margin-left: 8px; }
+.view-panel.drop-on, .view-rail.drop-on, .view-drop-zone.drop-on { border-color: var(--accent); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
+.icon-btn.sm.view-tool-btn { display: inline-grid; place-items: center; line-height: 1; width: 30px; height: 28px; color: var(--text-2); border: 1px solid var(--border); }
+.icon-btn.sm.view-tool-btn:hover { color: var(--text); border-color: var(--accent); }
+.icon-btn.sm.view-pin-btn.on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.pin-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.pin-step { display: grid; grid-template-columns: 1fr auto auto auto 1fr; align-items: center; gap: 10px; margin-bottom: 10px; }
+.pin-step > :first-child { grid-column: 2; }
+.pin-step .btn { line-height: 1; padding: 2px 12px; font-size: var(--fs-sub); }
+.pin-step .pin-remove { justify-self: end; font-size: var(--fs-small); padding: 3px 9px; }
+.pin-step .pin-remove:hover, .icon-btn.row-remove:hover { color: var(--bad); }
+.mini-btn.mini-remove:hover { background: var(--bad); }
+.view-rail { flex: none; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 6px 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); color: var(--text-2); cursor: pointer; font: inherit; }
+.view-rail:hover { color: var(--text); border-color: var(--accent); }
+.view-rail-label { font-weight: 600; letter-spacing: 0.04em; }
+.view-rail .tab-count { margin-left: 0; }
+.view-drop-zone { flex: none; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 72px; padding: 10px; border: 2px dashed var(--border-strong); border-radius: var(--radius); background: var(--panel); color: var(--text-2); font-weight: 600; text-align: center; }
+/* Both hidden: the column is a slim rail, so the view rail stands up too. */
+@media (min-width: 901px) {
+  .search-hidden:not(.has-view) .view-rail { flex-direction: column; padding: 12px 0; }
+  .search-hidden:not(.has-view) .view-rail-label { writing-mode: vertical-rl; transform: rotate(180deg); }
+  .search-hidden:not(.has-view) .view-drop-zone { writing-mode: vertical-rl; transform: rotate(180deg); min-height: 180px; padding: 10px 0; }
+}
 
 @media (max-width: 1400px) {
   .deck-workspace { grid-template-columns: minmax(340px, 1fr) minmax(360px, 1fr); grid-template-areas: 'search deck' 'search details'; }
