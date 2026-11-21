@@ -76,8 +76,8 @@ function EdhrecData({ deck, onView }: { deck: Deck; onView: (v: Viewing) => void
   return (
     <>
       <div className="edhrec-block">
-        <div className="edhrec-subhead">
-          <span className="edhrec-subhead-title">Salt</span>
+        <div className="panel-subhead">
+          <span className="panel-subhead-title">Salt</span>
           {salt.size > 0 && (
             <span className="edhrec-stats">
               <span className="edhrec-stat" title="Sum of the salt scores of every card in the main deck"><b>{total.toFixed(1)}</b> total</span>
@@ -169,8 +169,8 @@ function Suggestions({ deck, onView }: { deck: Deck; onView: (v: Viewing) => voi
   if (!name) return <div className="muted small edhrec-block">Choose a commander to see what its decks usually play.</div>;
   return (
     <div className="edhrec-block">
-      <div className="edhrec-subhead">
-        <span className="edhrec-subhead-title">Popular with {name.split(' // ')[0]}</span>
+      <div className="panel-subhead">
+        <span className="panel-subhead-title">Popular with {name.split(' // ')[0]}</span>
         <a className="link-btn small" href={edhrecCommanderUrl(name)} target="_blank" rel="noreferrer">EDHREC ↗</a>
       </div>
       {failed ? <div className="muted small">EDHREC isn’t available right now. Try again later.</div>

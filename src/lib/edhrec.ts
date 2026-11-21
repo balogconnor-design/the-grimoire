@@ -1,6 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import type { Card } from '../types';
-import { getCollection } from './scryfall';
+import { resetCardsByNameForTests } from './cardsByName';
 import { db } from './store';
 
 /**
@@ -167,27 +166,10 @@ export function resetEdhrecForTests() {
   saltStatus = { state: 'idle', fetchedAt: 0 };
   saltRun = null;
   commanders.clear();
-  cardCache.clear();
+  resetCardsByNameForTests();
 }
 
 // ---------- Card data for suggestions ----------
 
-const cardCache = new Map<string, Card | null>();
-/** Every EDHREC name we have looked up on Scryfall so far (null = Scryfall didn't find it). */
-export const suggestionCard = (name: string): Card | null | undefined => cardCache.get(name);
-
-/**
- * Look up suggested cards on Scryfall (75 per request) so they can be opened and dragged like search
- * results. Remembers the answers for this visit; names already looked up are skipped.
- */
-export async function loadSuggestionCards(names: string[]): Promise<void> {
-  const todo = [...new Set(names)].filter((n) => !cardCache.has(n));
-  if (!todo.length) return;
-  const { found } = await getCollection(todo.map((name) => ({ name })));
-  const byName = new Map<string, Card>();
-  for (const c of found) {
-    byName.set(c.name, c);
-    for (const f of c.card_faces ?? []) if (f.name && !byName.has(f.name)) byName.set(f.name, c);
-  }
-  for (const n of todo) cardCache.set(n, byName.get(n) ?? byName.get(n.split(' // ')[0]) ?? null);
-}
+/** Suggested cards are looked up on Scryfall with the shared by-name lookup. */
+export { cardByName as suggestionCard, loadCardsByName as loadSuggestionCards } from './cardsByName';
