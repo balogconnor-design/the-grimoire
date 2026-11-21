@@ -73,8 +73,8 @@ export default defineConfig({
         start_url: '/',
         scope: '/',
         display: 'standalone',
-        background_color: '#0f1218',
-        theme_color: '#0f1218',
+        background_color: '#141414',
+        theme_color: '#141414',
         categories: ['games', 'utilities'],
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },

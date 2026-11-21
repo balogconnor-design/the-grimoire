@@ -10,7 +10,7 @@ import { DataSafety } from './components/DataSafety';
 import { isPortable } from './lib/device';
 import logoUrl from './assets/grimoire-logo.png';
 
-const THEME_COLOR: Record<string, string> = { dark: '#0f1218', light: '#f3f5f8' };
+const THEME_COLOR: Record<string, string> = { dark: '#141414', light: '#f3f5f8' };
 
 function useHashRoute() {
   const [hash, setHash] = useState(() => window.location.hash.slice(1) || '/');
