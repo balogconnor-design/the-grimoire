@@ -117,6 +117,34 @@ export interface Deck {
   tags?: string[];
   /** Commander bracket you aim for (1–5); the bracket estimate warns when the cards go over it. */
   targetBracket?: 1 | 2 | 3 | 4 | 5;
+  /** Automatic changelog, oldest first: one session per burst of edits (see deckHistory.ts). */
+  changelog?: DeckChangeSession[];
+}
+
+/** A card count change in the changelog: delta copies of this card name on this board. */
+export interface DeckChangeItem { name: string; board: Board; delta: number }
+
+/** Changes made close together (within 30 minutes), netted out per card and board. */
+export interface DeckChangeSession {
+  id: string;
+  startedAt: number;
+  at: number; // last change in the session
+  items: DeckChangeItem[];
+  /** Commander before and after (card names; missing = none). */
+  commander?: { from?: string; to?: string };
+  /** Why the change happened when it wasn't a normal edit, e.g. a restored snapshot. Notes are never merged. */
+  note?: string;
+}
+
+/** A saved copy of a deck's cards, made by hand (or automatically before a snapshot is restored). */
+export interface DeckSnapshot {
+  id: string;
+  deckId: string;
+  name: string;
+  entries: DeckEntry[];
+  commanderUid?: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
 // ---------- Collection ----------

@@ -326,7 +326,7 @@ export async function importDecklist(deckId: string, text: string, mode: 'append
     if (line.commander && getFormat(next.format).hasCommander) next.commanderUid = entry.uid;
     added += line.qty;
   }
-  if (matched.length) await saveDeck(next);
+  if (matched.length) await saveDeck(next, { note: mode === 'replace' ? 'Imported a list (replaced the cards)' : 'Imported a list' });
   return { added, matchedLines: matched.length, missing: missingOut, lines: lines.length, cards };
 }
 
