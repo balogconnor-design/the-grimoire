@@ -721,11 +721,8 @@ function BracketSection({ deck, filter, setFilter, onView }: ChartProps & ViewPr
           </ul>
         </div>
       )}
-      {stags.size === 0 && (
-        <div className="muted small">
-          {stagStatus.state === 'updating' ? `Downloading Scryfall tags… ${stagStatus.done}/${stagStatus.total}. ` : 'Scryfall tags aren’t downloaded yet, so '}
-          {stagStatus.state === 'updating' ? 'Extra turns and land denial are checked once that finishes.' : 'extra turns and land denial aren’t checked.'}
-        </div>
+      {stags.size === 0 && stagStatus.state === 'error' && (
+        <div className="muted small">Scryfall tags couldn’t be loaded, so extra turns and land denial aren’t checked. Reload the page to try again.</div>
       )}
       <div className="muted tiny">
         Brackets describe how a deck plays, so the cards only set the lowest bracket it fits. Bracket 1 vs 2 and 4 vs 5 depend on intent.

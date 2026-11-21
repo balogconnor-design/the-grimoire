@@ -3,7 +3,9 @@ import type { Deck, DeckEntry } from '../src/types';
 import { csvColumn } from '../src/lib/scryfall';
 import { parseQuery } from '../src/lib/query';
 import { deckmatesByTag, entryTags, groupByManaValue, groupByTag, mainGroup, type TagSources } from '../src/lib/deckTags';
-import { loadScryfallTags, refreshScryfallTags, SCRYFALL_TAGS, scryfallTagsOf, setScryfallTagsForTests, setTagPageGapForTests } from '../src/lib/scryfallTags';
+import { readFileSync } from 'node:fs';
+import { clearOldDownloads, indexTagData, loadScryfallTags, SCRYFALL_TAGS, scryfallTagsOf, setScryfallTagsForTests } from '../src/lib/scryfallTags';
+import { db } from '../src/lib/store';
 import { basic, card, freshDb } from './helpers';
 
 describe('csvColumn', () => {
@@ -125,36 +127,39 @@ describe('searching Scryfall tags locally', () => {
   });
 });
 
-describe('downloading Scryfall tags', () => {
-  beforeEach(async () => { await freshDb(); setScryfallTagsForTests({}); setTagPageGapForTests(0); });
-  afterEach(() => { vi.unstubAllGlobals(); });
+describe('bundled Scryfall tags', () => {
+  beforeEach(async () => { await freshDb(); });
 
-  it('pages through each tag as CSV, saves the names and reloads them', async () => {
-    const pageOf = (n: number, prefix: string) => 'name\n' + Array.from({ length: n }, (_, i) => `${prefix} ${i}`).join('\n');
-    const fetchMock = vi.fn(async (url: string) => {
-      const u = new URL(url);
-      const q = u.searchParams.get('q');
-      const page = Number(u.searchParams.get('page'));
-      expect(u.searchParams.get('format')).toBe('csv');
-      if (q === 'otag:ramp') return new Response(page === 1 ? pageOf(175, 'Ramp') : page === 2 ? pageOf(3, 'More') : '', { status: page <= 2 ? 200 : 422 });
-      return new Response('{"object":"error"}', { status: 404 });
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    await refreshScryfallTags(true);
-    expect(scryfallTagsOf('Ramp 0')).toEqual(['ramp']);
-    expect(scryfallTagsOf('More 2')).toEqual(['ramp']);
-    // Two pages for ramp (the second is short, so no third request), one request for every other tag.
-    expect(fetchMock).toHaveBeenCalledTimes(2 + SCRYFALL_TAGS.length - 1);
-
-    setScryfallTagsForTests({});
-    await loadScryfallTags();
-    expect(scryfallTagsOf('Ramp 174')).toEqual(['ramp']);
+  it('ships all 40 tags, each with cards, in the agreed priority order', async () => {
+    const data = JSON.parse(readFileSync(new URL('../src/data/scryfall-tags.json', import.meta.url), 'utf8'));
+    expect(SCRYFALL_TAGS).toHaveLength(40);
+    expect(data.tags).toEqual(SCRYFALL_TAGS.map((t) => t.otag));
+    data.cards.forEach((list: number[]) => expect(list.length).toBeGreaterThan(0));
+    expect(SCRYFALL_TAGS.slice(0, 4).map((t) => t.label)).toEqual(['ramp', 'mana rock', 'mana dork', 'cost reducer']);
+    expect(SCRYFALL_TAGS.map((t) => t.label)).toEqual(expect.arrayContaining(['artifact removal', 'enchantment removal', 'evasion', 'typal', 'landfall', 'blink', 'fog']));
   });
 
-  it('stops quietly on a network error', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('offline'); }));
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    await expect(refreshScryfallTags(true)).resolves.toBeUndefined();
-    warn.mockRestore();
+  it('loads without touching the network and tags real cards', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    await loadScryfallTags();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(scryfallTagsOf('Sol Ring')).toEqual(expect.arrayContaining(['ramp', 'mana rock']));
+    expect(scryfallTagsOf('Swords to Plowshares')).toContain('removal');
+    fetchSpy.mockRestore();
+  });
+
+  it('indexes card lists into tags in priority order', () => {
+    const m = indexTagData({ generated: 'x', tags: ['draw', 'ramp'], names: ['A', 'B'], cards: [[0, 1], [0]] });
+    expect(m.get('A')).toEqual(['ramp', 'draw']); // ramp comes before draw in the priority order
+    expect(m.get('B')).toEqual(['draw']);
+  });
+
+  it('clears the per-tag lists older versions downloaded', async () => {
+    const d = await db();
+    await d.put('meta', { key: 'stag:ramp', value: { names: ['X'], fetchedAt: 1 } });
+    await d.put('meta', { key: 'settings', value: {} });
+    await clearOldDownloads();
+    expect(await d.get('meta', 'stag:ramp')).toBeUndefined();
+    expect(await d.get('meta', 'settings')).toBeDefined();
   });
 });

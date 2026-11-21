@@ -221,11 +221,8 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
         </div>
       )}
       {queryWarnings.length > 0 && <div className="warn-text small">{queryWarnings.join(' · ')}</div>}
-      {groupBy === 'tag' && stagStatus.state === 'updating' && (
-        <div className="muted small">Downloading Scryfall tags… {stagStatus.done}/{stagStatus.total}</div>
-      )}
-      {groupBy === 'tag' && stagStatus.state !== 'updating' && stags.size === 0 && (
-        <div className="muted small">Scryfall tags haven't been downloaded yet. They download automatically when you're online.</div>
+      {groupBy === 'tag' && stagStatus.state === 'error' && (
+        <div className="muted small">Scryfall tags couldn't be loaded. Reload the page to try again.</div>
       )}
 
       {hasFilter && (
