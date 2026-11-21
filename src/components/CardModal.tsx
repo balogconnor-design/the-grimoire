@@ -170,7 +170,7 @@ function CardModalBody({ card: initial, deckId, entryUid, onClose, onNavigate, s
           ) : <div className="card-img-missing">{card.name}</div>}
           {!inline && canPin && (
             <button type="button" className="btn btn-ghost btn-sm pin-btn" onClick={() => { pinCard(card, entryUid); onClose(); }}
-              title="Keep this card on show under Card Search (or right-click any card)">📌 Pin to view panel</button>
+              title="Pin this card to the view panel under Card Search (or right-click any card)">📌 Pin to view panel</button>
           )}
           {hasBackFaceImage(card) && (
             <button className="btn btn-ghost flip-btn" onClick={() => setFace((f) => (f ? 0 : 1))}>

@@ -601,6 +601,96 @@ test('view panel: right-click to pin, drag a copy from it, Pin button, arrow key
   expect(errors).toEqual([]);
 });
 
+test('view panel: pin several cards, card / grid / list views, sort, remove, collapse, hide, drag to pin', async ({ page, isMobile, browserName }) => {
+  test.skip(!!isMobile, 'right-click and the three-column layout are desktop features');
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const errors = watchErrors(page);
+  await open(page);
+  const counter = { ...SOL_RING, id: 'counter-pin', name: 'Counterspell', type_line: 'Instant', mana_cost: '{U}{U}', cmc: 2, oracle_text: 'Counter target spell.', prices: { usd: '0.50' } };
+  const bolt = { ...SOL_RING, id: 'bolt-pin', name: 'Lightning Bolt', type_line: 'Instant', mana_cost: '{R}', cmc: 1, oracle_text: 'Deal 3 damage.', prices: { usd: '2.00' } };
+  await page.route('https://api.scryfall.com/cards/search?**', (route) => {
+    if (new URL(route.request().url()).searchParams.get('format') === 'csv') return route.fallback();
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ object: 'list', total_cards: 3, has_more: false, data: [SOL_RING, counter, bolt] }) });
+  });
+  await createDeck(page, 'Pins');
+  const search = page.locator('.search-panel');
+  await search.locator('.search-input').fill('anything');
+  await search.locator('.search-input').press('Enter');
+  const tile = (name: string) => search.locator('.result-card', { hasText: name });
+  await tile('Sol Ring').hover();
+  await tile('Sol Ring').getByRole('button', { name: 'Add Sol Ring to main deck' }).click();
+
+  // Right-click shows one card; pin it, then right-clicks add instead of replacing.
+  const view = page.locator('.view-panel');
+  await tile('Sol Ring').click({ button: 'right' });
+  await view.getByRole('button', { name: 'Pin the view panel' }).click();
+  await tile('Counterspell').click({ button: 'right' });
+  await tile('Lightning Bolt').click({ button: 'right' });
+  const count = view.locator('h2 .tab-count');
+  await expect(count).toHaveText('3');
+
+  // Card view: one at a time, step through them.
+  await expect(view.locator('.pin-step')).toContainText('3 of 3');
+  await expect(view.locator('.card-modal-info')).toContainText('Lightning Bolt');
+  await view.getByRole('button', { name: 'Next pinned card' }).click();
+  await expect(view.locator('.pin-step')).toContainText('1 of 3');
+  await expect(view.locator('.card-modal-info')).toContainText('Sol Ring');
+
+  // Grid: card art like the search results; sort by name.
+  await view.getByRole('radio', { name: /Grid/ }).click();
+  const tiles = view.locator('.result-card');
+  await expect(tiles).toHaveCount(3);
+  await view.getByLabel('Sort pinned cards').selectOption('name');
+  await expect(tiles.first()).toContainText('Counterspell');
+  await view.getByLabel('Sort pinned cards').selectOption('price');
+  await expect(tiles.first()).toContainText('Lightning Bolt');
+
+  // Remove one from the grid.
+  await tiles.filter({ hasText: 'Counterspell' }).hover();
+  await view.getByRole('button', { name: 'Remove Counterspell from the view panel' }).click();
+  await expect(tiles).toHaveCount(2);
+  await expect(count).toHaveText('2');
+
+  // List view rows; clicking one opens it in the Card view.
+  await view.getByRole('radio', { name: /List/ }).click();
+  await expect(view.locator('.result-row')).toHaveCount(2);
+  await view.locator('.result-row', { hasText: 'Sol Ring' }).locator('.row-name').click();
+  await expect(view.getByRole('radio', { name: /Card/ })).toHaveAttribute('aria-checked', 'true');
+  await expect(view.locator('.card-modal-info')).toContainText('Sol Ring');
+
+  // Collapse to the header, then hide to a rail with the count; the rail brings it back.
+  await view.getByRole('button', { name: 'Collapse the view panel' }).click();
+  await expect(view.locator('.card-modal')).toHaveCount(0);
+  await view.getByRole('button', { name: 'Hide the view panel' }).click();
+  await expect(view).toHaveCount(0);
+  const rail = page.getByRole('button', { name: 'Show the view panel' });
+  await expect(rail).toContainText('2');
+  await rail.click();
+  await expect(view.locator('.card-modal')).toBeVisible();
+
+  if (browserName !== 'webkit') {
+    // Dragging a search result or a deck row onto the panel pins it.
+    await tile('Counterspell').locator('.result-art').dragTo(view);
+    await expect(count).toHaveText('3');
+    await expect(view.locator('.card-modal-info')).toContainText('Counterspell');
+    await view.getByRole('button', { name: 'Remove Counterspell from the view panel' }).click();
+    await view.getByRole('radio', { name: /Grid/ }).click();
+    await tiles.filter({ hasText: 'Sol Ring' }).hover();
+    await view.getByRole('button', { name: 'Remove Sol Ring from the view panel' }).click();
+    await expect(count).toHaveText('1');
+    await page.locator('.deck-groups .entry', { hasText: 'Sol Ring' }).dragTo(view);
+    await expect(count).toHaveText('2');
+  }
+
+  // Unpin keeps only the card on show; close clears the panel.
+  await view.getByRole('button', { name: 'Unpin the view panel' }).click();
+  await expect(count).toHaveCount(0);
+  await expect(view.locator('.pin-toolbar')).toHaveCount(0);
+  await view.getByRole('button', { name: 'Close the view panel' }).click();
+  await expect(view).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 test('a search that can not reach Scryfall says so and offers Try again', async ({ page }) => {
   await open(page);
   let fail = true;

@@ -20,7 +20,7 @@ import { FavStar, TagList, SCOPE_META, type TagScope } from './TagEditor';
 import { useToast } from './Toast';
 import { hideArt, hoverArt, hoverArtProps } from './HoverArt';
 import { pinOnRightClick } from '../lib/viewPanel';
-import { isCardDrag, readCardDrag } from '../lib/dnd';
+import { ENTRY_DRAG, isCardDrag, readCardDrag } from '../lib/dnd';
 import { ManageScryfallTags } from './ScryfallTagSettings';
 import { useScryfallTags, useScryfallTagStatus } from '../lib/scryfallTags';
 import { defaultGroupTags, entryTags, groupByManaValue, groupByTag, mainGroup, OTHER_GROUP } from '../lib/deckTags';
@@ -66,7 +66,7 @@ const readColWidths = (): Record<string, number> => {
 const saveColWidths = (w: Record<string, number>) => { try { localStorage.setItem(COL_KEY, JSON.stringify(w)); } catch { /* only this session remembers */ } };
 /** Tiles narrower than this show the card picture on hover too (it's hard to read small). */
 const GRID_HOVER_BELOW = 170;
-const ENTRY_DRAG = 'application/x-grimoire-entry';
+
 function readGroupBy(): GroupBy {
   try {
     const v = localStorage.getItem(GROUP_BY_KEY);
@@ -230,19 +230,20 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
     <span className={`own-mark ${state}`} title={title} aria-label={title}>{state === 'full' ? '✓' : state === 'part' ? '◐' : '○'}</span>
   );
   /**
-   * Rows can be dragged (same in every view): onto another of the card's tags when grouping by tag,
-   * and onto the commander slot when the card can be the commander.
+   * Rows can be dragged (same in every view): onto the view panel to pin the card, onto another of
+   * the card's tags when grouping by tag, and onto the commander slot when the card can be the commander.
    */
   const regroupDrag = (e: DeckEntry, isCmd: boolean) => {
-    const can = !isCmd && (groupBy === 'tag' || isCmdCandidate(e));
     return {
-      draggable: can,
-      onDragStart: can ? (ev: DragEvent) => {
+      draggable: true,
+      onDragStart: (ev: DragEvent) => {
         ev.dataTransfer.setData(ENTRY_DRAG, e.uid);
-        ev.dataTransfer.effectAllowed = 'move';
+        ev.dataTransfer.setData('text/plain', e.card.name);
+        ev.dataTransfer.effectAllowed = 'copyMove';
         hideArt();
-        setDragUid(e.uid);
-      } : undefined,
+        // The commander only goes to the view panel; it never regroups.
+        if (!isCmd) setDragUid(e.uid);
+      },
       onDragEnd: () => { setDragUid(null); setDropGroup(null); setCmdDrop(false); },
     };
   };
@@ -251,7 +252,7 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
     const regroup = groupBy === 'tag' && entryTags(e, tagSrc).all.length > 1;
     const toCmd = isCmdCandidate(e);
     if (regroup && toCmd) return 'Drag onto another of its tags to list it there, or onto the commander slot';
-    if (regroup) return 'Drag onto another of its tags to list it there';
+    if (regroup) return 'Drag onto another of its tags to list it there, or onto the view panel to pin it';
     if (toCmd) return `Drag onto the ${fmt.id === 'oathbreaker' ? 'Oathbreaker' : 'commander'} slot to make it your ${fmt.id === 'oathbreaker' ? 'Oathbreaker' : 'commander'}`;
     return undefined;
   };

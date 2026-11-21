@@ -45,7 +45,7 @@ export function ResultViewSwitch({ value, onChange }: { value: ResultView; onCha
  * (taller, uniform rows with rules text and tags). The card picture shows on hover; click opens the
  * card view; on the deck page the row drags onto the deck list like a grid tile.
  */
-export function CardResultRow({ card, subject, view, onOpen, onTag, onTagClick, onCollect, addButton, badge, draggable, dim }: {
+export function CardResultRow({ card, subject, view, onOpen, onTag, onTagClick, onCollect, addButton, badge, draggable, dim, onRemove }: {
   card: Card;
   subject: Subject;
   view: 'list' | 'details';
@@ -57,6 +57,8 @@ export function CardResultRow({ card, subject, view, onOpen, onTag, onTagClick, 
   badge?: ReactNode;
   draggable?: boolean;
   dim?: boolean;
+  /** Shows a remove button (the view panel's pinned cards). */
+  onRemove?: () => void;
 }) {
   const owned = subject.ownedQty ?? 0;
   const decks = subject.decks ?? [];
@@ -115,6 +117,7 @@ export function CardResultRow({ card, subject, view, onOpen, onTag, onTagClick, 
           {view === 'details' && <button className="icon-btn sm" onClick={onTag} title="Tag this card" aria-label={`Tag ${card.name}`}>🏷</button>}
           {view === 'details' && <button className="icon-btn sm" onClick={onCollect} title="Add to collection" aria-label={`Add ${card.name} to collection`}>◈+</button>}
           {addButton}
+          {onRemove && <button className="icon-btn sm danger row-remove" onClick={onRemove} title="Remove from the view panel" aria-label={`Remove ${card.name} from the view panel`}>✕</button>}
         </span>
       </div>
     </div>

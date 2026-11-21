@@ -1,5 +1,5 @@
 import { ViewPanel } from '../components/ViewPanel';
-import { hostViewPanel, usePinned } from '../lib/viewPanel';
+import { hostViewPanel, useViewPanel } from '../lib/viewPanel';
 import { useEffect, useMemo, useState } from 'react';
 import type { Board, DeckFilter } from '../types';
 import { useDeck, updateDeck, deleteDeck } from '../lib/store';
@@ -46,7 +46,9 @@ export function DeckPage({ id }: { id: string }) {
     try { localStorage.setItem('grimoire.searchMode', m); localStorage.removeItem('grimoire.searchHidden'); } catch { /* session only */ }
   };
   const searchHidden = searchMode === 'hidden';
-  const pinned = usePinned();
+  const view = useViewPanel();
+  // The view panel takes room in the column only while it has cards and isn't hidden.
+  const hasView = view.items.length > 0 && view.mode !== 'hidden';
   useEffect(() => hostViewPanel(), []);
   const validation = useMemo(() => (deck ? validateDeck(deck) : null), [deck]);
   const allDeckTags = useAllDeckTags();
@@ -151,14 +153,14 @@ export function DeckPage({ id }: { id: string }) {
         ))}
       </nav>
 
-      <div className={`deck-workspace show-${mobileTab} search-${searchMode} ${pinned ? 'has-view' : ''}`}>
+      <div className={`deck-workspace show-${mobileTab} search-${searchMode} ${hasView ? 'has-view' : ''} view-${view.mode}`}>
         <div className="col col-search">
           {searchHidden ? (
             <button type="button" className="search-rail" onClick={() => setSearchMode('collapsed')} title="Show Card Search" aria-label="Show Card Search">
               <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 4l4 4-4 4" /></svg><span className="search-rail-label">Card Search</span>
             </button>
           ) : <SearchPanel deck={deck} board={board} mode={searchMode} onMode={setSearchMode} />}
-          <ViewPanel deck={deck} />
+          <ViewPanel deck={deck} board={board} />
         </div>
         <div className="col col-deck"><DeckList deck={deck} validation={validation} filter={filter} setFilter={setFilter} board={board} setBoard={setBoard} /></div>
         <div className="col col-details"><DeckDetails deck={deck} validation={validation} filter={filter} setFilter={setFilterAndShow} /></div>

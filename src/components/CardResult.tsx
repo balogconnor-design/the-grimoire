@@ -8,7 +8,7 @@ import { pinOnRightClick } from '../lib/viewPanel';
 import { TagList, type TagScope } from './TagEditor';
 
 /** A search-result card tile with ownership + tag info and quick actions. */
-export function CardResult({ card, subject, onOpen, onTag, onTagClick, onCollect, addButton, badge, draggable, dim }: {
+export function CardResult({ card, subject, onOpen, onTag, onTagClick, onCollect, addButton, badge, draggable, dim, onRemove }: {
   card: Card;
   subject: Subject;
   onOpen: () => void;
@@ -22,6 +22,8 @@ export function CardResult({ card, subject, onOpen, onTag, onTagClick, onCollect
   draggable?: boolean;
   /** Shown greyed out (e.g. already in the deck), still usable. */
   dim?: boolean;
+  /** Shows a remove button (the view panel's pinned cards). */
+  onRemove?: () => void;
 }) {
   const owned = subject.ownedQty ?? 0;
   const decks = subject.decks ?? [];
@@ -50,6 +52,7 @@ export function CardResult({ card, subject, onOpen, onTag, onTagClick, onCollect
           onClick={() => setCardFavorite(card, !subject.favorite)}
         >{subject.favorite ? '★' : '☆'}</button>
         <div className="result-actions">
+          {onRemove && <button className="mini-btn mini-remove" onClick={onRemove} title="Remove from the view panel" aria-label={`Remove ${card.name} from the view panel`}>✕</button>}
           <button className="mini-btn" onClick={onTag} title="Tag this card" aria-label={`Tag ${card.name}`}>🏷</button>
           <button className="mini-btn" onClick={onCollect} title="Add to collection" aria-label={`Add ${card.name} to collection`}>◈+</button>
         </div>
