@@ -38,4 +38,4 @@ body:
     attributes:
       label: App version
       description: Shown at the top of Help & about (the ? button).
-      placeholder: e.g. 0.2.0
+      placeholder: e.g. 0.8.0
