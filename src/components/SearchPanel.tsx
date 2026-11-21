@@ -33,7 +33,7 @@ const BOARD_NAME: Record<Board, { full: string; short: string }> = {
 };
 
 /** Card search on the deck page. The + button and drag and drop add to the board shown in the deck list. */
-export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Board }) {
+export function SearchPanel({ deck, board = 'main', onHide }: { deck: Deck; board?: Board; onHide?: () => void }) {
   const fmt = getFormat(deck.format);
   const identity = deckIdentity(deck);
   const toast = useToast();
@@ -173,7 +173,10 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
     <section className="panel search-panel">
       <div className="panel-head">
         <h2>Card Search</h2>
-        <a className="muted small" href="https://scryfall.com/docs/syntax" target="_blank" rel="noreferrer">Syntax guide ↗</a>
+        <span className="panel-head-tools">
+          <a className="muted small" href="https://scryfall.com/docs/syntax" target="_blank" rel="noreferrer">Syntax guide ↗</a>
+          {onHide && <button type="button" className="icon-btn sm hide-search-btn" onClick={onHide} title="Hide Card Search for more room" aria-label="Hide Card Search">⟨</button>}
+        </span>
       </div>
 
       <form onSubmit={onSubmit} className="search-form">
@@ -267,7 +270,7 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
         </>
       )}
 
-      {selected && <CardModal card={selected} deckId={deck.id} onClose={() => setSelected(null)} />}
+      {selected && <CardModal card={selected} deckId={deck.id} onClose={() => setSelected(null)} siblings={results.map((c) => ({ card: c }))} />}
       {tagging && <TagModal card={tagging} context={{ kind: 'deck', deckId: deck.id }} onClose={() => setTagging(null)} />}
       {collecting && <AddToCollectionModal card={collecting} deckId={deck.id} onClose={() => setCollecting(null)} />}
     </section>

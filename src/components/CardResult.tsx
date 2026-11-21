@@ -4,6 +4,7 @@ import type { Subject } from '../lib/query';
 import { cardImage, cardPrice, formatUSD } from '../lib/rules';
 import { setCardDrag, setDragPreview } from '../lib/dnd';
 import { setCardFavorite } from '../lib/actions';
+import { pinOnRightClick } from '../lib/viewPanel';
 import { TagList, type TagScope } from './TagEditor';
 
 /** A search-result card tile with ownership + tag info and quick actions. */
@@ -31,7 +32,7 @@ export function CardResult({ card, subject, onOpen, onTag, onTagClick, onCollect
     if (pic) setDragPreview(e.dataTransfer, pic);
   };
   return (
-    <div className={`result-card ${draggable ? 'is-draggable' : ''} ${dim ? 'is-dim' : ''}`} title={dim ? 'Already in this deck' : undefined}>
+    <div className={`result-card ${draggable ? 'is-draggable' : ''} ${dim ? 'is-dim' : ''}`} title={dim ? 'Already in this deck' : undefined} onContextMenu={pinOnRightClick(card)}>
       <div className="result-art" draggable={draggable || undefined} onDragStart={draggable ? onDragStart : undefined}>
         <button className="result-img-btn" onClick={onOpen} title={draggable ? `${card.name} — drag onto the deck list to add it` : card.name}>
           {img ? <img src={img} alt={card.name} loading="lazy" draggable={false} /> : <div className="card-img-missing">{card.name}</div>}

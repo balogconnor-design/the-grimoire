@@ -1,3 +1,5 @@
+import { ViewPanel } from '../components/ViewPanel';
+import { hostViewPanel, usePinned } from '../lib/viewPanel';
 import { useEffect, useMemo, useState } from 'react';
 import type { Board, DeckFilter } from '../types';
 import { useDeck, updateDeck, deleteDeck } from '../lib/store';
@@ -27,6 +29,11 @@ export function DeckPage({ id }: { id: string }) {
   const [ie, setIe] = useState<'import' | 'export' | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [mobileTab, setMobileTab] = useState<MobileTab>('deck');
+  // Card Search can be hidden to give the deck list and Metrics more room (remembered in this browser).
+  const [searchHidden, setSearchHiddenState] = useState(() => { try { return localStorage.getItem('grimoire.searchHidden') === '1'; } catch { return false; } });
+  const setSearchHidden = (v: boolean) => { setSearchHiddenState(v); try { localStorage.setItem('grimoire.searchHidden', v ? '1' : '0'); } catch { /* session only */ } };
+  const pinned = usePinned();
+  useEffect(() => hostViewPanel(), []);
   const validation = useMemo(() => (deck ? validateDeck(deck) : null), [deck]);
   const allDeckTags = useAllDeckTags();
   // Result of a main-menu import that created this deck (only shown when cards were missing).
@@ -128,8 +135,15 @@ export function DeckPage({ id }: { id: string }) {
         ))}
       </nav>
 
-      <div className={`deck-workspace show-${mobileTab}`}>
-        <div className="col col-search"><SearchPanel deck={deck} board={board} /></div>
+      <div className={`deck-workspace show-${mobileTab} ${searchHidden ? 'search-hidden' : ''} ${pinned ? 'has-view' : ''}`}>
+        <div className="col col-search">
+          {searchHidden ? (
+            <button type="button" className="search-rail" onClick={() => setSearchHidden(false)} title="Show Card Search" aria-label="Show Card Search">
+              <span aria-hidden>⟩</span><span className="search-rail-label">Card Search</span>
+            </button>
+          ) : <SearchPanel deck={deck} board={board} onHide={() => setSearchHidden(true)} />}
+          <ViewPanel deck={deck} />
+        </div>
         <div className="col col-deck"><DeckList deck={deck} validation={validation} filter={filter} setFilter={setFilter} board={board} setBoard={setBoard} /></div>
         <div className="col col-details"><DeckDetails deck={deck} validation={validation} filter={filter} setFilter={setFilterAndShow} /></div>
       </div>

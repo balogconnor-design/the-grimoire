@@ -168,7 +168,7 @@ export function GlobalSearch() {
       )}
       </>)}
 
-      {open && <CardModal card={open} onClose={() => setOpen(null)} />}
+      {open && <CardModal card={open} onClose={() => setOpen(null)} siblings={(results ?? []).map((c) => ({ card: c }))} />}
       {tagging && <TagModal card={tagging} context={{ kind: 'search' }} onClose={() => setTagging(null)} />}
       {collecting && <AddToCollectionModal card={collecting} onClose={() => setCollecting(null)} />}
     </section>

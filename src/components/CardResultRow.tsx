@@ -6,6 +6,7 @@ import { setCardDrag } from '../lib/dnd';
 import { setCardFavorite } from '../lib/actions';
 import { ManaCost } from './Mana';
 import { hideArt, hoverArtProps } from './HoverArt';
+import { pinOnRightClick } from '../lib/viewPanel';
 import { TagList, type TagScope } from './TagEditor';
 
 export type ResultView = 'grid' | 'list' | 'details';
@@ -71,6 +72,7 @@ export function CardResultRow({ card, subject, view, onOpen, onTag, onTagClick, 
       draggable={draggable || undefined} onDragStart={draggable ? onDragStart : undefined}
       title={dim ? 'Already in this deck' : undefined}
       {...hoverArtProps(card)}
+      onContextMenu={pinOnRightClick(card, undefined, hideArt)}
     >
       <div className="row-main">
         <button className="row-name" onClick={() => { hideArt(); onOpen(); }} title={draggable ? `${card.name}: click to view, drag onto the deck list to add` : card.name}>

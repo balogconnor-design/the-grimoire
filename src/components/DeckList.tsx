@@ -18,6 +18,7 @@ import { SavedSearches } from './SavedSearches';
 import { FavStar, TagList, SCOPE_META, type TagScope } from './TagEditor';
 import { useToast } from './Toast';
 import { hideArt, hoverArtProps } from './HoverArt';
+import { pinOnRightClick } from '../lib/viewPanel';
 import { isCardDrag, readCardDrag } from '../lib/dnd';
 import { useScryfallTags, useScryfallTagStatus } from '../lib/scryfallTags';
 import { defaultGroupTags, entryTags, groupByManaValue, groupByTag, mainGroup, OTHER_GROUP } from '../lib/deckTags';
@@ -328,6 +329,7 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
                         key={e.uid}
                         className={`entry ${problems ? 'has-problem' : ''} ${dragUid === e.uid ? 'dragging' : ''}`}
                         {...hoverArtProps(e.card)}
+                        onContextMenu={pinOnRightClick(e.card, e.uid, hideArt)}
                         draggable={groupBy === 'tag' && !isCmd}
                         onDragStart={groupBy === 'tag' && !isCmd ? (ev) => {
                           ev.dataTransfer.setData(ENTRY_DRAG, e.uid);
@@ -403,7 +405,8 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
       )}
 
       {open && (
-        <CardModal card={open.card} deckId={deck.id} entryUid={open.uid} onClose={() => setOpen(null)} />
+        <CardModal card={open.card} deckId={deck.id} entryUid={open.uid} onClose={() => setOpen(null)}
+          siblings={groups.flatMap((g) => g.entries).map((x) => ({ card: x.card, entryUid: x.uid }))} />
       )}
       {tagging && <TagModal card={tagging.card} context={{ kind: 'deck', deckId: deck.id }} onClose={() => setTagging(null)} />}
       {buying && <AddToCollectionModal card={buying.entry.card} deckId={deck.id} qty={buying.qty} onClose={() => setBuying(null)} />}

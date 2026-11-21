@@ -109,7 +109,7 @@ function EdhrecData({ deck, onView }: { deck: Deck; onView: (v: Viewing) => void
           <ol className="edhrec-salty">
             {scored.slice(0, SALTY_SHOWN).map(({ entry, salt: s }) => (
               <li key={entry.uid}>
-                <CardLink card={entry.card} name={entry.card.name} className="edhrec-card-btn" onOpen={() => onView({ card: entry.card, entryUid: entry.uid })} />
+                <CardLink card={entry.card} name={entry.card.name} entryUid={entry.uid} className="edhrec-card-btn" onOpen={() => onView({ card: entry.card, entryUid: entry.uid })} />
                 <span className="edhrec-salt-score" title="EDHREC salt score, 0–4">{s.toFixed(2)}</span>
               </li>
             ))}

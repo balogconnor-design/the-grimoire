@@ -59,7 +59,7 @@ export function CombosPanel({ deck }: { deck: Deck }) {
     return (
       <span key={n} className={`combo-card ${entry ? '' : 'combo-missing'}`}>
         {i > 0 && <span className="combo-plus" aria-hidden> + </span>}
-        <CardLink card={entry?.card ?? cardByName(n)} name={n} onOpen={() => void open(n)} className="inline-card-link" />
+        <CardLink card={entry?.card ?? cardByName(n)} name={n} entryUid={entry?.uid} onOpen={() => void open(n)} className="inline-card-link" />
         {c.commanderCards.includes(n) && <span className="muted tiny"> (commander)</span>}
       </span>
     );

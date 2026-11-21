@@ -455,7 +455,7 @@ function ManaProducers({ deck, filter, setFilter, onView }: ChartProps & ViewPro
               {sum.producers.map((p) => (
                 <tr key={p.entry.uid}>
                   <td>
-                    <div className="producer-name">{p.entry.qty > 1 && <span className="muted">{p.entry.qty}× </span>}<CardLink card={p.entry.card} name={p.entry.card.name} onOpen={() => onView(p.entry)} /></div>
+                    <div className="producer-name">{p.entry.qty > 1 && <span className="muted">{p.entry.qty}× </span>}<CardLink card={p.entry.card} name={p.entry.card.name} entryUid={p.entry.uid} onOpen={() => onView(p.entry)} /></div>
                     {p.filter && (
                       <div className="muted tiny-label producer-note">
                         Filters <ManaText text={p.filter.from} size={12} /> → <ManaText text={p.filter.into} size={12} />
@@ -701,7 +701,7 @@ function BracketSection({ deck, filter, setFilter, onView }: ChartProps & ViewPr
                 return (
                   <Fragment key={n}>
                     {i > 0 && ' · '}
-                    {entry ? <CardLink card={entry.card} name={n} onOpen={() => onView(entry)} /> : n}
+                    {entry ? <CardLink card={entry.card} name={n} entryUid={entry.uid} onOpen={() => onView(entry)} /> : n}
                   </Fragment>
                 );
               })}
@@ -721,7 +721,7 @@ function BracketSection({ deck, filter, setFilter, onView }: ChartProps & ViewPr
                   return (
                     <Fragment key={n}>
                       {i > 0 && ' + '}
-                      {entry ? <CardLink card={entry.card} name={n} onOpen={() => onView(entry)} className="inline-card-link" /> : n}
+                      {entry ? <CardLink card={entry.card} name={n} entryUid={entry.uid} onOpen={() => onView(entry)} className="inline-card-link" /> : n}
                     </Fragment>
                   );
                 })}

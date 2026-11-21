@@ -282,14 +282,47 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .col > .panel { height: var(--col-h); overflow-y: auto; }
 .mobile-tabs { display: none; }
 
+/* Card Search column: search on top, the view panel (right-clicked card) underneath; each scrolls on its own. */
+.col-search { display: flex; flex-direction: column; gap: 14px; height: var(--col-h); min-height: 0; }
+.col-search > .panel { height: auto; flex: 1 1 0; min-height: 0; overflow-y: auto; }
+.has-view .col-search > .search-panel { flex: 1 1 52%; }
+.has-view .col-search > .view-panel { flex: 1 1 48%; }
+.view-panel { container-type: inline-size; }
+.view-panel .panel-head { margin-bottom: 8px; }
+.view-panel .view-hint { margin-left: auto; }
+.panel-head-tools { display: inline-flex; align-items: center; gap: 10px; }
+/* Card Search hidden: a slim rail brings it back; the other columns take the room. */
+.search-rail { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 12px 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); color: var(--text-2); cursor: pointer; font: inherit; flex: 1 1 auto; }
+.search-rail:hover { color: var(--text); border-color: var(--accent); }
+.search-rail-label { writing-mode: vertical-rl; transform: rotate(180deg); font-weight: 600; letter-spacing: 0.04em; }
+.deck-workspace.search-hidden:not(.has-view) { grid-template-columns: 44px minmax(360px, 1.15fr) minmax(320px, 0.9fr); }
+.deck-workspace.search-hidden.has-view { grid-template-columns: minmax(320px, 0.95fr) minmax(360px, 1.1fr) minmax(320px, 0.85fr); }
+.has-view .search-rail { flex: none; flex-direction: row; justify-content: center; padding: 6px 10px; }
+.has-view .search-rail-label { writing-mode: horizontal-tb; transform: none; }
+.search-hidden.has-view .col-search > .view-panel { flex: 1 1 100%; }
+/* Inline card details in the view panel: one column when narrow, two when there's room. */
+.card-view-inline .card-modal { grid-template-columns: 1fr; gap: 12px; }
+.card-view-inline .card-modal-image .card-img-large { max-width: 250px; cursor: grab; }
+@container (min-width: 560px) { .card-view-inline .card-modal { grid-template-columns: minmax(200px, 250px) 1fr; } }
+.card-step { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; }
+.card-step .btn { font-size: var(--fs-sub); line-height: 1; padding: 2px 12px; }
+.pin-btn { align-self: center; }
+
 @media (max-width: 1400px) {
   .deck-workspace { grid-template-columns: minmax(340px, 1fr) minmax(360px, 1fr); grid-template-areas: 'search deck' 'search details'; }
-  .col-search > .panel { position: sticky; top: calc(var(--topbar-h) + 14px); }
+  .col-search { position: sticky; top: calc(var(--topbar-h) + 14px); align-self: start; }
+  .deck-workspace.search-hidden:not(.has-view) { grid-template-columns: 44px minmax(360px, 1fr); }
+  .deck-workspace.search-hidden.has-view { grid-template-columns: minmax(320px, 0.9fr) minmax(360px, 1fr); }
   .col-deck > .panel, .col-details > .panel { height: auto; max-height: none; overflow: visible; }
 }
 @media (max-width: 900px) {
   .deck-workspace { grid-template-columns: 1fr; grid-template-areas: 'search' 'deck' 'details'; padding: 10px; }
-  .col > .panel, .col-search > .panel { height: auto; position: static; overflow: visible; }
+  .col > .panel, .col-search > .panel { height: auto; position: static; overflow: visible; flex: none; }
+  .col-search { height: auto; position: static; }
+  .deck-workspace.search-hidden:not(.has-view), .deck-workspace.search-hidden.has-view { grid-template-columns: 1fr; }
+  .search-rail { flex-direction: row; justify-content: center; padding: 8px; }
+  .search-rail-label { writing-mode: horizontal-tb; transform: none; }
+  .hide-search-btn { display: none; }
   .mobile-tabs { display: flex; gap: 4px; padding: 8px 10px 0; position: sticky; top: var(--topbar-h); z-index: 10; background: var(--bg); }
   .mobile-tabs .tab { flex: 1; }
   .deck-workspace.show-search .col-deck, .deck-workspace.show-search .col-details,
