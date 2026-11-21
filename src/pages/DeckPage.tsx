@@ -1,6 +1,7 @@
 import { ViewPanel } from '../components/ViewPanel';
 import { hostViewPanel, useViewPanel } from '../lib/viewPanel';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useWheelHandoff } from '../lib/wheelHandoff';
 import type { Board, DeckFilter } from '../types';
 import { useDeck, updateDeck, deleteDeck } from '../lib/store';
 import { FORMATS, getFormat } from '../lib/formats';
@@ -50,6 +51,9 @@ export function DeckPage({ id }: { id: string }) {
   // The view panel takes room in the column only while it has cards and isn't hidden.
   const hasView = view.items.length > 0 && view.mode !== 'hidden';
   useEffect(() => hostViewPanel(), []);
+  // Firefox: wheel over Card Search moves the page once Card Search can't scroll further (mid-size screens).
+  const searchColRef = useRef<HTMLDivElement>(null);
+  useWheelHandoff(searchColRef, !!deck);
   const validation = useMemo(() => (deck ? validateDeck(deck) : null), [deck]);
   const allDeckTags = useAllDeckTags();
   // Result of a main-menu import that created this deck (only shown when cards were missing).
@@ -154,7 +158,7 @@ export function DeckPage({ id }: { id: string }) {
       </nav>
 
       <div className={`deck-workspace show-${mobileTab} search-${searchMode} ${hasView ? 'has-view' : ''} view-${view.mode}`}>
-        <div className="col col-search">
+        <div className="col col-search" ref={searchColRef}>
           {searchHidden ? (
             <button type="button" className="search-rail" onClick={() => setSearchMode('collapsed')} title="Show Card Search" aria-label="Show Card Search">
               <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 4l4 4-4 4" /></svg><span className="search-rail-label">Card Search</span>

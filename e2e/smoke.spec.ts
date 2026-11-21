@@ -1101,3 +1101,27 @@ test('commander: drag onto the commander slot, and its color identity applies to
   await expect.poll(() => asked.at(-1)).toContain('id<=wubg');
   expect(errors).toEqual([]);
 });
+
+test('mid-size screens: the wheel over Card Search moves the page once Card Search reaches its end', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'desktop layout');
+  const errors = watchErrors(page);
+  const names = Array.from({ length: 40 }, (_, i) => `Card ${i}`);
+  await open(page);
+  await page.route('https://api.scryfall.com/cards/collection', async (route) => {
+    const ids = route.request().postDataJSON().identifiers as { name?: string; id?: string }[];
+    const data = ids.map((x) => { const name = x.name ?? names[Number(x.id?.slice(1))]; const n = names.indexOf(name); return { ...SOL_RING, id: `c${n}`, oracle_id: `o${n}`, name, cmc: n % 6 }; });
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ object: 'list', data, not_found: [] }) });
+  });
+  await page.setViewportSize({ width: 1000, height: 600 }); // two columns: Metrics under the deck list
+  await page.getByRole('button', { name: '⇪ Import deck' }).first().click();
+  await page.getByLabel('Decklist').fill('Deck\n' + names.map((n) => `1 ${n}`).join('\n'));
+  await page.getByRole('button', { name: 'Import deck', exact: true }).last().click();
+  await expect(page).toHaveURL(/#\/deck\//);
+  await page.keyboard.press('Escape');
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollHeight - innerHeight)).toBeGreaterThan(1500);
+  // Several quick wheel turns over Card Search (Firefox used to keep them all on Card Search's own scroll).
+  await page.mouse.move(150, 400);
+  for (let i = 0; i < 5; i++) { await page.mouse.wheel(0, 300); await page.waitForTimeout(150); }
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(500);
+  expect(errors).toEqual([]);
+});
