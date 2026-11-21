@@ -550,7 +550,19 @@ test('view panel: right-click to pin, drag a copy from it, Pin button, arrow key
   await expect(modal).toHaveCount(0);
   await expect(view).toContainText('Sol Ring');
 
-  // Hide Card Search: a rail brings it back; the choice survives a reload; the pinned card keeps the column.
+  // Collapse Card Search: just the search bar and the first row of buttons; searching opens the results again.
+  await expect(search.getByRole('button', { name: 'Hide Card Search' })).toHaveCount(0); // two steps to hide
+  await search.getByRole('button', { name: 'Collapse Card Search' }).click();
+  await expect(search.locator('.search-input')).toBeVisible();
+  await expect(search.getByRole('button', { name: /Advanced/ })).toBeVisible();
+  await expect(search.locator('.result-card').first()).toBeHidden();
+  await expect(search.getByRole('button', { name: '★ Popular staples' })).toBeHidden();
+  await search.locator('.search-input').press('Enter');
+  await expect(search.locator('.result-card').first()).toBeVisible();
+  await expect(search.getByRole('button', { name: 'Collapse Card Search' })).toBeVisible();
+  await search.getByRole('button', { name: 'Collapse Card Search' }).click();
+
+  // Then hide it: a rail brings it back; the choice survives a reload; the pinned card keeps the column.
   await search.getByRole('button', { name: 'Hide Card Search' }).click();
   await expect(page.locator('.search-panel')).toHaveCount(0);
   await expect(view).toBeVisible();

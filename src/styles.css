@@ -290,6 +290,17 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .view-panel { container-type: inline-size; }
 .view-panel .panel-head { margin-bottom: 8px; }
 .view-panel .view-hint { margin-left: auto; }
+/* Collapsed Card Search: just the search bar and the first row of buttons. */
+@media (min-width: 901px) {
+  .search-panel.collapsed .search-options > :nth-child(n + 5), .search-panel.collapsed .advanced,
+  .search-panel.collapsed .query-preview, .search-panel.collapsed .search-body { display: none; }
+  .search-panel.collapsed .search-options { margin-bottom: 0; }
+  .col-search > .search-panel.collapsed { flex: none; }
+}
+/* Phones use the Search / Deck / Metrics tabs instead. */
+@media (max-width: 900px) { .search-mode-btn { display: none; } }
+.icon-btn.sm.search-mode-btn { display: inline-grid; place-items: center; line-height: 1; width: 30px; height: 28px; color: var(--text-2); border: 1px solid var(--border); }
+.icon-btn.sm.search-mode-btn:hover { color: var(--text); border-color: var(--accent); }
 .panel-head-tools { display: inline-flex; align-items: center; gap: 10px; }
 /* Card Search hidden: a slim rail brings it back; the other columns take the room. */
 .search-rail { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 12px 0; border: 1px solid var(--border); border-radius: var(--radius); background: var(--panel); color: var(--text-2); cursor: pointer; font: inherit; flex: 1 1 auto; }
@@ -322,7 +333,6 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
   .deck-workspace.search-hidden:not(.has-view), .deck-workspace.search-hidden.has-view { grid-template-columns: 1fr; }
   .search-rail { flex-direction: row; justify-content: center; padding: 8px; }
   .search-rail-label { writing-mode: horizontal-tb; transform: none; }
-  .hide-search-btn { display: none; }
   .mobile-tabs { display: flex; gap: 4px; padding: 8px 10px 0; position: sticky; top: var(--topbar-h); z-index: 10; background: var(--bg); }
   .mobile-tabs .tab { flex: 1; }
   .deck-workspace.show-search .col-deck, .deck-workspace.show-search .col-details,
