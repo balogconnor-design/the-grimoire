@@ -592,6 +592,53 @@ test('a search that can not reach Scryfall says so and offers Try again', async 
   await expect(err).toHaveCount(0);
 });
 
+test('deck list: list dividers, grid and table views, color identity grouping and sorting', async ({ page, isMobile }) => {
+  const errors = watchErrors(page);
+  await open(page);
+  const bolt = { ...SOL_RING, id: 'bolt-test', name: 'Lightning Bolt', type_line: 'Instant', mana_cost: '{R}', cmc: 1, colors: ['R'], color_identity: ['R'], prices: { usd: '0.99' } };
+  await page.route('https://api.scryfall.com/cards/collection', async (route) => {
+    const ids = route.request().postDataJSON().identifiers as { name: string }[];
+    const data = ids.map((i) => (i.name === 'Lightning Bolt' ? bolt : i.name === 'Sol Ring' ? SOL_RING : null)).filter(Boolean);
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ object: 'list', data, not_found: [] }) });
+  });
+  await page.getByRole('button', { name: '⇪ Import deck' }).first().click();
+  await page.getByLabel('Decklist').fill('Deck\n1 Lightning Bolt\n1 Sol Ring');
+  await page.getByRole('button', { name: 'Import deck', exact: true }).last().click();
+  await expect(page).toHaveURL(/#\/deck\//);
+  await page.keyboard.press('Escape');
+  if (isMobile) await page.locator('.mobile-tabs .tab', { hasText: 'Deck' }).click();
+  const list = page.locator('.col-deck');
+
+  // Group by color identity: Red, then Colorless.
+  await page.getByLabel('Group cards by').selectOption('identity');
+  await expect(list.locator('.group-name')).toHaveText(['Red', 'Colorless']);
+  await page.getByLabel('Group cards by').selectOption('mv');
+
+  // Grid: full pictures, opens the card window.
+  await list.getByRole('radio', { name: 'Grid' }).click();
+  await expect(list.locator('.grid-tile')).toHaveCount(2);
+  await list.locator('.grid-tile').first().locator('.grid-img-btn').click();
+  await expect(page.locator('.modal')).toBeVisible();
+  await page.locator('.modal-close').click();
+
+  // Table: a row per card with its type; remembered after a reload.
+  await list.getByRole('radio', { name: 'Table' }).click();
+  await expect(list.locator('.deck-table tbody tr')).toHaveCount(2);
+  await expect(list.locator('.deck-table')).toContainText('Lightning Bolt');
+  await page.reload();
+  if (isMobile) await page.locator('.mobile-tabs .tab', { hasText: 'Deck' }).click();
+  await expect(page.locator('.col-deck .deck-table').first()).toBeVisible();
+
+  // The sort setting is kept (the order itself is covered by unit tests).
+  await page.getByLabel('Sort cards by').selectOption('price');
+  await expect(page.getByLabel('Sort cards by')).toHaveValue('price');
+
+  // List: back to rows with dividers.
+  await page.locator('.col-deck').getByRole('radio', { name: 'List' }).click();
+  await expect(page.locator('.col-deck .entries .entry')).toHaveCount(2);
+  expect(errors).toEqual([]);
+});
+
 test('#tag search and the tag browser find tagged cards', async ({ page, isMobile }) => {
   const errors = watchErrors(page);
   await open(page);
