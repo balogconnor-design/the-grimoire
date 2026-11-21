@@ -10,6 +10,8 @@ import { refreshPrices, setTargetBracket } from '../lib/actions';
 import { BRACKET_GC_LIMIT, BRACKETS, bracketName, estimateBracket, type BracketNumber } from '../lib/bracket';
 import { ManaSymbol } from './Mana';
 import { EdhrecPanel } from './EdhrecPanel';
+import { CombosPanel } from './CombosPanel';
+import { COMBO_TAG_LABEL, currentCombos, useCombos } from '../lib/combos';
 import { CardLink } from './CardLink';
 import { CardModal } from './CardModal';
 import { useToast } from './Toast';
@@ -102,6 +104,7 @@ export function DeckDetails({ deck, validation, filter, setFilter }: Props) {
       </div>
 
       {fmt.hasCommander && <BracketSection deck={deck} filter={filter} setFilter={setFilter} onView={setViewing} />}
+      {fmt.hasCommander && <CombosPanel deck={deck} />}
       {fmt.hasCommander && <EdhrecPanel deck={deck} />}
 
       {/* Price */}
@@ -660,7 +663,8 @@ const bracketRangeName = (floor: BracketNumber) =>
 function BracketSection({ deck, filter, setFilter, onView }: ChartProps & ViewProps) {
   const stags = useScryfallTags();
   const stagStatus = useScryfallTagStatus();
-  const est = useMemo(() => estimateBracket(deck, stags), [deck, stags]);
+  const { saved } = useCombos(deck.id);
+  const est = useMemo(() => estimateBracket(deck, stags, currentCombos(deck, saved)), [deck, stags, saved]);
   const mainByName = useMemo(() => new Map(deck.entries.filter((e) => e.board === 'main').map((e) => [e.card.name, e])), [deck.entries]);
   const target = deck.targetBracket;
   const over = target != null && est.floor > target;
@@ -727,6 +731,28 @@ function BracketSection({ deck, filter, setFilter, onView }: ChartProps & ViewPr
           </div>
         );
       })}
+      {est.combos.length > 0 && (
+        <div className="bracket-group">
+          <span className="small"><b>Combos</b> {est.combos.length}</span>
+          <span className="muted tiny"> · from Commander Spellbook</span>
+          <ul className="small bracket-combos">
+            {est.combos.map(({ combo, bracket }) => (
+              <li key={combo.id}>
+                {combo.cards.map((n, i) => {
+                  const entry = mainByName.get(n);
+                  return (
+                    <Fragment key={n}>
+                      {i > 0 && ' + '}
+                      {entry ? <CardLink card={entry.card} name={n} onOpen={() => onView(entry)} className="inline-card-link" /> : n}
+                    </Fragment>
+                  );
+                })}
+                <span className="muted tiny"> · {combo.tag ? COMBO_TAG_LABEL[combo.tag] : ''}, Bracket {bracket}+</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {stags.size === 0 && (
         <div className="muted small">
           {stagStatus.state === 'updating' ? `Downloading Scryfall tags… ${stagStatus.done}/${stagStatus.total}. ` : 'Scryfall tags aren’t downloaded yet, so '}
@@ -736,7 +762,7 @@ function BracketSection({ deck, filter, setFilter, onView }: ChartProps & ViewPr
       <div className="muted tiny">
         Brackets describe how a deck plays, so the cards only set the lowest bracket it fits. Bracket 1 vs 2 and 4 vs 5 depend on intent.
         {' '}Rules as of Wizards’ February 9, 2026 update. Game Changer flags come from Scryfall (↻ Refresh prices updates them); extra turns and land denial use Scryfall tags.
-        {' '}Two-card combos aren’t checked yet.
+        {' '}{saved ? 'Combos come from your last Commander Spellbook check (Combos panel).' : 'Combos count once you run Check combos in the Combos panel.'}
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import type { Deck } from '../types';
+import { COMBO_TAG_LABEL, type Combo, type ComboTag } from '../../shared/spellbook';
 
 /**
  * Commander Brackets (beta), as of Wizards' February 9, 2026 update:
@@ -8,7 +9,8 @@ import type { Deck } from '../types';
  *   4 Optimized  – no limits
  *   5 cEDH       – no limits (decided by intent and competitive tuning, not by cards)
  * Tutor limits were removed in October 2025. Brackets are about intent, so cards only give a floor:
- * the lowest bracket the deck's cards allow. Two-card combos are checked later (Commander Spellbook).
+ * the lowest bracket the deck's cards allow. Combos come from a Commander Spellbook check (optional):
+ * Spellbook rates each combo with a bracket-named tag, mapped to a bracket by COMBO_TAG_BRACKET.
  */
 export const BRACKETS = [
   { n: 1, name: 'Exhibition' },
@@ -23,6 +25,14 @@ export const BRACKET_GC_LIMIT = 3;
 /** More extra-turn cards than this reads as "high quantity" (Brackets 2–3 expect a few, not chained). */
 export const BRACKET_EXTRA_TURN_LIMIT = 2;
 
+/**
+ * The lowest bracket a combo fits, from Commander Spellbook's tag. Exhibition and Core fit Brackets 1–2;
+ * Powerful and Spicy (two-card combos that need setup or come late) fit Bracket 3; Ruthless (early,
+ * cheap two-card wins and infinites such as Thassa's Oracle + Demonic Consultation) needs Bracket 4.
+ * Oddball is treated like Core. Banned combos use a banned card, which the legality check already flags.
+ */
+export const COMBO_TAG_BRACKET: Record<ComboTag, BracketNumber | null> = { E: 1, C: 2, O: 2, P: 3, S: 3, R: 4, B: null };
+
 export const bracketName = (n: number) => BRACKETS.find((b) => b.n === n)?.name ?? '';
 
 export interface BracketReason { bracket: BracketNumber; text: string }
@@ -34,13 +44,15 @@ export interface BracketEstimate {
   extraTurns: string[];
   /** Single-target land destruction: no bracket rule, listed for information. */
   landDestruction: string[];
+  /** Combos from the last Commander Spellbook check that raise the floor, highest first. */
+  combos: { combo: Combo; bracket: BracketNumber }[];
   reasons: BracketReason[];
 }
 
 const names = (list: string[]) => [...new Set(list)].sort((a, b) => a.localeCompare(b));
 
 /** Flag the main deck's cards (commander included) against the bracket rules. */
-export function estimateBracket(deck: Deck, scryfallTags: Map<string, string[]>): BracketEstimate {
+export function estimateBracket(deck: Deck, scryfallTags: Map<string, string[]>, checkedCombos: Combo[] = []): BracketEstimate {
   const main = deck.entries.filter((e) => e.board === 'main');
   const tagged = (label: string) => main.filter((e) => (scryfallTags.get(e.card.name) ?? []).includes(label)).map((e) => e.card.name);
   const gameChangers = names(main.filter((e) => e.card.game_changer).map((e) => e.card.name));
@@ -63,8 +75,19 @@ export function estimateBracket(deck: Deck, scryfallTags: Map<string, string[]>)
   } else if (extraTurns.length) {
     reasons.push({ bracket: 2, text: `${plural(extraTurns.length, 'extra-turn card')}: none in Bracket 1; fine in 2–3 if not chained` });
   }
+  const combos = checkedCombos
+    .map((combo) => ({ combo, bracket: combo.tag ? COMBO_TAG_BRACKET[combo.tag] : null }))
+    .filter((c): c is { combo: Combo; bracket: BracketNumber } => c.bracket != null && c.bracket > 1)
+    .sort((a, b) => b.bracket - a.bracket);
+  for (const b of [4, 3, 2] as const) {
+    const at = combos.filter((c) => c.bracket === b);
+    if (!at.length) continue;
+    const tags = [...new Set(at.map((c) => COMBO_TAG_LABEL[c.combo.tag!]))].join(' / ');
+    const why = b === 4 ? 'early two-card combos need Bracket 4 and up' : b === 3 ? 'two-card combos fit from Bracket 3' : 'fine from Bracket 2';
+    reasons.push({ bracket: b, text: `${plural(at.length, 'combo')} Commander Spellbook rates ${tags}: ${why}` });
+  }
   const floor = Math.max(1, ...reasons.map((r) => r.bracket)) as BracketNumber;
-  return { floor, gameChangers, massLandDenial, extraTurns, landDestruction, reasons: reasons.sort((a, b) => b.bracket - a.bracket) };
+  return { floor, gameChangers, massLandDenial, extraTurns, landDestruction, combos, reasons: reasons.sort((a, b) => b.bracket - a.bracket) };
 }
 
 /** A saved target bracket, or undefined when it isn't a whole number 1–5. */

@@ -554,11 +554,29 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .bracket-group-head { padding: 0; }
 .bracket-group-head.active { text-decoration: underline; }
 .bracket-cards { color: var(--text-2, var(--muted)); line-height: 1.5; }
-.edhrec-block { margin-bottom: 14px; }
+.edhrec-block, .panel-block { margin-bottom: 14px; }
+/* Combos panel (CombosPanel.tsx) */
+.combo-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.combo { padding: 7px 9px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-2); }
+.combo-cards { font-size: 0.88rem; line-height: 1.45; }
+.combo-missing .card-link-name { font-style: italic; color: var(--gold); }
+.combo-plus { color: var(--muted); }
+.combo-tag { display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 999px; font-size: 0.7rem; font-weight: 700; vertical-align: 1px; border: 1px solid var(--border-strong); color: var(--text-2); }
+.combo-tag-R, .combo-tag-B { border-color: var(--bad); color: var(--bad); }
+.combo-tag-S, .combo-tag-P { border-color: var(--warn); color: var(--warn); }
+.combo-tag-E, .combo-tag-C { border-color: var(--good); color: var(--good); }
+.combo-produces { margin-top: 2px; }
+.combo-actions { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 10px; margin-top: 4px; }
+.combo-steps summary { cursor: pointer; color: var(--accent); }
+.combo-steps[open] { flex-basis: 100%; }
+.combo-steps ol { margin: 4px 0; padding-left: 18px; }
+.combo-pre { white-space: pre-line; }
+.combo-check { display: flex; align-items: center; gap: 10px; margin: 6px 0; }
+.bracket-combos { margin: 2px 0 0; padding-left: 18px; }
 /* Sub-headings inside the EDHREC panel: an accent bar and rule so they read apart from the card rows. */
-.edhrec-subhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+.panel-subhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
   margin-bottom: 6px; padding: 0 0 5px 9px; border-left: 3px solid var(--accent); border-bottom: 1px solid var(--border); }
-.edhrec-subhead-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); }
+.panel-subhead-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); }
 .edhrec-stats { display: inline-flex; gap: 6px; }
 .edhrec-stat { font-size: 0.74rem; color: var(--muted); background: var(--bg-2); border-radius: 999px; padding: 1px 8px; font-variant-numeric: tabular-nums; }
 .edhrec-stat b { color: var(--text); font-weight: 700; }
