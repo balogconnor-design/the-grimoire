@@ -8,27 +8,30 @@ import { hideArt, hoverArtProps } from './HoverArt';
  * card view, drag onto the deck list to add it, rest the pointer on it to see the art.
  * `card` may be missing while its data is still loading: then it only opens (via onOpen) and can't be dragged yet.
  */
-export function CardLink({ card, name, onOpen, className = '', children }: {
+export function CardLink({ card, name, onOpen, className = '', children, draggable = true }: {
   card?: Card | null;
   name: string;
   onOpen: () => void;
   className?: string;
   children?: ReactNode;
+  /** Off where there is no deck list to drop onto (Collection pages). */
+  draggable?: boolean;
 }) {
+  const canDrag = draggable && !!card;
   const onDragStart = (e: DragEvent) => {
     hideArt();
-    if (card) setCardDrag(e.dataTransfer, card);
+    if (canDrag && card) setCardDrag(e.dataTransfer, card);
     else e.preventDefault();
   };
   return (
     <button
       type="button"
       {...hoverArtProps(card)}
-      className={`card-link ${card ? 'is-draggable' : ''} ${className}`}
-      draggable={card ? true : undefined}
+      className={`card-link ${canDrag ? 'is-draggable' : ''} ${className}`}
+      draggable={canDrag || undefined}
       onDragStart={onDragStart}
       onClick={(e) => { e.stopPropagation(); hideArt(); onOpen(); }}
-      title={card ? `${name}: click to view, drag onto the deck list to add` : `${name}: click to view`}
+      title={canDrag ? `${name}: click to view, drag onto the deck list to add` : `${name}: click to view`}
     >
       {children ?? <span className="card-link-name">{name}</span>}
     </button>

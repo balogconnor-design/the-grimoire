@@ -572,6 +572,8 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .card-link:hover .card-link-name, .card-link:focus-visible .card-link-name { color: var(--accent); text-decoration: underline dotted; text-underline-offset: 2px; }
 .card-link.is-draggable:active { cursor: grabbing; }
 .bracket-cards .card-link, .bracket-cards .card-link-name { display: inline; }
+.inline-card-link, .inline-card-link .card-link-name { display: inline; }
+.inv-card-text .card-link { display: block; }
 .edhrec-drag { display: block; width: 100%; }
 .edhrec-salt-score { font-variant-numeric: tabular-nums; color: var(--muted); }
 .edhrec-table { table-layout: fixed; margin-bottom: 6px; }

@@ -1,5 +1,8 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import type { PurchasedDeck, SaleRecord, TxKind } from '../types';
+import { CardLink } from '../components/CardLink';
+import { CardModal } from '../components/CardModal';
+import { hideArt, hoverArtProps } from '../components/HoverArt';
+import type { Card, PurchasedDeck, SaleRecord, TxKind } from '../types';
 import { collectionT, decksT, ownedDecksT, pricesT, salesT } from '../lib/store';
 import { computePL, FINISH_LABEL, isDisposal, lotsTrend, realizedPL, spentOn, valueSeries } from '../lib/collection';
 import {
@@ -39,6 +42,7 @@ const RANGES: { id: string; label: string; days?: number }[] = [
 const daysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
 
 export function Transactions() {
+  const [viewing, setViewing] = useState<Card | null>(null);
   const all = salesT.useAll();
   const [kind, setKind] = useState<KindFilter>('all');
   const [range, setRange] = useState('all');
@@ -202,7 +206,7 @@ export function Transactions() {
                     <td className="inv-card">
                       <img src={cardImage(s.card, 'small')} alt="" className="inv-thumb" loading="lazy" />
                       <div className="inv-card-text">
-                        <span className="inv-name truncate">{s.card.name}</span>
+                        <CardLink card={s.card} name={s.card.name} draggable={false} onOpen={() => setViewing(s.card)}><span className="inv-name truncate card-link-name">{s.card.name}</span></CardLink>
                         <span className="muted tiny-label">{s.card.set.toUpperCase()} #{s.card.collector_number} · {FINISH_LABEL[s.finish]}{s.condition ? ` · ${s.condition}` : ''}</span>
                       </div>
                     </td>
@@ -234,6 +238,7 @@ export function Transactions() {
       {rows.length > limit && <button className="btn btn-ghost load-more" onClick={() => setLimit((l) => l + 300)}>Show more ({rows.length - limit} hidden)</button>}
       <p className="muted tiny">Deleting a record only removes it from history — it doesn't add or remove cards. Sold and traded rows are the permanent record of cards no longer in your collection.</p>
       {trading && <TradeModal onClose={() => setTrading(false)} />}
+      {viewing && <CardModal card={viewing} onClose={() => setViewing(null)} />}
     </div>
   );
 }
@@ -362,7 +367,7 @@ function PurchasedDeckDetail({ pd, lots, realizedProceeds, deckName, onSell }: {
               {sorted.map((l) => {
                 const v = computePL([l], false);
                 return (
-                  <tr key={l.id} onClick={() => setOpenItem(l.id)}>
+                  <tr key={l.id} onClick={() => { hideArt(); setOpenItem(l.id); }} {...hoverArtProps(l.card)}>
                     <td className="truncate">{l.card.name} <span className="muted tiny-label">{l.card.set.toUpperCase()}</span></td>
                     <td className="num">{l.qty}</td>
                     <td className="num">{formatUSD(l.purchasePrice)}</td>
