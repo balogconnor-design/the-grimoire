@@ -89,13 +89,24 @@ export function setPinned(on: boolean) {
   set({ pinned: false, items: keep ? [keep] : [], focus: keep?.card.name ?? null });
 }
 
-/** Take one card out of the panel; the panel closes when the last one goes. */
-export function removeCard(name: string) {
+/**
+ * Take one card out of the panel; the panel closes when the last one goes. Returns an undo that puts
+ * the card back where it was (and re-pins the panel if it had closed).
+ */
+export function removeCard(name: string): (() => void) | undefined {
   const i = state.items.findIndex((p) => p.card.name === name);
-  if (i < 0) return;
+  if (i < 0) return undefined;
+  const removed = state.items[i];
+  const wasPinned = state.pinned;
   const items = state.items.filter((_, j) => j !== i);
   const focus = state.focus === name ? (items[Math.min(i, items.length - 1)]?.card.name ?? null) : state.focus;
   set({ items, focus, pinned: items.length ? state.pinned : false });
+  return () => {
+    if (!canPin() || state.items.some((p) => p.card.name === name)) return;
+    const back = state.items.slice();
+    back.splice(Math.min(i, back.length), 0, removed);
+    set({ items: back, focus: name, pinned: state.items.length ? state.pinned : wasPinned });
+  };
 }
 
 export function focusCard(name: string) { set({ focus: name }); }

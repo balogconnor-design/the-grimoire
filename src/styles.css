@@ -211,6 +211,8 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 /* ---------- Toasts & modal ---------- */
 .toasts { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
 .toast { background: var(--panel-2); border: 1px solid var(--border-strong); padding: 9px 16px; border-radius: 8px; box-shadow: var(--shadow); font-size: var(--fs-small); animation: toast-in 0.18s ease-out; }
+.toast-action { pointer-events: auto; margin-left: 12px; padding: 2px 10px; border-radius: 6px; border: 1px solid var(--accent); background: transparent; color: var(--accent); font: inherit; font-weight: 700; cursor: pointer; }
+.toast-action:hover { background: var(--accent-soft); }
 .toast-success { border-left: 3px solid var(--good); }
 .toast-error { border-left: 3px solid var(--bad); }
 @keyframes toast-in { from { opacity: 0; transform: translateY(8px); } }
@@ -320,6 +322,17 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .card-step { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; }
 .card-step .btn { font-size: var(--fs-sub); line-height: 1; padding: 2px 12px; }
 .pin-btn { align-self: center; }
+/* Panel controls (Card Search bar, View tools, deck tabs and toolbar) stay at the top while the panel
+   scrolls, with a thin violet line between them and the contents. Phones scroll normally. */
+.panel-controls { position: relative; z-index: 6; margin: -4px -14px 12px; padding: 14px 14px 10px; background: var(--panel); border-bottom: 2px solid color-mix(in srgb, var(--accent) 60%, transparent); }
+.panel > .panel-controls:first-child { margin-top: -14px; border-radius: var(--radius) var(--radius) 0 0; }
+.panel-controls > :last-child { margin-bottom: 0; }
+.panel.collapsed > .panel-controls { margin-bottom: 0; padding-bottom: 0; border-bottom-color: transparent; }
+.search-form-extra { margin-bottom: 10px; }
+/* Sticky offsets count from inside the panel's 14px padding, so pin 14px higher to sit flush with its top. */
+@media (min-width: 901px) { .panel-controls { position: sticky; top: -14px; } }
+/* Mid-size screens: the deck list grows with the page, so its controls stick under the top bar. */
+@media (min-width: 901px) and (max-width: 1400px) { .col-deck .panel-controls { top: calc(var(--topbar-h) - 14px); } }
 /* View panel: pinned cards, collapse and hide like Card Search, drag a card onto it to pin it. */
 .view-panel:focus { outline: none; }
 .has-view.view-collapsed .col-search > .view-panel { flex: none; }

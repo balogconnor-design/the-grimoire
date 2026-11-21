@@ -650,6 +650,12 @@ test('view panel: pin several cards, card / grid / list views, sort, remove, col
   await view.getByRole('button', { name: 'Remove Counterspell from the view panel' }).click();
   await expect(tiles).toHaveCount(2);
   await expect(count).toHaveText('2');
+  // Right-clicking a card in the panel removes it too, with Undo.
+  await tiles.filter({ hasText: 'Lightning Bolt' }).click({ button: 'right' });
+  await expect(count).toHaveText('1');
+  await page.locator('.toast', { hasText: 'Removed Lightning Bolt' }).getByRole('button', { name: 'Undo' }).click();
+  await expect(count).toHaveText('2');
+  await expect(tiles.first()).toContainText('Lightning Bolt');
 
   // List view rows; clicking one opens it in the Card view.
   await view.getByRole('radio', { name: /List/ }).click();

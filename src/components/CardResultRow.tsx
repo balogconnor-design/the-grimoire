@@ -1,4 +1,4 @@
-import type { DragEvent, ReactNode } from 'react';
+import type { DragEvent, MouseEvent, ReactNode } from 'react';
 import type { Card } from '../types';
 import type { Subject } from '../lib/query';
 import { cardPrice, formatUSD, frontTypeLine } from '../lib/rules';
@@ -45,7 +45,7 @@ export function ResultViewSwitch({ value, onChange }: { value: ResultView; onCha
  * (taller, uniform rows with rules text and tags). The card picture shows on hover; click opens the
  * card view; on the deck page the row drags onto the deck list like a grid tile.
  */
-export function CardResultRow({ card, subject, view, onOpen, onTag, onTagClick, onCollect, addButton, badge, draggable, dim, onRemove }: {
+export function CardResultRow({ card, subject, view, onOpen, onTag, onTagClick, onCollect, addButton, badge, draggable, dim, onRemove, onRightClick }: {
   card: Card;
   subject: Subject;
   view: 'list' | 'details';
@@ -59,6 +59,8 @@ export function CardResultRow({ card, subject, view, onOpen, onTag, onTagClick, 
   dim?: boolean;
   /** Shows a remove button (the view panel's pinned cards). */
   onRemove?: () => void;
+  /** Replaces the usual right-click (show in the view panel). */
+  onRightClick?: (e: MouseEvent) => void;
 }) {
   const owned = subject.ownedQty ?? 0;
   const decks = subject.decks ?? [];
@@ -74,7 +76,7 @@ export function CardResultRow({ card, subject, view, onOpen, onTag, onTagClick, 
       draggable={draggable || undefined} onDragStart={draggable ? onDragStart : undefined}
       title={dim ? 'Already in this deck' : undefined}
       {...hoverArtProps(card)}
-      onContextMenu={pinOnRightClick(card, undefined, hideArt)}
+      onContextMenu={onRightClick ?? pinOnRightClick(card, undefined, hideArt)}
     >
       <div className="row-main">
         <button className="row-name" onClick={() => { hideArt(); onOpen(); }} title={draggable ? `${card.name}: click to view, drag onto the deck list to add` : card.name}>
