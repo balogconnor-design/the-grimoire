@@ -23,6 +23,9 @@ import { AddCardsModal } from '../components/AddCardsModal';
 import { BackupModal } from '../components/BackupModal';
 import { AddToCollectionModal, ItemModal, WatchModal } from '../components/CollectionModals';
 import { useToast } from '../components/Toast';
+import { CardLink } from '../components/CardLink';
+import { CardModal } from '../components/CardModal';
+import { hideArt, hoverArtProps } from '../components/HoverArt';
 import { SellModal, TradeModal } from '../components/TransactionModals';
 import { PurchasedDecks, Stat, Transactions } from './CollectionLedger';
 import { LabeledTable } from '../components/LabeledTable';
@@ -206,7 +209,7 @@ function Overview({ onAdd, showInInventory }: { onAdd: () => void; showInInvento
             <div className="alert-group">
               <div className="label">▲ Sell targets reached</div>
               {sellHits.slice(0, 5).map((i) => (
-                <button key={i.id} className="alert-row" onClick={() => setOpenItem(i.id)}>
+                <button key={i.id} className="alert-row" onClick={() => { hideArt(); setOpenItem(i.id); }} {...hoverArtProps(i.card)}>
                   <span className="truncate">{i.card.name}</span>
                   <span className="price">{formatUSD(finishPrice(i.card, i.finish))} ≥ {formatUSD(i.targetPrice)}</span>
                 </button>
@@ -217,7 +220,7 @@ function Overview({ onAdd, showInInventory }: { onAdd: () => void; showInInvento
             <div className="alert-group">
               <div className="label">▼ Buy targets reached</div>
               {buyHits.slice(0, 5).map((w) => (
-                <button key={w.id} className="alert-row" onClick={() => navigate('/collection/watch')}>
+                <button key={w.id} className="alert-row" onClick={() => { hideArt(); navigate('/collection/watch'); }} {...hoverArtProps(w.card)}>
                   <span className="truncate">{w.card.name}</span>
                   <span className="price">{formatUSD(w.unit)} ≤ {formatUSD(w.target)}</span>
                 </button>
@@ -228,7 +231,7 @@ function Overview({ onAdd, showInInventory }: { onAdd: () => void; showInInvento
             <div className="alert-group">
               <div className="label">Big moves (7 days)</div>
               {movers.map(({ i, t }) => (
-                <button key={i.id} className="alert-row" onClick={() => setOpenItem(i.id)}>
+                <button key={i.id} className="alert-row" onClick={() => { hideArt(); setOpenItem(i.id); }} {...hoverArtProps(i.card)}>
                   <span className="truncate">{i.card.name} <span className="muted">{i.card.set.toUpperCase()}</span></span>
                   <Trend pct={t} />
                 </button>
@@ -296,7 +299,7 @@ function MoverList({ rows, onOpen, empty }: { rows: { i: CollectionItem; diff: n
     <ul className="coverage-list">
       {rows.map(({ i, diff, pct }) => (
         <li key={i.id}>
-          <button className="alert-row" onClick={() => onOpen(i.id)}>
+          <button className="alert-row" onClick={() => { hideArt(); onOpen(i.id); }} {...hoverArtProps(i.card)}>
             <span className="truncate">{i.card.name} <span className="muted small">{i.card.set.toUpperCase()}{i.finish !== 'nonfoil' ? ` · ${FINISH_LABEL[i.finish]}` : ''}</span></span>
             <PLBadge diff={diff} pct={pct} />
           </button>
@@ -444,7 +447,7 @@ function Inventory({ query, setQuery, onExport, onAdd }: { query: string; setQue
               const badges = printBadges(i.card);
               const plClass = pl.pct != null && Math.abs(pl.pct) >= 25 ? (pl.pct > 0 ? 'row-gain' : 'row-loss') : '';
               return (
-                <tr key={i.id} className={`${selected.has(i.id) ? 'selected' : ''} ${plClass}`} onClick={() => setOpenItem(i.id)}>
+                <tr key={i.id} className={`${selected.has(i.id) ? 'selected' : ''} ${plClass}`} onClick={() => { hideArt(); setOpenItem(i.id); }} {...hoverArtProps(i.card)}>
                   <td className="cb" onClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" checked={selected.has(i.id)} onChange={() => toggle(i.id)} aria-label={`Select ${i.card.name}`} />
                   </td>
@@ -558,6 +561,7 @@ function BulkBar({ ids, pl, allTags, onClear, onExport, onSell, onTrade }: { ids
 // ======================= Buy list =======================
 
 function BuyList() {
+  const [viewing, setViewing] = useState<Card | null>(null);
   const decks = decksT.useAll();
   const items = collectionT.useAll();
   const watch = watchT.useAll();
@@ -638,7 +642,7 @@ function BuyList() {
                     <td className="inv-card">
                       <img src={cardImage(c, 'small')} alt="" className="inv-thumb" loading="lazy" />
                       <div className="inv-card-text">
-                        <span className="inv-name truncate">{l.name}</span>
+                        <CardLink card={c} name={l.name} draggable={false} onOpen={() => setViewing(c)}><span className="inv-name truncate card-link-name">{l.name}</span></CardLink>
                         <span className="muted tiny-label">{c.set.toUpperCase()} #{c.collector_number}{cheapest.has(l.name) ? ' · cheapest print' : " · deck's print"}</span>
                       </div>
                     </td>
@@ -669,7 +673,7 @@ function BuyList() {
           <ul className="coverage-list">
             {wants.map((w) => (
               <li key={`${w.kind}:${w.id}`} className="alert-row static">
-                <span className="truncate">{w.qty}× {w.card.name} <span className="muted small">{w.card.set.toUpperCase()}</span></span>
+                <span className="truncate">{w.qty}× <CardLink card={w.card} name={w.card.name} draggable={false} onOpen={() => setViewing(w.card)} className="inline-card-link" /> <span className="muted small">{w.card.set.toUpperCase()}</span></span>
                 <span className="price">{formatUSD(w.unit)}{w.target != null && <> · target {formatUSD(w.target)}</>}</span>
                 {w.hit && <span className="hit-badge">▼ at target</span>}
               </li>
@@ -678,6 +682,7 @@ function BuyList() {
         </section>
       )}
       {buying && <AddToCollectionModal card={cheapest.get(buying.name) ?? buying.card} qty={buying.buy} onClose={() => setBuying(null)} />}
+      {viewing && <CardModal card={viewing} onClose={() => setViewing(null)} />}
     </div>
   );
 }
@@ -734,7 +739,7 @@ function TradeBinder() {
                 const hit = i.targetPrice != null && (finishPrice(i.card, i.finish) ?? 0) >= i.targetPrice;
                 const pl = itemPL(i);
                 return (
-                  <tr key={i.id} onClick={() => setOpenItem(i.id)}>
+                  <tr key={i.id} onClick={() => { hideArt(); setOpenItem(i.id); }} {...hoverArtProps(i.card)}>
                     <td className="inv-card">
                       <img src={cardImage(i.card, 'small')} alt="" className="inv-thumb" loading="lazy" />
                       <div className="inv-card-text">
@@ -765,6 +770,7 @@ function TradeBinder() {
 // ======================= Watchlist =======================
 
 function Watchlist() {
+  const [viewing, setViewing] = useState<Card | null>(null);
   const watch = watchT.useAll();
   const items = collectionT.useAll();
   const snaps = pricesT.useAll();
@@ -817,7 +823,7 @@ function Watchlist() {
                     <td className="inv-card">
                       <img src={cardImage(w.card, 'small')} alt="" className="inv-thumb" loading="lazy" />
                       <div className="inv-card-text">
-                        <span className="inv-name truncate">{w.card.name}</span>
+                        <CardLink card={w.card} name={w.card.name} draggable={false} onOpen={() => setViewing(w.card)}><span className="inv-name truncate card-link-name">{w.card.name}</span></CardLink>
                         <span className="muted tiny-label">{w.card.set.toUpperCase()} #{w.card.collector_number} · {FINISH_LABEL[w.finish]}{w.notes ? ` · ${w.notes}` : ''}</span>
                       </div>
                     </td>
@@ -845,7 +851,7 @@ function Watchlist() {
                     <td className="inv-card">
                       <img src={cardImage(i.card, 'small')} alt="" className="inv-thumb" loading="lazy" />
                       <div className="inv-card-text">
-                        <span className="inv-name truncate">{i.card.name}</span>
+                        <CardLink card={i.card} name={i.card.name} draggable={false} onOpen={() => setViewing(i.card)}><span className="inv-name truncate card-link-name">{i.card.name}</span></CardLink>
                         <span className="muted tiny-label"><span className="intent intent-buy">Buy more</span> own {i.qty} · {i.card.set.toUpperCase()} · {FINISH_LABEL[i.finish]}</span>
                       </div>
                     </td>
@@ -867,6 +873,7 @@ function Watchlist() {
         <AddToCollectionModal card={bought.card} qty={bought.qty} onClose={() => setBought(null)}
           onAdded={() => { void watchT.remove(bought.id); }} />
       )}
+      {viewing && <CardModal card={viewing} onClose={() => setViewing(null)} />}
     </div>
   );
 }

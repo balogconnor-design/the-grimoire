@@ -301,6 +301,30 @@ test('cards in Deck Details open, and hover art waits then stays on screen', asy
   expect(errors).toEqual([]);
 });
 
+test('collection lists show hover art, and the buy list opens cards', async ({ page, isMobile }) => {
+  test.skip(!!isMobile, 'touch screens have no hover');
+  const errors = watchErrors(page);
+  await open(page);
+  await createDeck(page, 'Buy Test');
+  const search = page.locator('.search-panel');
+  await search.locator('.search-input').fill('sol ring');
+  await search.locator('.search-input').press('Enter');
+  const result = search.locator('.result-card').first();
+  await result.hover();
+  await result.getByRole('button', { name: 'Add Sol Ring to main deck' }).click();
+
+  await page.goto('/#/collection/buy');
+  const link = page.locator('.card-link', { hasText: 'Sol Ring' }).first();
+  await expect(link).toBeVisible();
+  await expect(link).not.toHaveAttribute('draggable', 'true'); // nothing to drop onto here
+  await link.hover();
+  await expect(page.locator('.hover-preview')).toBeVisible();
+  await link.click();
+  await expect(page.locator('.hover-preview')).toHaveCount(0);
+  await expect(page.locator('.modal')).toContainText('Sol Ring');
+  expect(errors).toEqual([]);
+});
+
 test('#tag search and the tag browser find tagged cards', async ({ page, isMobile }) => {
   const errors = watchErrors(page);
   await open(page);
