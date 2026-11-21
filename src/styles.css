@@ -325,6 +325,16 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .chip-not { border-color: var(--bad); color: var(--bad); background: var(--bad-soft); }
 .adv-criteria summary { cursor: pointer; font-size: var(--fs-small); color: var(--text-2); padding: 4px 0; }
 .adv-criteria .adv-chips { padding: 4px 0 8px; }
+.adv-tags-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 8px; }
+.tag-pick-group { display: grid; grid-template-columns: 64px 1fr; gap: 6px 10px; align-items: start; margin-bottom: 6px; }
+.tag-pick-group > .label { margin: 4px 0 0; }
+.tag-pick-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.tag-pick-chip { font: inherit; font-size: var(--fs-tiny); padding: 2px 9px; border-radius: 999px; cursor: pointer; background: transparent; border: 1px solid var(--border-strong); color: var(--text-2); }
+.tag-pick-chip.scryfall { border-style: dashed; border-color: var(--tag-scryfall); color: var(--tag-scryfall); }
+.tag-pick-chip:hover { border-color: var(--accent); }
+.tag-pick-chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--text); }
+.tag-pick-chip.scryfall.on { background: var(--tag-scryfall-soft); border-color: var(--tag-scryfall); border-style: solid; color: var(--text); }
+.tag-pick-chip.not { background: var(--bad-soft); border-color: var(--bad); color: var(--bad); text-decoration: line-through; }
 .adv-check { display: flex; align-items: center; gap: 8px; font-size: var(--fs-small); align-self: end; }
 .adv-symbols { gap: 2px; }
 .adv-symbols .pip-toggle { border-color: transparent; }

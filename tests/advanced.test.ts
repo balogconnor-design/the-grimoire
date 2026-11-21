@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildAdvanced, countAdvanced, EMPTY_ADV, type Adv } from '../src/lib/advanced';
+import { liftScryfallTags } from '../src/lib/query';
+import { scryfallOtagFor } from '../src/lib/scryfallTags';
 import { splitForScryfall } from '../src/lib/query';
 
 const adv = (over: Partial<Adv>): Adv => ({ ...EMPTY_ADV, ...over });
@@ -41,13 +43,26 @@ describe('advanced search builder', () => {
   });
 
   it('keeps collection filters local and the rest for Scryfall', () => {
-    const q = buildAdvanced(adv({ games: ['paper', 'arena'], criteria: { foil: 'not' }, owned: 'owned', fav: true, tag: 'ramp' }));
+    const q = buildAdvanced(adv({ games: ['paper', 'arena'], criteria: { foil: 'not' }, owned: 'owned', tags: ['staple'] }));
     const split = splitForScryfall(q);
     expect(split.error).toBeUndefined();
     expect(split.remote).toContain('game:paper');
     expect(split.remote).toContain('game:arena');
     expect(split.remote).toContain('-is:foil');
-    expect(split.local).toBe('is:owned is:fav tag:ramp');
+    expect(split.local).toBe('is:owned #staple');
+  });
+
+  it('matches selected tags all, any or none, quoting tags with spaces', () => {
+    expect(buildAdvanced(adv({ tags: ['ramp', 'card draw'] }))).toBe('#ramp #"card draw"');
+    expect(buildAdvanced(adv({ tags: ['ramp', 'removal'], tagMode: 'any' }))).toBe('(#ramp or #removal)');
+    expect(buildAdvanced(adv({ tags: ['ramp'], tagMode: 'any' }))).toBe('#ramp');
+    expect(buildAdvanced(adv({ tags: ['ramp', 'staple'], tagMode: 'none' }))).toBe('-#ramp -#staple');
+    expect(countAdvanced(adv({ tags: ['ramp', 'staple'] }))).toBe(2);
+  });
+
+  it('sends a Scryfall tag picked with All to Scryfall (otag:) and keeps your own tags local', () => {
+    const lifted = liftScryfallTags(buildAdvanced(adv({ tags: ['mana rock', 'staple'] })), scryfallOtagFor);
+    expect(lifted).toEqual({ otags: ['mana-rock'], rest: '#staple' });
   });
 
   it('counts set filters, including result options', () => {
