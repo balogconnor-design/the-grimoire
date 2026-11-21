@@ -222,6 +222,16 @@ export async function refreshPrices(deckId: string) {
   await writeSnapshot(found); // builds the deck's price history for its 7-day change
 }
 
+/** Choose the tag an entry is listed under when the deck is grouped by tag (undefined = automatic). */
+export function setMainTag(deckId: string, entryUid: string, tag: string | undefined) {
+  updateDeck(deckId, (d) => {
+    const e = d.entries.find((x) => x.uid === entryUid);
+    if (!e) return;
+    if (tag) e.mainTag = tag;
+    else delete e.mainTag;
+  });
+}
+
 // ---------- Import / export ----------
 
 export interface ParsedLine {

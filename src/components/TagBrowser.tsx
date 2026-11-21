@@ -41,6 +41,7 @@ export function TagBrowser({ subjectFor, renderCard, onSearch }: {
       s.globalTags?.forEach((t) => add(t, 'global', card));
       s.cardTags?.forEach((t) => add(t, 'card', card));
       s.collectionTags?.forEach((t) => add(t, 'collection', card));
+      s.scryfallTags?.forEach((t) => add(t, 'scryfall', card));
     }
     for (const g of m.values()) g.cards.sort((a, b) => a.name.localeCompare(b.name));
     return [...m.values()].sort((a, b) => a.tag.localeCompare(b.tag));
@@ -48,7 +49,7 @@ export function TagBrowser({ subjectFor, renderCard, onSearch }: {
 
   const shown = filter.trim() ? groups.filter((g) => g.tag.includes(filter.trim().toLowerCase())) : groups;
   const toggle = (t: string) => setOpen((o) => (o.includes(t) ? o.filter((x) => x !== t) : [...o, t]));
-  const scopeOf = (g: TagGroup): TagScope => (g.scopes.has('global') ? 'global' : g.scopes.has('card') ? 'card' : 'collection');
+  const scopeOf = (g: TagGroup): TagScope => (g.scopes.has('global') ? 'global' : g.scopes.has('card') ? 'card' : g.scopes.has('collection') ? 'collection' : 'scryfall');
   const q = (t: string) => `#${/\s/.test(t) ? `"${t}"` : t}`;
 
   if (!groups.length) {

@@ -40,6 +40,47 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
   });
 }
 
+/**
+ * One page (up to 175 cards) of a search as Scryfall's CSV, reduced to card names. About a seventh of
+ * the JSON's size, for lists where only names matter (Scryfall tags). Null once past the last page.
+ */
+export async function searchNamesPage(q: string, page: number): Promise<string[] | null> {
+  return throttled(async () => {
+    const params = new URLSearchParams({ q, format: 'csv', unique: 'cards', page: String(page) });
+    const res = await fetch(`${API}/cards/search?${params}`, { headers: { Accept: 'text/csv' } });
+    if (res.status === 404 || res.status === 422) return null; // no results / past the end
+    if (!res.ok) throw new ScryfallError(`Scryfall request failed (${res.status})`, res.status);
+    return csvColumn(await res.text(), 'name');
+  });
+}
+
+/** Values of one column of a CSV document (handles quoted fields with commas, quotes and newlines). */
+export function csvColumn(text: string, column: string): string[] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quoted) {
+      if (ch === '"' && text[i + 1] === '"') { field += '"'; i++; }
+      else if (ch === '"') quoted = false;
+      else field += ch;
+    } else if (ch === '"') quoted = true;
+    else if (ch === ',') { row.push(field); field = ''; }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(field); field = '';
+      if (row.some((f) => f !== '')) rows.push(row);
+      row = [];
+    } else field += ch;
+  }
+  row.push(field);
+  if (row.some((f) => f !== '')) rows.push(row);
+  const col = rows[0]?.indexOf(column) ?? -1;
+  return col < 0 ? [] : rows.slice(1).map((r) => r[col]).filter(Boolean);
+}
+
 // Keep stored decks lean: only keep the fields the app reads.
 const KEEP: (keyof Card)[] = [
   'id', 'oracle_id', 'name', 'layout', 'mana_cost', 'cmc', 'type_line', 'oracle_text', 'flavor_text',

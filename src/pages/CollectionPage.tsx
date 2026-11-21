@@ -11,6 +11,7 @@ import { buildBuyList, wantList, type BuyLine } from '../lib/ownership';
 import { parseQuery } from '../lib/query';
 import { searchCards } from '../lib/scryfall';
 import { usePool, useAllCollectionTags, useGlobalTags, useSubjects } from '../lib/hooks';
+import { useScryfallTags } from '../lib/scryfallTags';
 import { download } from '../lib/backup';
 import { cardImage, cardPrice, formatUSD } from '../lib/rules';
 import { navigate } from '../lib/router';
@@ -358,6 +359,7 @@ function Inventory({ query, setQuery, onExport, onAdd }: { query: string; setQue
   const setSortKey = (k: SortKey) => { if (sort === k) setDir((d) => (d === 1 ? -1 : 1)); else { setSort(k); setDir(k === 'name' || k === 'set' ? 1 : -1); } };
   const onTagClick = (scope: TagScope, t: string) => setQuery(`${SCOPE_META[scope].key}:${quoteTag(t)}`);
   const globalTags = useGlobalTags();
+  const stags = useScryfallTags();
   const quick = (q: string) => setQuery(query.includes(q) ? query.replace(q, '').replace(/\s+/g, ' ').trim() : `${query} ${q}`.trim());
   const deckName = (id: string) => decks.find((d) => d.id === id)?.name ?? '';
 
@@ -455,7 +457,7 @@ function Inventory({ query, setQuery, onExport, onAdd }: { query: string; setQue
                         {i.finish !== 'nonfoil' && <span className={`finish-badge ${i.finish}`}>{FINISH_LABEL[i.finish]}</span>}
                         {badges.map((b) => <span key={b} className="print-badge">{b}</span>)}
                         {i.condition && <span className="cond-badge">{i.condition}</span>}
-                        <TagList groups={[{ scope: 'global', tags: globalTags.get(i.card.name) ?? [] }, { scope: 'collection', tags: i.tags }]} max={3} onTagClick={onTagClick} />
+                        <TagList groups={[{ scope: 'global', tags: globalTags.get(i.card.name) ?? [] }, { scope: 'collection', tags: i.tags }, { scope: 'scryfall', tags: stags.get(i.card.name) ?? [] }]} max={3} onTagClick={onTagClick} />
                       </span>
                     </div>
                   </td>

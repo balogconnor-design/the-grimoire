@@ -1,6 +1,7 @@
 import type { Card, CollectionItem, DeckEntry, Finish } from '../types';
 import { cardPrice, frontTypeLine } from './rules';
 import { finishPrice, isAltArt, itemPL, itemUnitValue, printBadges } from './collection';
+import { scryfallTagMatches } from './scryfallTags';
 
 /**
  * Local search engine — a practical subset of Scryfall syntax plus collection extras.
@@ -8,7 +9,7 @@ import { finishPrice, isAltArt, itemPL, itemUnitValue, printBadges } from './col
  *
  *   t:creature  o:"draw a card"  c>=ug  id<=wub  mv<=3  r:mythic  s:mh3  a:"terese"  pow>=4  usd>5
  *   is:foil  is:etched  is:alt  is:borderless  is:showcase  is:promo  is:fav  is:owned
- *   tag:ramp or #ramp (any scope)  gtag:staple (global)  coltag:binder  cardtag:wincon  decktag:cedh  status:sell  cond:nm  qty>=2  paid<10  gain>=50  pl>20  deck:atraxa  source:tcg
+ *   tag:ramp or #ramp (any scope)  stag:ramp or otag:ramp (Scryfall tags)  gtag:staple (global)  coltag:binder  cardtag:wincon  decktag:cedh  status:sell  cond:nm  qty>=2  paid<10  gain>=50  pl>20  deck:atraxa  source:tcg
  *   year>=2020  f:commander  kw:flying  -t:land  (t:elf or t:goblin)  !"Sol Ring"
  */
 
@@ -19,6 +20,7 @@ export interface Subject {
   entry?: DeckEntry;
   favorite?: boolean;
   globalTags?: string[]; // tags on the card itself, in every deck and printing
+  scryfallTags?: string[]; // automatic Scryfall tags (see scryfallTags.ts)
   collectionTags?: string[]; // tags on owned lots of this card
   cardTags?: string[]; // per-deck card tags (this deck in a deck view; every deck elsewhere)
   deckTags?: string[]; // tags of the deck(s) this card is in
@@ -40,7 +42,7 @@ export interface ParsedQuery {
 
 // Keys only meaningful against your own data (cannot be sent to Scryfall).
 export const LOCAL_KEYS = new Set([
-  'tag', 'tags', 'gtag', 'coltag', 'cardtag', 'decktag', 'status', 'intent', 'cond', 'condition', 'qty', 'owned', 'paid', 'cost', 'gain', 'pl',
+  'tag', 'tags', 'gtag', 'stag', 'coltag', 'cardtag', 'decktag', 'status', 'intent', 'cond', 'condition', 'qty', 'owned', 'paid', 'cost', 'gain', 'pl',
   'deck', 'source', 'fav', 'value',
 ]);
 const LOCAL_IS = new Set(['fav', 'favorite', 'favourite', 'owned', 'unowned', 'missing', 'allocated', 'unallocated', 'gain', 'loss', 'forsale', 'sell', 'trade', 'hold', 'buy', 'tagged', 'alt', 'altart']);
@@ -52,6 +54,7 @@ const KEY_ALIAS: Record<string, string> = {
   cn: 'cn', number: 'cn', a: 'artist', artist: 'artist', pow: 'pow', power: 'pow', tou: 'tou', toughness: 'tou',
   usd: 'usd', price: 'usd', is: 'is', not: 'not', tag: 'tag', tags: 'tag',
   gtag: 'gtag', globaltag: 'gtag', gt: 'gtag',
+  stag: 'stag', scryfalltag: 'stag', otag: 'otag', oracletag: 'otag', function: 'otag',
   coltag: 'coltag', ctag: 'coltag', collectiontag: 'coltag', cardtag: 'cardtag', etag: 'cardtag', decktag: 'decktag', dtag: 'decktag',
   status: 'status', intent: 'status',
   cond: 'cond', condition: 'cond', qty: 'qty', owned: 'qty', paid: 'paid', cost: 'paid', gain: 'gain', pl: 'pl',
@@ -260,6 +263,9 @@ function evalTerm(n: Extract<Node, { kind: 'term' }>, s: Subject, warn: (w: stri
     case 'lang': return (c.lang ?? 'en') === v;
     case 'format': return c.legalities?.[v] === 'legal' || c.legalities?.[v] === 'restricted';
     case 'banned': return c.legalities?.[v] === 'banned';
+    case 'stag':
+    case 'otag': // in local filters otag: checks the downloaded Scryfall tags; in the main search it goes to Scryfall
+      return (s.scryfallTags ?? []).some((t) => scryfallTagMatches(t, v, op === '=' || key === 'otag'));
     case 'tag':
     case 'gtag':
     case 'coltag':
@@ -268,7 +274,8 @@ function evalTerm(n: Extract<Node, { kind: 'term' }>, s: Subject, warn: (w: stri
       const pool = key === 'gtag' ? s.globalTags : key === 'coltag' ? s.collectionTags : key === 'cardtag' ? s.cardTags : key === 'decktag' ? s.deckTags
         : [...(s.globalTags ?? []), ...(s.collectionTags ?? []), ...(s.cardTags ?? []), ...(s.deckTags ?? [])];
       const tags = (pool ?? []).map((t) => t.toLowerCase());
-      return op === '=' ? tags.includes(v) : tags.some((t) => t.includes(v));
+      const own = op === '=' ? tags.includes(v) : tags.some((t) => t.includes(v));
+      return own || (key === 'tag' && (s.scryfallTags ?? []).some((t) => scryfallTagMatches(t, v, op === '=')));
     }
     case 'status': {
       const i = s.item?.intent;
@@ -325,7 +332,7 @@ function isTest(v: string, s: Subject): boolean | null {
     case 'trade': return s.item?.intent === 'trade' || s.item?.intent === 'sell-trade';
     case 'hold': return s.item?.intent === 'hold';
     case 'buy': return s.item?.intent === 'buy';
-    case 'tagged': return !!(s.globalTags?.length || s.collectionTags?.length || s.cardTags?.length || s.deckTags?.length);
+    case 'tagged': return !!(s.scryfallTags?.length || s.globalTags?.length || s.collectionTags?.length || s.cardTags?.length || s.deckTags?.length);
     case 'legendary': return /\bLegendary\b/.test(tl);
     case 'commander': return /\bLegendary\b/.test(tl) && /\bCreature\b/.test(tl) || /can be your commander/i.test(allText(c));
     case 'gamechanger': return !!c.game_changer;

@@ -58,7 +58,8 @@ test('advanced search builds a Scryfall query on the main page', async ({ page }
   const errors = watchErrors(page);
   await open(page);
   const sent: string[] = [];
-  page.on('request', (r) => { if (r.url().includes('/cards/search')) sent.push(new URL(r.url()).searchParams.get('q') ?? ''); });
+  // Scryfall tag downloads (format=csv) run in the background; only record the user's searches.
+  page.on('request', (r) => { const u = new URL(r.url()); if (u.pathname === '/cards/search' && u.searchParams.get('format') !== 'csv') sent.push(u.searchParams.get('q') ?? ''); });
   await page.getByRole('button', { name: /Advanced/ }).first().click();
   const adv = page.locator('.advanced');
   await adv.getByRole('button', { name: 'Color: G' }).click();
