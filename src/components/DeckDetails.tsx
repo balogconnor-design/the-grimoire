@@ -14,7 +14,7 @@ import { planAllocation, releaseAllocation } from '../lib/ownership';
 import { collectionT, useSettings } from '../lib/store';
 import { navigate } from '../lib/router';
 import { useScryfallTags } from '../lib/scryfallTags';
-import { atLeast, cardsSeen, oddsGroups, type OddsGroup } from '../lib/drawOdds';
+import { atLeast, oddsGroups, SEEN_MAX, SEEN_MIN, turnHint, type OddsGroup } from '../lib/drawOdds';
 
 interface Props {
   deck: Deck;
@@ -537,12 +537,15 @@ function TypeBreakdown({ deck, filter, setFilter }: ChartProps) {
 
 const ODDS_TAGS_SHOWN = 8;
 const ODDS_KEY = 'grimoire.drawOdds';
-interface OddsPrefs { min: number; turn: number; onDraw: boolean }
+interface OddsPrefs { min: number; seen: number }
 function readOddsPrefs(): OddsPrefs {
   try {
     const v = JSON.parse(localStorage.getItem(ODDS_KEY) ?? '{}');
-    return { min: v.min >= 1 && v.min <= 4 ? v.min : 1, turn: v.turn >= 1 && v.turn <= 10 ? v.turn : 1, onDraw: !!v.onDraw };
-  } catch { return { min: 1, turn: 1, onDraw: false }; }
+    return {
+      min: v.min >= 1 && v.min <= 4 ? v.min : 1,
+      seen: Number.isInteger(v.seen) && v.seen >= SEEN_MIN && v.seen <= SEEN_MAX ? v.seen : SEEN_MIN,
+    };
+  } catch { return { min: 1, seen: SEEN_MIN }; }
 }
 const tagQuery = (t: string) => `#${/\s/.test(t) ? `"${t}"` : t}`;
 const fmtChance = (p: number) => (p >= 0.995 && p < 1 ? '>99' : p > 0 && p < 0.005 ? '<1' : (p * 100).toFixed(0));
@@ -559,7 +562,7 @@ function DrawOdds({ deck, filter, setFilter }: ChartProps) {
     try { localStorage.setItem(ODDS_KEY, JSON.stringify(next)); } catch { /* storage unavailable: only this session remembers */ }
   };
   const g = useMemo(() => oddsGroups(deck, { global: globalTags, scryfall: stags }), [deck, globalTags, stags]);
-  const seen = cardsSeen(prefs.turn, prefs.onDraw);
+  const seen = prefs.seen;
   const tags = allTags ? g.tags : g.tags.slice(0, ODDS_TAGS_SHOWN);
 
   const row = (r: OddsGroup) => {
@@ -600,15 +603,12 @@ function DrawOdds({ deck, filter, setFilter }: ChartProps) {
                 {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
             </label>
-            <label>by{' '}
-              <select className="input input-sm" value={prefs.turn} onChange={(e) => setPrefs({ turn: Number(e.target.value) })} aria-label="By turn">
-                <option value={1}>opening hand</option>
-                {[2, 3, 4, 5, 6, 7, 8, 9, 10].map((t) => <option key={t} value={t}>turn {t}</option>)}
+            <label>by card{' '}
+              <select className="input input-sm" value={seen} onChange={(e) => setPrefs({ seen: Number(e.target.value) })} aria-label="By card">
+                {Array.from({ length: SEEN_MAX - SEEN_MIN + 1 }, (_, i) => SEEN_MIN + i).map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
             </label>
-            <label className="odds-draw">
-              <input type="checkbox" checked={prefs.onDraw} onChange={(e) => setPrefs({ onDraw: e.target.checked })} /> On the draw
-            </label>
+            <span className="muted">{turnHint(seen)}</span>
           </div>
           <table className="color-table odds-table">
             <thead><tr><th>Type</th><th title="Copies in the library">Cards</th><th title={`Chance of at least ${prefs.min} in ${seen} cards`}>Chance</th></tr></thead>
@@ -628,8 +628,8 @@ function DrawOdds({ deck, filter, setFilter }: ChartProps) {
         </>
       )}
       <div className="muted tiny">
-        Chance of at least {prefs.min} card{prefs.min === 1 ? '' : 's'} of each kind in your first {seen} cards: a 7-card hand
-        {prefs.turn > 1 ? ` plus one draw a turn${prefs.onDraw ? '' : ' (none on turn 1 on the play)'}` : prefs.onDraw ? ' plus your first draw' : ''}.
+        Chance of at least {prefs.min} card{prefs.min === 1 ? '' : 's'} of each kind among the first {seen} cards you see
+        {' '}(a 7-card hand, then one draw a turn; no draw on turn 1 on the play).
         {' '}{commanderEntry(deck) ? 'The commander isn’t in the library. ' : ''}Ignores mulligans, tutors and extra draws. A card counts under each of its tags. Click a row to filter the deck list.
       </div>
     </div>
