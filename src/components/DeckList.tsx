@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type DragEvent, type MouseEvent } from 'react';
+import { useEffect, useMemo, useState, type DragEvent } from 'react';
 import type { Board, Deck, DeckEntry, DeckFilter, TypeCategory } from '../types';
 import { getFormat } from '../lib/formats';
 import {
@@ -17,6 +17,7 @@ import { AddToCollectionModal } from './CollectionModals';
 import { SavedSearches } from './SavedSearches';
 import { FavStar, TagList, SCOPE_META, type TagScope } from './TagEditor';
 import { useToast } from './Toast';
+import { hideArt, hoverArtProps } from './HoverArt';
 import { isCardDrag, readCardDrag } from '../lib/dnd';
 import { useScryfallTags, useScryfallTagStatus } from '../lib/scryfallTags';
 import { entryTags, groupByManaValue, groupByTag, mainGroup } from '../lib/deckTags';
@@ -49,7 +50,6 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
   const [dragOver, setDragOver] = useState(false);
   const [dragTab, setDragTab] = useState<Board | null>(null);
   const [open, setOpen] = useState<DeckEntry | null>(null);
-  const [preview, setPreview] = useState<{ src: string; x: number; y: number } | null>(null);
   const [showBasics, setShowBasics] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [tagging, setTagging] = useState<DeckEntry | null>(null);
@@ -136,14 +136,6 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
     const to = tab ?? board;
     toast(addCard(deck.id, card, 1, to), 'success');
     if (to !== board) setBoard(to);
-  };
-
-  const showPreview = (e: MouseEvent, entry: DeckEntry) => {
-    const src = cardImage(entry.card, 'normal');
-    if (!src) return;
-    const x = Math.min(e.clientX + 24, window.innerWidth - 270);
-    const y = Math.min(Math.max(e.clientY - 170, 8), window.innerHeight - 360);
-    setPreview({ src, x, y });
   };
 
   return (
@@ -262,7 +254,7 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
         </div>
       )}
 
-      <div className="deck-groups" onMouseLeave={() => setPreview(null)}>
+      <div className="deck-groups" onMouseLeave={hideArt}>
         {groups.length === 0 && (
           <div className="empty">
             {hasFilter ? 'No cards match the current filter.' : board === 'main' ? 'Your deck is empty. Search for cards to add them.' : `Nothing in the ${BOARD_LABEL[board].toLowerCase()} yet.`}
@@ -322,13 +314,12 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
                       <li
                         key={e.uid}
                         className={`entry ${problems ? 'has-problem' : ''} ${dragUid === e.uid ? 'dragging' : ''}`}
-                        onMouseMove={(ev) => showPreview(ev, e)}
-                        onMouseLeave={() => setPreview(null)}
+                        {...hoverArtProps(e.card)}
                         draggable={groupBy === 'tag' && !isCmd}
                         onDragStart={groupBy === 'tag' && !isCmd ? (ev) => {
                           ev.dataTransfer.setData(ENTRY_DRAG, e.uid);
                           ev.dataTransfer.effectAllowed = 'move';
-                          setPreview(null);
+                          hideArt();
                           setDragUid(e.uid);
                         } : undefined}
                         onDragEnd={() => { setDragUid(null); setDropGroup(null); }}
@@ -340,7 +331,7 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
                           <button className="icon-btn sm" onClick={() => setQty(deck.id, e.uid, e.qty + 1)} disabled={isCmd} aria-label="Add one">+</button>
                         </div>
                         <div className="entry-main">
-                          <button className="entry-name" onClick={() => { setPreview(null); setOpen(e); }}>
+                          <button className="entry-name" onClick={() => { hideArt(); setOpen(e); }}>
                             {ownState !== 'skip' && (
                               <span className={`own-mark ${ownState}`} title={ownTitle} aria-label={ownTitle}>
                                 {ownState === 'full' ? '✓' : ownState === 'part' ? '◐' : '○'}
@@ -359,11 +350,11 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
                         </span>
                         <div className="entry-actions">
                           <FavStar on={!!e.favorite} onToggle={() => toggleEntryFavorite(deck.id, e.uid)} />
-                          <button className="icon-btn sm" title="Tag (card tags for this deck)" aria-label={`Tag ${e.card.name}`} onClick={() => { setPreview(null); setTagging(e); }}>🏷</button>
+                          <button className="icon-btn sm" title="Tag (card tags for this deck)" aria-label={`Tag ${e.card.name}`} onClick={() => { hideArt(); setTagging(e); }}>🏷</button>
                           {own && own.missing > 0 && (
                             <button
                               className="icon-btn sm" title={`Mark ${own.missing} as purchased / owned — adds this print to your collection`}
-                              aria-label={`Mark ${e.card.name} owned`} onClick={() => { setPreview(null); setBuying({ entry: e, qty: own.missing }); }}
+                              aria-label={`Mark ${e.card.name} owned`} onClick={() => { hideArt(); setBuying({ entry: e, qty: own.missing }); }}
                             >🛒</button>
                           )}
                           {fmt.hasCommander && board === 'main' && !isCmd && canBeCommander(e.card, fmt) && (
@@ -392,10 +383,6 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
           );
         })}
       </div>
-
-      {preview && (
-        <img className="hover-preview" src={preview.src} style={{ left: preview.x, top: preview.y }} alt="" />
-      )}
 
       {open && (
         <CardModal card={open.card} deckId={deck.id} entryUid={open.uid} onClose={() => setOpen(null)} />

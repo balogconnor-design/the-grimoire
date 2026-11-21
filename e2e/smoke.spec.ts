@@ -256,6 +256,51 @@ test('EDHREC suggestions open the card view and drag into the deck', async ({ pa
   expect(errors).toEqual([]);
 });
 
+test('cards in Deck Details open, and hover art waits then stays on screen', async ({ page, isMobile }) => {
+  test.skip(!!isMobile, 'touch screens have no hover; phones show the details panel on its own tab');
+  await page.setViewportSize({ width: 1600, height: 1000 }); // three columns: Deck Details at the right edge
+  const errors = watchErrors(page);
+  await open(page);
+  await createDeck(page, 'Hover Test');
+  const search = page.locator('.search-panel');
+  await search.locator('.search-input').fill('sol ring');
+  await search.locator('.search-input').press('Enter');
+  const result = search.locator('.result-card').first();
+  await result.hover();
+  await result.getByRole('button', { name: 'Add Sol Ring to main deck' }).click();
+
+  // Mana producers: the card name is a card link.
+  const producers = page.locator('.detail-section', { has: page.getByRole('heading', { name: 'Mana producers' }) });
+  const link = producers.locator('.card-link', { hasText: 'Sol Ring' });
+  await link.scrollIntoViewIfNeeded();
+  await expect(link).toHaveAttribute('draggable', 'true');
+  const box = (await link.boundingBox())!;
+  await page.mouse.move(box.x + box.width - 4, box.y + box.height / 2);
+  await page.waitForTimeout(150);
+  await expect(page.locator('.hover-preview')).toHaveCount(0); // not yet: it waits first
+  const art = page.locator('.hover-preview');
+  await expect(art).toBeVisible();
+  const artBox = (await art.boundingBox())!;
+  expect(artBox.x).toBeGreaterThanOrEqual(0);
+  expect(artBox.x + artBox.width).toBeLessThanOrEqual(1600);
+  const pointerX = box.x + box.width - 4;
+  expect(artBox.x >= pointerX || artBox.x + artBox.width <= pointerX).toBe(true); // beside the pointer, not under it
+  expect(artBox.y + artBox.height).toBeLessThanOrEqual(1000);
+  if (test.info().project.name === 'chromium') await page.screenshot({ path: 'test-results/hover-art.png' });
+
+  await link.click();
+  await expect(page.locator('.hover-preview')).toHaveCount(0);
+  await expect(page.locator('.modal')).toContainText('Sol Ring');
+  await page.locator('.modal-close').click();
+
+  // The deck list uses the same art.
+  await page.locator('.deck-groups .entry', { hasText: 'Sol Ring' }).hover();
+  await expect(art).toBeVisible();
+  await page.mouse.move(5, 500);
+  await expect(art).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
+
 test('#tag search and the tag browser find tagged cards', async ({ page, isMobile }) => {
   const errors = watchErrors(page);
   await open(page);
