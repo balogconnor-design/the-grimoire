@@ -420,3 +420,23 @@ export function splitForScryfall(q: string): { remote: string; local: string; er
   }
   return { remote: remote.map(toText).join(' '), local: local.map(toText).join(' ') };
 }
+
+/**
+ * Pull top-level tag terms that name one of the fixed Scryfall tags (`#ramp`, `tag:ramp`,
+ * `stag:"mana rock"`) out of a query, so the search can ask Scryfall (`otag:`) for every card
+ * with that tag instead of only checking cards you already have. `rest` is the query without them.
+ */
+export function liftScryfallTags(q: string, otagFor: (value: string) => string | undefined): { otags: string[]; rest: string } {
+  const root = parse(tokenize(q.trim()));
+  if (!root) return { otags: [], rest: '' };
+  const parts = root.kind === 'and' ? root.nodes : [root];
+  const otags: string[] = [];
+  const rest: Node[] = [];
+  for (const p of parts) {
+    const key = p.kind === 'term' ? KEY_ALIAS[p.key] ?? p.key : '';
+    const otag = p.kind === 'term' && (key === 'tag' || key === 'stag') && (p.op === ':' || p.op === '=') ? otagFor(p.value) : undefined;
+    if (otag) otags.push(otag);
+    else rest.push(p);
+  }
+  return otags.length ? { otags: [...new Set(otags)], rest: rest.map((n) => (n.kind === 'or' ? `(${toText(n)})` : toText(n))).join(' ') } : { otags: [], rest: q.trim() };
+}

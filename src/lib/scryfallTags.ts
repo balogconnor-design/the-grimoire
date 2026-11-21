@@ -38,6 +38,13 @@ export const SCRYFALL_TAGS: { otag: string; label: string }[] = [
 ];
 
 const LABEL_ORDER = new Map(SCRYFALL_TAGS.map((t, i) => [t.label, i]));
+/** True for the label of one of the fixed Scryfall tags (e.g. "mana rock"). */
+export const isScryfallTagLabel = (t: string) => LABEL_ORDER.has(t);
+/** The Scryfall name (otag) for a search value given as a label or a Scryfall name, if it is one of the fixed tags. */
+export const scryfallOtagFor = (value: string): string | undefined => {
+  const v = value.toLowerCase().replace(/-/g, ' ');
+  return SCRYFALL_TAGS.find((t) => t.label === v || t.otag.replace(/-/g, ' ') === v)?.otag;
+};
 /** Sort labels into priority order (the order of SCRYFALL_TAGS). */
 export const byTagPriority = (a: string, b: string) => (LABEL_ORDER.get(a) ?? 999) - (LABEL_ORDER.get(b) ?? 999);
 

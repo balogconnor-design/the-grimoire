@@ -8,7 +8,7 @@ import { TagBrowser } from './TagBrowser';
 import { getFormat } from '../lib/formats';
 import { deckIdentity } from '../lib/rules';
 import { addCard } from '../lib/actions';
-import { hybridMore, hybridSearch } from '../lib/search';
+import { appendResults, hybridMore, hybridSearch } from '../lib/search';
 import { useSubjects } from '../lib/hooks';
 import { CardModal } from './CardModal';
 import { CardResult } from './CardResult';
@@ -95,7 +95,7 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
     setLoading(true);
     try {
       const res = await hybridMore(next, local, subjectFor);
-      setResults((r) => [...r, ...res.cards]);
+      setResults((r) => appendResults(r, res.cards, adv.unique));
       setNext(res.next);
     } catch (e) {
       setError((e as Error).message);

@@ -4,8 +4,11 @@ import { mockScryfall } from './scryfall';
 // Errors the app logs or throws fail the test (Scryfall is mocked, so there's no network noise).
 function watchErrors(page: Page) {
   const errors: string[] = [];
-  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(`console: ${m.text()}`); });
+  // WebKit reports the background Scryfall tag download (CSV) as an error when a test navigates
+  // away mid-request. The app already catches it, so it isn't a failure.
+  const cancelledTagDownload = (m: string) => /format=csv/.test(m) && /access control checks|cancelled|aborted/i.test(m);
+  page.on('pageerror', (e) => { if (!cancelledTagDownload(e.message)) errors.push(`pageerror: ${e.message}`); });
+  page.on('console', (m) => { if (m.type() === 'error' && !cancelledTagDownload(m.text())) errors.push(`console: ${m.text()}`); });
   return errors;
 }
 
@@ -191,11 +194,22 @@ test('#tag search and the tag browser find tagged cards', async ({ page, isMobil
   await pick.click();
   await expect(page.locator('.tag-group')).toContainText('Sol Ring');
 
-  // #ramp alone searches your own cards.
+  // A tag of yours that isn't a Scryfall tag searches your own cards.
   const box = page.locator('.search-form input').first();
+  await box.fill('#ramp-ish');
+  await box.press('Enter');
+  await expect(page.locator('.empty')).toContainText('No cards match');
+
+  // #ramp is also a Scryfall tag: Scryfall is asked for every card with it (otag:ramp).
+  const asked = page.waitForRequest((r) => {
+    const u = new URL(r.url());
+    return u.pathname === '/cards/search' && u.searchParams.get('format') !== 'csv' && (u.searchParams.get('q') ?? '').includes('otag:ramp');
+  });
   await box.fill('#ramp');
   await box.press('Enter');
-  await expect(page.locator('.results-meta')).toContainText('1 of your cards');
+  await asked;
+  await expect(page.locator('.results-meta')).toContainText('1 cards');
+  await expect(page.locator('.result-card')).toHaveCount(1);
   await expect(page.locator('.result-card')).toContainText('Sol Ring');
   expect(errors).toEqual([]);
 });
