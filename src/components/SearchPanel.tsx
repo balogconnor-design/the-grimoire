@@ -221,6 +221,8 @@ export function SearchPanel({ deck, board = 'main', mode = 'expanded', onMode }:
 
   return (
     <section className={`panel search-panel ${collapsed ? 'collapsed' : ''}`}>
+      {/* Pinned to the top of the panel while the results scroll. */}
+      <div className="panel-controls">
       <div className="panel-head">
         <h2>Card Search</h2>
         <span className="panel-head-tools">
@@ -283,11 +285,16 @@ export function SearchPanel({ deck, board = 'main', mode = 'expanded', onMode }:
           ))}
           {board !== 'main' && <span className="add-target" title="The + button and drag and drop add to the board shown in the deck list">Adding to the {target.full}</span>}
         </div>
-
-        {showAdv && <AdvancedSearch value={adv} onChange={setAdv} />}
-
-        {fullQuery && <div className="query-preview" title="Query sent to Scryfall"><code>{fullQuery}</code></div>}
       </form>
+      </div>
+
+      {/* Advanced scrolls with the results (it can be taller than the panel); Enter in it still searches. */}
+      {(showAdv || fullQuery) && (
+        <form onSubmit={onSubmit} className="search-form search-form-extra">
+          {showAdv && <AdvancedSearch value={adv} onChange={setAdv} />}
+          {fullQuery && <div className="query-preview" title="Query sent to Scryfall"><code>{fullQuery}</code></div>}
+        </form>
+      )}
 
       <div className="search-body">
       {showTags ? (

@@ -77,6 +77,22 @@ describe('view panel', () => {
     expect(viewPanelState().pinned).toBe(false);
   });
 
+  it('undoing a removal puts the card back in its place, and reopens a closed panel pinned', () => {
+    leave = hostViewPanel();
+    pinCard(sol); pinCard(counter); pinCard(bolt);
+    removeCard('Counterspell')!();
+    expect(names()).toEqual(['Sol Ring', 'Counterspell', 'Lightning Bolt']);
+    expect(viewPanelState().focus).toBe('Counterspell');
+    removeCard('Sol Ring'); removeCard('Lightning Bolt');
+    const undo = removeCard('Counterspell')!;
+    expect(names()).toEqual([]);
+    undo();
+    expect(names()).toEqual(['Counterspell']);
+    expect(viewPanelState().pinned).toBe(true);
+    undo(); // already back: nothing happens
+    expect(names()).toEqual(['Counterspell']);
+  });
+
   it('unpinning keeps only the card on show; closing clears everything', () => {
     leave = hostViewPanel();
     pinCard(sol); pinCard(counter);

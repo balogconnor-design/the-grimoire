@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent } from 'react';
 import type { Board, Card, Deck } from '../types';
 import {
   closeView, focusCard, pinCard, removeCard, setPinned, setViewMode, sortPinned, useViewPanel, type Pinned, type PinSort,
@@ -177,6 +177,18 @@ export function ViewPanel({ deck, board = 'main' }: { deck: Deck; board?: Board 
   };
   const onTagClick = (scope: TagScope, t: string) => { requestCardSearch(`${SCOPE_META[scope].key}:${/\s/.test(t) ? `"${t}"` : t}`); };
   const open = (c: Card) => { focusCard(c.name); setView('card'); };
+  /** Right-clicking a card that is already in the panel takes it out (with Undo, as there's no confirmation). */
+  const removeByRightClick = (name: string) => (e: MouseEvent) => {
+    e.preventDefault();
+    const undo = removeCard(name);
+    if (undo) toast(`Removed ${name} from the view panel`, 'info', { label: 'Undo', run: undo });
+  };
+  // Card view: right-click the card picture to remove it. Cards named inside the details (deckmates
+  // and so on) keep their own right-click, which adds them.
+  const onCardViewContextMenu = (e: MouseEvent) => {
+    if (e.defaultPrevented || !current) return;
+    if ((e.target as HTMLElement).closest('.card-modal-image img, .card-modal-image .card-img-missing')) removeByRightClick(current.card.name)(e);
+  };
 
   const cardProps = (p: Pinned) => {
     const c = p.card;
@@ -184,7 +196,8 @@ export function ViewPanel({ deck, board = 'main' }: { deck: Deck; board?: Board 
     return {
       card: c, subject: subjects(c, { deckId: deck.id }), draggable: true,
       onOpen: () => open(c), onTag: () => setTagging(c), onCollect: () => setCollecting(c), onTagClick,
-      onRemove: () => removeCard(c.name),
+      onRemove: () => { removeCard(c.name); },
+      onRightClick: removeByRightClick(c.name),
       badge: n ? <span className="in-deck-badge">{n} {target.short}</span> : null,
       addButton: (
         <button className="quick-add" title={`Add 1 to ${target.full}`} aria-label={`Add ${c.name} to ${target.full}`}
@@ -199,9 +212,10 @@ export function ViewPanel({ deck, board = 'main' }: { deck: Deck; board?: Board 
       className={`panel view-panel ${collapsed ? 'collapsed' : ''} ${pinned ? 'is-pinned' : ''} ${drop.over ? 'drop-on' : ''}`}
       aria-label="View panel" tabIndex={-1} onKeyDown={onKeyDown} {...drop.props}
     >
+      <div className="panel-controls">
       <div className="panel-head">
         <h2>View{pinned && <span className="tab-count" title={`${items.length} pinned`}>{items.length}</span>}</h2>
-        {!collapsed && <span className="muted small view-hint">{pinned ? 'Right-click or drag cards here to add' : 'Right-click a card to show it · pin to keep several'}</span>}
+        {!collapsed && <span className="muted small view-hint">{pinned ? 'Right-click or drag to add · right-click here to remove' :'Right-click a card to show it · pin to keep several'}</span>}
         <span className="panel-head-tools">
           <button
             type="button" className={`icon-btn sm view-tool-btn view-pin-btn ${pinned ? 'on' : ''}`} aria-pressed={pinned}
@@ -210,11 +224,11 @@ export function ViewPanel({ deck, board = 'main' }: { deck: Deck; board?: Board 
             aria-label={pinned ? 'Unpin the view panel' : 'Pin the view panel'}
           ><PinIcon on={pinned} /></button>
           {!collapsed && (
-            <button type="button" className="icon-btn sm view-tool-btn" onClick={() => setViewMode('collapsed')} title="Collapse the view panel" aria-label="Collapse the view panel"><Chevron dir="up" /></button>
+            <button type="button" className="icon-btn sm view-tool-btn" onClick={() => setViewMode('collapsed')} title="Collapse the view panel" aria-label="Collapse the view panel"><Chevron dir="down" /></button>
           )}
           {collapsed && (
             <>
-              <button type="button" className="icon-btn sm view-tool-btn" onClick={() => setViewMode('expanded')} title="Expand the view panel" aria-label="Expand the view panel"><Chevron dir="down" /></button>
+              <button type="button" className="icon-btn sm view-tool-btn" onClick={() => setViewMode('expanded')} title="Expand the view panel" aria-label="Expand the view panel"><Chevron dir="up" /></button>
               <button type="button" className="icon-btn sm view-tool-btn" onClick={() => setViewMode('hidden')} title="Hide the view panel for more room" aria-label="Hide the view panel"><Chevron dir="left" /></button>
             </>
           )}
@@ -237,10 +251,7 @@ export function ViewPanel({ deck, board = 'main' }: { deck: Deck; board?: Board 
           </select>
         </div>
       )}
-
-      {!collapsed && (!pinned || view === 'card') && current && (
-        <>
-          {pinned && (
+      {!collapsed && pinned && view === 'card' && current && (
             <div className="pin-step">
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => step(-1)} disabled={sorted.length < 2} aria-label="Previous pinned card" title="Previous (←)">‹</button>
               <span className="muted small">{index + 1} of {sorted.length}</span>
@@ -248,9 +259,13 @@ export function ViewPanel({ deck, board = 'main' }: { deck: Deck; board?: Board 
               <button type="button" className="btn btn-ghost btn-sm pin-remove" onClick={() => removeCard(current.card.name)}
                 aria-label={`Remove ${current.card.name} from the view panel`} title="Remove this card from the view panel">✕ Remove</button>
             </div>
-          )}
+      )}
+      </div>
+
+      {!collapsed && (!pinned || view === 'card') && current && (
+        <div className="pin-card-view" onContextMenu={onCardViewContextMenu}>
           <CardView key={`${current.card.name}|${current.entryUid ?? ''}`} card={current.card} deckId={deck.id} entryUid={current.entryUid} />
-        </>
+        </div>
       )}
 
       {!collapsed && pinned && view !== 'card' && (

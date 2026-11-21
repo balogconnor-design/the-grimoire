@@ -1,4 +1,4 @@
-import type { DragEvent, ReactNode } from 'react';
+import type { DragEvent, MouseEvent, ReactNode } from 'react';
 import type { Card } from '../types';
 import type { Subject } from '../lib/query';
 import { cardImage, cardPrice, formatUSD } from '../lib/rules';
@@ -8,7 +8,7 @@ import { pinOnRightClick } from '../lib/viewPanel';
 import { TagList, type TagScope } from './TagEditor';
 
 /** A search-result card tile with ownership + tag info and quick actions. */
-export function CardResult({ card, subject, onOpen, onTag, onTagClick, onCollect, addButton, badge, draggable, dim, onRemove }: {
+export function CardResult({ card, subject, onOpen, onTag, onTagClick, onCollect, addButton, badge, draggable, dim, onRemove, onRightClick }: {
   card: Card;
   subject: Subject;
   onOpen: () => void;
@@ -24,6 +24,8 @@ export function CardResult({ card, subject, onOpen, onTag, onTagClick, onCollect
   dim?: boolean;
   /** Shows a remove button (the view panel's pinned cards). */
   onRemove?: () => void;
+  /** Replaces the usual right-click (show in the view panel). */
+  onRightClick?: (e: MouseEvent) => void;
 }) {
   const owned = subject.ownedQty ?? 0;
   const decks = subject.decks ?? [];
@@ -34,7 +36,7 @@ export function CardResult({ card, subject, onOpen, onTag, onTagClick, onCollect
     if (pic) setDragPreview(e.dataTransfer, pic);
   };
   return (
-    <div className={`result-card ${draggable ? 'is-draggable' : ''} ${dim ? 'is-dim' : ''}`} title={dim ? 'Already in this deck' : undefined} onContextMenu={pinOnRightClick(card)}>
+    <div className={`result-card ${draggable ? 'is-draggable' : ''} ${dim ? 'is-dim' : ''}`} title={dim ? 'Already in this deck' : undefined} onContextMenu={onRightClick ?? pinOnRightClick(card)}>
       <div className="result-art" draggable={draggable || undefined} onDragStart={draggable ? onDragStart : undefined}>
         <button className="result-img-btn" onClick={onOpen} title={draggable ? `${card.name} — drag onto the deck list to add it` : card.name}>
           {img ? <img src={img} alt={card.name} loading="lazy" draggable={false} /> : <div className="card-img-missing">{card.name}</div>}

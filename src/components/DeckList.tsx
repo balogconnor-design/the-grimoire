@@ -396,6 +396,8 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
         </div>
       )}
 
+      {/* Pinned to the top of the panel while the cards scroll. */}
+      <div className="panel-controls">
       <div className="board-tabs" role="tablist">
         {(['main', 'side', 'maybe'] as Board[]).map((b) => (
           <button
@@ -407,8 +409,6 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
         ))}
         <span className="board-price">{formatUSD(boardPrice(deck, board))}</span>
       </div>
-
-      {dragOver && <div className="drop-hint">Drop to add to {BOARD_LABEL[dragTab ?? board]}</div>}
 
       <div className="list-toolbar">
         <input
@@ -452,6 +452,9 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
           </button>
         )}
       </div>
+      </div>
+
+      {dragOver && <div className="drop-hint">Drop to add to {BOARD_LABEL[dragTab ?? board]}</div>}
 
       {showBasics && board === 'main' && <BasicLandAdder deck={deck} onDone={() => setShowBasics(false)} />}
 

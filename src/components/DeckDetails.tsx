@@ -83,7 +83,7 @@ export function DeckDetails({ deck, validation, filter, setFilter }: Props) {
       {fmt.hasCommander && <CombosPanel deck={deck} />}
       {fmt.hasCommander && <EdhrecPanel deck={deck} />}
 
-      <Collapsible id="price" title="Price" defaultOpen={false} closedMeta={<b className="meta-strong">{formatUSD(boardPrice(deck, 'main'))}</b>}
+      <Collapsible title="Price" defaultOpen={false} closedMeta={<b className="meta-strong">{formatUSD(boardPrice(deck, 'main'))}</b>}
         right={<button className="link-btn small" onClick={doRefresh} disabled={refreshing}>{refreshing ? 'Refreshing…' : '↻ Refresh'}</button>}>
         <div className="price-total">{formatUSD(boardPrice(deck, 'main'))}</div>
         <div className="muted small">
