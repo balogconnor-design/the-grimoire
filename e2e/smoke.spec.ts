@@ -867,3 +867,58 @@ test('help page opens from the top bar and shows the version', async ({ page }) 
   await expect(page.getByRole('link', { name: 'Open an issue on GitHub' })).toHaveAttribute('href', /github\.com\/balogconnor-design\/the-grimoire\/issues/);
   expect(errors).toEqual([]);
 });
+
+test('deck history: changelog, snapshots, compare and restore', async ({ page, isMobile }) => {
+  const errors = watchErrors(page);
+  await open(page);
+  await createDeck(page, 'History Test');
+  if (isMobile) await page.locator('.mobile-tabs .tab', { hasText: 'Search' }).click();
+  const search = page.locator('.search-panel');
+  await search.locator('.search-input').fill('sol ring');
+  await search.locator('.search-input').press('Enter');
+  const result = search.locator('.result-card').first();
+  await expect(result).toContainText('Sol Ring');
+  await result.hover();
+  await result.getByRole('button', { name: 'Add Sol Ring to main deck' }).click();
+
+  // The add is in the changelog.
+  await page.getByRole('button', { name: 'History' }).click();
+  const modal = page.locator('.modal');
+  await expect(modal.locator('.history-session')).toContainText('+1 Sol Ring');
+
+  // Save a snapshot.
+  await modal.locator('.tab', { hasText: 'Snapshots' }).click();
+  await modal.getByLabel('Snapshot name').fill('v1');
+  await modal.getByRole('button', { name: 'Save snapshot' }).click();
+  await expect(modal.locator('.snapshot-row')).toContainText('v1');
+  if (!isMobile) await page.screenshot({ path: 'test-results/history-snapshots.png' });
+  await modal.getByRole('button', { name: 'Close' }).click();
+
+  // Change the deck: a second copy of Sol Ring goes to the sideboard.
+  if (isMobile) await page.locator('.mobile-tabs .tab', { hasText: 'Deck' }).click();
+  await page.locator('.board-tabs .tab', { hasText: 'Sideboard' }).click();
+  if (isMobile) await page.locator('.mobile-tabs .tab', { hasText: 'Search' }).click();
+  await result.hover();
+  await result.getByRole('button', { name: 'Add Sol Ring to sideboard' }).click();
+
+  // Compare the deck now (A) with the snapshot (B).
+  await page.getByRole('button', { name: 'Compare' }).click();
+  await expect(page.getByLabel('Deck B')).toHaveValue(/^snap:/);
+  await modal.getByRole('radio', { name: 'Sideboard' }).click();
+  await expect(modal.locator('.compare-a')).toContainText('Sol Ring');
+  if (!isMobile) await page.screenshot({ path: 'test-results/compare.png' });
+  await modal.getByRole('button', { name: 'Close' }).click();
+
+  // Restore the snapshot: the sideboard copy is gone, and the current cards were saved first.
+  await page.getByRole('button', { name: 'History' }).click();
+  await modal.locator('.tab', { hasText: 'Snapshots' }).click();
+  await modal.locator('.snapshot-row', { hasText: 'v1' }).getByRole('button', { name: 'Restore' }).click();
+  await modal.locator('.snapshot-row', { hasText: 'v1' }).getByRole('button', { name: 'Restore' }).click();
+  await expect(modal.locator('.snapshot-row')).toHaveCount(2);
+  await modal.locator('.tab', { hasText: 'Changes' }).click();
+  await expect(modal.locator('.history-session').first()).toContainText('Restored snapshot “v1”');
+  await modal.getByRole('button', { name: 'Close' }).click();
+  if (isMobile) await page.locator('.mobile-tabs .tab', { hasText: 'Deck' }).click();
+  await expect(page.locator('.board-tabs .tab', { hasText: 'Sideboard' }).locator('.tab-count')).toHaveText('0');
+  expect(errors).toEqual([]);
+});

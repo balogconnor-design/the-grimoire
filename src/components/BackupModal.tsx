@@ -168,7 +168,7 @@ export function BackupModal({ items: only, selectedCount, initialTab = 'export',
               <ul>
                 <li>{pending.summary.decks} decks</li>
                 <li>{pending.summary.collection} collection lots ({pending.summary.copies} cards)</li>
-                <li>{pending.summary.watchlist} watchlist · {pending.summary.sales} transactions · {pending.summary.ownedDecks} purchased decks · {pending.summary.searches} saved searches · {pending.summary.globalTags} globally tagged cards</li>
+                <li>{pending.summary.watchlist} watchlist · {pending.summary.sales} transactions · {pending.summary.ownedDecks} purchased decks · {pending.summary.searches} saved searches · {pending.summary.globalTags} globally tagged cards · {pending.summary.deckSnapshots} deck snapshots</li>
                 <li>{pending.summary.prices} days of price history</li>
               </ul>
               <DroppedNotice summary={pending.summary} />
@@ -189,6 +189,7 @@ const DROPPED_LABEL: [keyof BackupSummary['dropped'], string][] = [
   ['decks', 'decks'], ['deckCards', 'deck cards'], ['collection', 'collection lots'], ['watchlist', 'watchlist items'],
   ['sales', 'transactions'], ['prices', 'price-history days'], ['searches', 'saved searches'], ['ownedDecks', 'purchased decks'],
   ['globalTags', 'global tags'],
+  ['deckSnapshots', 'deck snapshots'],
 ];
 
 /** Which records were left out of the restore because they were incomplete or invalid. */

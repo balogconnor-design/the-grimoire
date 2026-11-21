@@ -1,11 +1,12 @@
 import { openDB, type IDBPDatabase, type IDBPTransaction } from 'idb';
 import { useSyncExternalStore } from 'react';
-import type { CollectionItem, Deck, GlobalCardTags, PriceSnapshot, PurchasedDeck, SaleRecord, SavedSearch, WatchItem } from '../types';
+import { recordChanges } from './deckHistory';
+import type { CollectionItem, Deck, DeckSnapshot, GlobalCardTags, PriceSnapshot, PurchasedDeck, SaleRecord, SavedSearch, WatchItem } from '../types';
 
 // Internal name: renaming it makes existing data unreadable. Keep "deckforge".
 const DB_NAME = 'deckforge';
-const DB_VERSION = 4;
-export const STORES = ['decks', 'collection', 'watchlist', 'sales', 'prices', 'searches', 'owneddecks', 'cardtags', 'meta'] as const;
+const DB_VERSION = 5;
+export const STORES = ['decks', 'collection', 'watchlist', 'sales', 'prices', 'searches', 'owneddecks', 'cardtags', 'decksnaps', 'meta'] as const;
 export type StoreName = (typeof STORES)[number];
 
 type UpgradeStep = (d: IDBPDatabase) => void;
@@ -19,7 +20,7 @@ const ensureStores: UpgradeStep = (d) => {
 
 /**
  * Schema upgrade steps, keyed by the version they upgrade TO. Opening runs every step after the
- * stored version, in order. v1 had only 'decks'; v2/v3 added the rest; v4 added 'cardtags' (global tags). Add a step here (and bump
+ * stored version, in order. v1 had only 'decks'; v2/v3 added the rest; v4 added 'cardtags' (global tags); v5 added 'decksnaps' (deck snapshots). Add a step here (and bump
  * DB_VERSION) only when the schema itself changes.
  */
 export const UPGRADES: Record<number, UpgradeStep> = {
@@ -27,6 +28,7 @@ export const UPGRADES: Record<number, UpgradeStep> = {
   2: ensureStores,
   3: ensureStores,
   4: ensureStores,
+  5: ensureStores,
 };
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
@@ -188,7 +190,10 @@ export const ownedDecksT = createTable<PurchasedDeck>('owneddecks', (a, b) => (b
 /** Global card tags, keyed by card name (not tied to a deck or an owned copy). */
 export const globalTagsT = createTable<GlobalCardTags>('cardtags', (a, b) => a.id.localeCompare(b.id));
 
-export const TABLES = [decksT, collectionT, watchT, salesT, pricesT, searchesT, ownedDecksT, globalTagsT];
+/** Saved copies of decks (newest first). Kept apart from the deck so everyday deck saves stay small. */
+export const snapshotsT = createTable<DeckSnapshot>('decksnaps', (a, b) => b.createdAt - a.createdAt);
+
+export const TABLES = [decksT, collectionT, watchT, salesT, pricesT, searchesT, ownedDecksT, globalTagsT, snapshotsT];
 
 // ---------- Settings (meta store, key/value) ----------
 
@@ -353,7 +358,12 @@ export function useDecks(): { decks: Deck[]; loaded: boolean } {
 }
 export const useDeck = (id: string | undefined) => decksT.useOne(id);
 export const getDeck = (id: string) => decksT.get(id);
-export const saveDeck = (deck: Deck) => decksT.put(deck);
+/**
+ * Save a deck. Card and commander changes since the stored version are added to its changelog
+ * (a note starts a session of its own, e.g. "Restored snapshot ...").
+ */
+export const saveDeck = (deck: Deck, opts: { note?: string } = {}) =>
+  decksT.put({ ...deck, changelog: recordChanges(getDeck(deck.id), deck, opts) });
 
 /** Immutable update helper: fn receives a draft copy of the deck. */
 export function updateDeck(id: string, fn: (d: Deck) => Deck | void) {
@@ -364,10 +374,11 @@ export function updateDeck(id: string, fn: (d: Deck) => Deck | void) {
   saveDeck(result).catch(() => undefined); // failure already reported + reloaded
 }
 
-/** Delete a deck and release the collection copies committed to it, in one transaction. */
+/** Delete a deck and its snapshots, and release the collection copies committed to it, in one transaction. */
 export async function deleteDeck(id: string) {
-  await transact(['decks', 'collection'], async (tx) => {
+  await transact(['decks', 'collection', 'decksnaps'], async (tx) => {
     tx.delete('decks', id);
+    for (const s of await tx.getAll<DeckSnapshot>('decksnaps')) if (s.deckId === id) tx.delete('decksnaps', s.id);
     for (const i of await tx.getAll<CollectionItem>('collection')) {
       if (!i.allocations?.[id]) continue;
       const allocations = { ...i.allocations };

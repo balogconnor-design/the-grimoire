@@ -17,6 +17,7 @@ import { navigate } from '../lib/router';
 import { clearPendingImport, onCardSearchRequest, peekPendingImport, requestCardSearch } from '../lib/searchBus';
 import { Modal } from '../components/Modal';
 import { ImportResultView } from '../components/ImportResult';
+import { CompareModal, DeckHistoryModal } from '../components/DeckHistory';
 
 const DAY = 24 * 60 * 60 * 1000;
 type MobileTab = 'search' | 'deck' | 'details';
@@ -28,6 +29,9 @@ export function DeckPage({ id }: { id: string }) {
   const [board, setBoard] = useState<Board>('main');
   const [ie, setIe] = useState<'import' | 'export' | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [history, setHistory] = useState(false);
+  // Compare window: open with an optional starting B side ('snap:<id>' / 'deck:<id>').
+  const [compare, setCompare] = useState<{ initial?: string } | null>(null);
   const [mobileTab, setMobileTab] = useState<MobileTab>('deck');
   // Card Search can be hidden to give the deck list and Metrics more room (remembered in this browser).
   const [searchMode, setSearchModeState] = useState<SearchMode>(() => {
@@ -116,6 +120,8 @@ export function DeckPage({ id }: { id: string }) {
           <span className={`legal-dot ${validation.legal ? 'ok' : 'bad'}`} title={validation.legal ? 'Deck is legal' : 'Deck has issues — see Metrics'} />
         </div>
         <div className="header-actions">
+          <button className="btn btn-sm" onClick={() => setHistory(true)} title="Changelog and snapshots">History</button>
+          <button className="btn btn-sm" onClick={() => setCompare({})} title="Compare with a snapshot or another deck">Compare</button>
           <button className="btn btn-sm" onClick={() => setIe('import')}>Import</button>
           <button className="btn btn-sm" onClick={() => setIe('export')}>Export</button>
           {confirmDelete ? (
@@ -158,6 +164,8 @@ export function DeckPage({ id }: { id: string }) {
         <div className="col col-details"><DeckDetails deck={deck} validation={validation} filter={filter} setFilter={setFilterAndShow} /></div>
       </div>
 
+      {history && <DeckHistoryModal deck={deck} onClose={() => setHistory(false)} onCompare={(snapId) => { setHistory(false); setCompare({ initial: `snap:${snapId}` }); }} />}
+      {compare && <CompareModal deck={deck} initial={compare.initial} onClose={() => setCompare(null)} />}
       {ie && <ImportExportModal deck={deck} initialTab={ie} onClose={() => setIe(null)} />}
       {imported && imported.missing.length > 0 && (
         <Modal onClose={closeImported} title="Import result">
