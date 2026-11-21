@@ -140,7 +140,7 @@ test('draw odds panel shows and updates the chance per card type', async ({ page
   await expect(artifact).toContainText('100%');
   await odds.getByLabel('At least this many').selectOption('2');
   await expect(artifact).toContainText('0%');
-  await odds.getByLabel('By card').selectOption('10');
+  await odds.getByLabel('In first cards').selectOption('10');
   await expect(odds).toContainText('= turn 4');
   await odds.getByLabel('On the draw').check();
   await expect(odds).toContainText('= turn 3');

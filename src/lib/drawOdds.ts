@@ -1,5 +1,5 @@
 import type { Deck, DeckEntry } from '../types';
-import { commanderEntry, TYPE_ORDER, typeCategory } from './rules';
+import { commanderEntry, isLand, isMdfcLand, landManaColors, TYPE_ORDER, typeCategory } from './rules';
 import { entryTags, type TagSources } from './deckTags';
 
 /** Natural log of n!, summed directly (n stays small: a deck is at most a few hundred cards). */
@@ -35,7 +35,7 @@ export function cardsSeen(turn: number, onDraw: boolean): number {
 }
 
 export interface OddsGroup {
-  kind: 'type' | 'tag';
+  kind: 'type' | 'tag' | 'color';
   key: string;
   count: number;
 }
@@ -45,12 +45,17 @@ export interface OddsGroup {
  * and how many copies of each card type and tag it holds. Types follow the Card types panel
  * (one primary type per card); tags count every tag a card has (yours and Scryfall's), most first.
  */
-export function oddsGroups(deck: Deck, src: TagSources): { library: number; types: OddsGroup[]; tags: OddsGroup[] } {
+export function oddsGroups(deck: Deck, src: TagSources): { library: number; types: OddsGroup[]; tags: OddsGroup[]; colors: OddsGroup[] } {
   const cmd = commanderEntry(deck)?.uid;
   const lib: DeckEntry[] = deck.entries.filter((e) => e.board === 'main' && e.uid !== cmd);
   const types = new Map<string, number>();
   const tags = new Map<string, number>();
+  const colors = new Map<string, number>();
   for (const e of lib) {
+    // A land (or a spell // land card) that can make a colour is a source of it; a dual counts for each colour.
+    if (isLand(e.card) || isMdfcLand(e.card)) {
+      for (const c of landManaColors(e.card)) if ('WUBRG'.includes(c)) colors.set(c, (colors.get(c) ?? 0) + e.qty);
+    }
     const t = typeCategory(e.card);
     types.set(t, (types.get(t) ?? 0) + e.qty);
     for (const tag of entryTags(e, src).all) tags.set(tag, (tags.get(tag) ?? 0) + e.qty);
@@ -60,6 +65,7 @@ export function oddsGroups(deck: Deck, src: TagSources): { library: number; type
     types: TYPE_ORDER.filter((t) => types.has(t)).map((t) => ({ kind: 'type' as const, key: t, count: types.get(t)! })),
     tags: [...tags].map(([key, count]) => ({ kind: 'tag' as const, key, count }))
       .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key)),
+    colors: [...'WUBRG'].filter((c) => colors.has(c)).map((c) => ({ kind: 'color' as const, key: c, count: colors.get(c)! })),
   };
 }
 

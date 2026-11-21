@@ -544,15 +544,21 @@ function DrawOdds({ deck, filter, setFilter }: ChartProps) {
 
   const row = (r: OddsGroup) => {
     const p = atLeast(g.library, r.count, seen, prefs.min);
-    const active = r.kind === 'type' ? filter.type === r.key : filter.text === tagQuery(r.key);
+    const active = r.kind === 'type' ? filter.type === r.key : r.kind === 'color' ? filter.color === r.key && filter.type === 'Land' : filter.text === tagQuery(r.key);
     const toggle = () => setFilter(r.kind === 'type'
       ? { ...filter, type: active ? undefined : (r.key as TypeCategory) }
-      : { ...filter, text: active ? undefined : tagQuery(r.key) });
+      : r.kind === 'color'
+        ? { ...filter, type: active ? undefined : 'Land', color: active ? undefined : r.key }
+        : { ...filter, text: active ? undefined : tagQuery(r.key) });
+    const label = r.kind === 'tag' ? `#${r.key}`
+      : r.kind === 'color' ? <span className="odds-color">↳ <ManaSymbol symbol={r.key} size={13} /> {COLOR_NAMES[r.key]} source</span> : r.key;
     return (
-      <tr key={`${r.kind}:${r.key}`} className={`clickable ${active ? 'active' : ''}`} onClick={toggle} tabIndex={0}
+      <tr key={`${r.kind}:${r.key}`} className={`clickable ${active ? 'active' : ''} ${r.kind === 'color' ? 'odds-sub' : ''}`} onClick={toggle} tabIndex={0}
         onKeyDown={(e) => e.key === 'Enter' && toggle()}
-        title={`${r.count} of ${g.library} cards · at least ${prefs.min} in ${seen} cards: ${(p * 100).toFixed(1)}%`}>
-        <td><span className="truncate">{r.kind === 'tag' ? `#${r.key}` : r.key}</span></td>
+        title={r.kind === 'color'
+          ? `${r.count} lands make ${COLOR_NAMES[r.key]} · chance of at least ${prefs.min} in your first ${seen} cards: ${(p * 100).toFixed(1)}%`
+          : `${r.count} of ${g.library} cards · at least ${prefs.min} in your first ${seen} cards: ${(p * 100).toFixed(1)}%`}>
+        <td><span className="truncate">{label}</span></td>
         <td>{r.count}</td>
         <td>
           <div className="pct-cell">
@@ -580,19 +586,20 @@ function DrawOdds({ deck, filter, setFilter }: ChartProps) {
                 {[1, 2, 3, 4].map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
             </label>
-            <label>by card{' '}
-              <select className="input input-sm" value={seen} onChange={(e) => setPrefs({ seen: Number(e.target.value) })} aria-label="By card">
+            <label>in first{' '}
+              <select className="input input-sm" value={seen} onChange={(e) => setPrefs({ seen: Number(e.target.value) })} aria-label="In first cards">
                 {Array.from({ length: SEEN_MAX - SEEN_MIN + 1 }, (_, i) => SEEN_MIN + i).map((n) => <option key={n} value={n}>{n}</option>)}
               </select>
+              {' '}cards
             </label>
             <label className="odds-draw">
               <input type="checkbox" checked={prefs.onDraw} onChange={(e) => setPrefs({ onDraw: e.target.checked })} /> On the draw
             </label>
-            <span className="muted">= {turnHint(seen, prefs.onDraw)}</span>
+            {seen > SEEN_MIN && <span className="muted">= {turnHint(seen, prefs.onDraw)}</span>}
           </div>
           <table className="color-table odds-table">
             <thead><tr><th>Type</th><th title="Copies in the library">Cards</th><th title={`Chance of at least ${prefs.min} in ${seen} cards`}>Chance</th></tr></thead>
-            <tbody>{g.types.map(row)}</tbody>
+            <tbody>{g.types.flatMap((t) => (t.key === 'Land' ? [row(t), ...g.colors.map(row)] : [row(t)]))}</tbody>
           </table>
           {g.tags.length > 0 && (
             <table className="color-table odds-table">
@@ -608,9 +615,9 @@ function DrawOdds({ deck, filter, setFilter }: ChartProps) {
         </>
       )}
       <div className="muted tiny">
-        Chance of at least {prefs.min} card{prefs.min === 1 ? '' : 's'} of each kind among the first {seen} cards you see
-        {' '}(a 7-card hand, then one draw a turn; no draw on turn 1 on the play).
-        {' '}{commanderEntry(deck) ? 'The commander isn’t in the library. ' : ''}Ignores mulligans, tutors and extra draws. A card counts under each of its tags. Click a row to filter the deck list.
+        Chance of drawing at least {prefs.min} of each kind in your first {seen} cards (your 7-card hand, then one draw a turn).
+        {' '}Colour rows are the chance of a land that makes that colour; dual lands count for each colour, so the colours overlap and don’t add up to the Land row.
+        {' '}{commanderEntry(deck) ? 'The commander isn’t in the library. ' : ''}Mulligans and extra draws aren’t counted. Click a row to filter the deck list.
       </div>
     </div>
   );
