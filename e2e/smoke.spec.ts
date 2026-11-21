@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { mockScryfall } from './scryfall';
+import { mockScryfall, SOL_RING } from './scryfall';
 
 // Errors the app logs or throws fail the test (Scryfall is mocked, so there's no network noise).
 function watchErrors(page: Page) {
@@ -195,6 +195,64 @@ test('EDHREC stays off until turned on, then shows salt scores', async ({ page, 
   await expect(panel.locator('.edhrec-salty')).toContainText('1.59');
   await expect(panel).toContainText('Choose a commander');
   expect(edhrec).toEqual(['https://json.edhrec.com/pages/top/salt-1.json']);
+  expect(errors).toEqual([]);
+});
+
+test('EDHREC suggestions open the card view and drag into the deck', async ({ page, isMobile, browserName }) => {
+  test.skip(!!isMobile, 'phones show the details panel on its own tab');
+  // Wide enough for the three-column layout, so the deck list and EDHREC panel are both on screen while dragging.
+  await page.setViewportSize({ width: 1600, height: 1000 });
+  const errors = watchErrors(page);
+  await open(page);
+  // Later routes win: a legendary commander for searches, a suggested card for lookups, and EDHREC.
+  const atraxa = { ...SOL_RING, id: 'atraxa-test', name: "Atraxa, Praetors' Voice", type_line: 'Legendary Creature — Phyrexian Angel Horror', mana_cost: '{G}{W}{U}{B}', cmc: 4 };
+  const skate = { ...SOL_RING, id: 'skate-test', name: 'Deepglow Skate', type_line: 'Creature — Fish', mana_cost: '{4}{U}', cmc: 5 };
+  await page.route('https://api.scryfall.com/cards/search?**', (route) => {
+    if (new URL(route.request().url()).searchParams.get('format') === 'csv') return route.fallback();
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ object: 'list', total_cards: 1, has_more: false, data: [atraxa] }) });
+  });
+  await page.route('https://api.scryfall.com/cards/collection', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ object: 'list', data: [skate], not_found: [] }) }));
+  await page.route('https://json.edhrec.com/**', (route) => {
+    const url = route.request().url();
+    const body = url.includes('/commanders/')
+      ? { container: { json_dict: { card: { num_decks: 46414 }, cardlists: [{ header: 'Creatures', cardviews: [{ name: 'Deepglow Skate', num_decks: 300, potential_decks: 1000, synergy: 0.25 }] }] } } }
+      : { container: { json_dict: { cardlists: [{ header: '', cardviews: [{ name: "Atraxa, Praetors' Voice", salt: 1.72 }] }] } } };
+    return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
+  });
+
+  await createDeck(page, 'Suggest Test');
+  const search = page.locator('.search-panel');
+  await search.locator('.search-input').fill('atraxa');
+  await search.locator('.search-input').press('Enter');
+  const result = search.locator('.result-card').first();
+  await result.hover();
+  await result.getByRole('button', { name: "Add Atraxa, Praetors' Voice to main deck" }).click();
+  await page.locator('.deck-groups').getByText("Atraxa, Praetors' Voice").first().hover();
+  await page.locator('.deck-groups').getByTitle('Set as commander').click();
+
+  const panel = page.locator('.edhrec-panel');
+  await panel.getByRole('button', { name: 'Turn on EDHREC' }).click();
+  const row = panel.locator('.edhrec-table tr', { hasText: 'Deepglow Skate' });
+  const handle = row.locator('.edhrec-drag');
+  await expect(handle).toHaveAttribute('draggable', 'true'); // Scryfall data loaded
+
+  // Click opens the card view; the salt list opens deck cards too.
+  await row.click();
+  await expect(page.locator('.modal')).toContainText('Deepglow Skate');
+  await page.locator('.modal-close').click();
+  await panel.locator('.edhrec-salty').getByRole('button', { name: /Atraxa/ }).click();
+  await expect(page.locator('.modal')).toContainText('Atraxa');
+  await page.locator('.modal-close').click();
+
+  if (browserName === 'chromium') await panel.screenshot({ path: 'test-results/edhrec-panel.png' });
+
+  // Drag onto the deck list adds it (Playwright can't drive HTML drag and drop in WebKit on Windows/Linux).
+  if (browserName !== 'webkit') {
+    await handle.dragTo(page.locator('.deck-groups'));
+    await expect(page.locator('.board-tabs .tab', { hasText: 'Main' }).locator('.tab-count')).toHaveText('2');
+    await expect(panel).toContainText('You already run every card EDHREC lists');
+  }
   expect(errors).toEqual([]);
 });
 

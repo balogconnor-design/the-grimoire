@@ -552,8 +552,21 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 .bracket-group-head { padding: 0; }
 .bracket-group-head.active { text-decoration: underline; }
 .bracket-cards { color: var(--text-2, var(--muted)); line-height: 1.5; }
-.edhrec-salt, .edhrec-suggest { margin-bottom: 10px; }
-.edhrec-salt .section-head, .edhrec-suggest .section-head { margin-bottom: 4px; }
+.edhrec-block { margin-bottom: 14px; }
+/* Sub-headings inside the EDHREC panel: an accent bar and rule so they read apart from the card rows. */
+.edhrec-subhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 6px; padding: 0 0 5px 9px; border-left: 3px solid var(--accent); border-bottom: 1px solid var(--border); }
+.edhrec-subhead-title { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); }
+.edhrec-stats { display: inline-flex; gap: 6px; }
+.edhrec-stat { font-size: 0.74rem; color: var(--muted); background: var(--bg-2); border-radius: 999px; padding: 1px 8px; font-variant-numeric: tabular-nums; }
+.edhrec-stat b { color: var(--text); font-weight: 700; }
+.edhrec-salty { list-style: none; margin: 0; padding: 0; font-size: 0.86rem; display: flex; flex-direction: column; }
+.edhrec-salty li { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.edhrec-card-btn { flex: 1; min-width: 0; text-align: left; background: none; border: 0; padding: 3px 4px; margin-left: -4px; color: inherit; font: inherit; border-radius: 4px; cursor: pointer; }
+.edhrec-card-btn:hover, .edhrec-card-btn:focus-visible { background: var(--bg-2); color: var(--text); }
+.edhrec-card-btn .truncate { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.edhrec-salt-score { font-variant-numeric: tabular-nums; color: var(--muted); }
+.edhrec-drag.is-draggable { cursor: grab; }
 .edhrec-table { table-layout: fixed; margin-bottom: 6px; }
 .edhrec-table th:nth-child(2), .edhrec-table td:nth-child(2) { width: 52px; }
 .edhrec-table th:nth-child(3), .edhrec-table td:nth-child(3) { width: 62px; }
