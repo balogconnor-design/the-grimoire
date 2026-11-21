@@ -489,6 +489,9 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 /* ---------- Deck list ---------- */
 .commander-showcase { position: relative; border-radius: var(--radius); overflow: hidden; margin-bottom: 12px; min-height: 150px; border: 1px solid var(--gold); background: var(--gold-soft); }
 .commander-showcase.empty { border-style: dashed; min-height: 0; }
+.commander-showcase.cmd-drop-ok { outline: 1px dashed var(--gold); outline-offset: 2px; }
+.commander-showcase.cmd-drop-hover { outline: 2px solid var(--gold); outline-offset: 2px; }
+.cmd-drop-hint { position: absolute; inset: 0; z-index: 2; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.55); color: #f2c662; font-weight: 750; pointer-events: none; }
 .commander-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 25%; }
 .commander-overlay { position: relative; padding: 14px 16px; min-height: 150px; display: flex; flex-direction: column; justify-content: flex-end; gap: 4px; background: linear-gradient(180deg, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.82) 75%); color: #fff; }
 .commander-label { font-size: var(--fs-tiny); font-weight: 750; letter-spacing: 0.08em; text-transform: uppercase; color: var(--gold); }
@@ -905,6 +908,7 @@ button.tag.tag-sm { font-size: var(--fs-tiny); }
 .collection-panel .section-head { margin: 0; }
 .card-tags-panel { padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: 8px; }
 .card-tags-panel .section-head { margin: 0; }
+.card-tags-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .deckmates { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border); padding-top: 8px; }
 .deckmate-row { display: flex; flex-direction: column; gap: 4px; }
 .deckmate-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
@@ -1059,6 +1063,9 @@ button.alert-row:hover { background: var(--panel-2); }
 .group-tags-list .scryfall-name { color: var(--tag-scryfall); }
 .group-tags-list .count { color: var(--muted); font-variant-numeric: tabular-nums; }
 .group-tags-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.stag-toggle { display: flex; gap: 8px; align-items: center; margin: 4px 0 12px; cursor: pointer; }
+.stag-settings .stag-off { opacity: 0.5; }
+.stag-settings .scryfall-name { color: var(--tag-scryfall); }
 .group-by { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-small); white-space: nowrap; }
 .row-actions { display: flex; gap: 4px; align-items: center; justify-content: flex-end; white-space: nowrap; }
 

@@ -70,12 +70,13 @@ export function SearchPanel({ deck, board = 'main', mode = 'expanded', onMode }:
   const subjects = useSubjects();
   const subjectFor = (c: Card) => subjects(c, { deckId: deck.id });
 
-  const constraints = useMemo(() => {
+  const constraintsFor = (withIdentity: boolean, legal: boolean) => {
     const c: string[] = [];
-    if (useIdentity && identity) c.push(identity.length ? `id<=${identity.join('').toLowerCase()}` : 'id:c');
-    if (useLegal && fmt.searchKey) c.push(`f:${fmt.searchKey}`);
+    if (withIdentity && identity) c.push(identity.length ? `id<=${identity.join('').toLowerCase()}` : 'id:c');
+    if (legal && fmt.searchKey) c.push(`f:${fmt.searchKey}`);
     return c.join(' ');
-  }, [useIdentity, identity, useLegal, fmt.searchKey]);
+  };
+  const constraints = constraintsFor(useIdentity, useLegal);
 
   const userQuery = [query.trim(), buildAdvanced(adv)].filter(Boolean).join(' ');
   const fullQuery = [userQuery, favOnly ? 'is:fav' : '', constraints].filter(Boolean).join(' ');
@@ -88,10 +89,13 @@ export function SearchPanel({ deck, board = 'main', mode = 'expanded', onMode }:
   // Cards already in the deck (any board) are shown greyed out rather than hidden.
   const inAnyBoard = useMemo(() => new Set(deck.entries.map((e) => e.card.name)), [deck.entries]);
 
+  /** The search on screen, so it can run again when the commander or the Identity / Legal filters change. */
+  const lastRun = useRef<{ base: string; fav: boolean; sortBy: SortOrder; commanderSearch?: boolean } | null>(null);
   const run = async (base = userQuery, extra = constraints, fav = favOnly, sortBy: SortOrder = order) => {
     expand();
     const q = [base.trim(), fav ? 'is:fav' : ''].filter(Boolean).join(' ');
     if (!q && !extra.trim()) return;
+    lastRun.current = { base, fav, sortBy };
     setShowTags(false);
     setLoading(true);
     setError('');
@@ -132,8 +136,43 @@ export function SearchPanel({ deck, board = 'main', mode = 'expanded', onMode }:
 
   const findCommander = () => {
     setQuery('is:commander');
-    void run('is:commander', fmt.searchKey && useLegal ? `f:${fmt.searchKey}` : '');
+    void run('is:commander', constraintsFor(false, useLegal));
+    if (lastRun.current) lastRun.current.commanderSearch = true;
   };
+
+  /** Run the search on screen again with these filters (nothing happens before a first search). */
+  const rerun = (withIdentity: boolean, legal: boolean) => {
+    const last = lastRun.current;
+    if (!last) return;
+    void run(last.base, last.commanderSearch ? constraintsFor(false, legal) : constraintsFor(withIdentity, legal), last.fav, last.sortBy);
+    if (last.commanderSearch && lastRun.current) lastRun.current.commanderSearch = true;
+  };
+  const toggleIdentity = (on: boolean) => { setUseIdentity(on); rerun(on, useLegal); };
+  const toggleLegal = (on: boolean) => { setUseLegal(on); rerun(useIdentity, on); };
+
+  // A new commander (from ★, drag and drop or Set as Commander) applies its color identity straight away:
+  // the Identity filter turns on and the search on screen runs again. After "Find a commander" the
+  // commander list has done its job, so it is cleared instead.
+  const identityKey = identity ? identity.join('') || 'C' : '';
+  const prevIdentity = useRef(identityKey);
+  const rerunRef = useRef(rerun);
+  rerunRef.current = rerun;
+  useEffect(() => {
+    if (prevIdentity.current === identityKey) return;
+    prevIdentity.current = identityKey;
+    if (!identityKey) return;
+    setUseIdentity(true);
+    if (lastRun.current?.commanderSearch) {
+      lastRun.current = null;
+      setQuery('');
+      setResults([]);
+      setTotal(null);
+      setNext(undefined);
+      setWarnings([]);
+      return;
+    }
+    rerunRef.current(true, useLegal);
+  }, [identityKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const popular = (kind: keyof typeof POPULAR) => {
     const q = POPULAR[kind].query;
@@ -223,13 +262,13 @@ export function SearchPanel({ deck, board = 'main', mode = 'expanded', onMode }:
           >★ Favorites</button>
           {fmt.hasCommander && identity && (
             <label className={`chip ${useIdentity ? 'chip-on' : ''}`}>
-              <input type="checkbox" checked={useIdentity} onChange={(e) => setUseIdentity(e.target.checked)} />
+              <input type="checkbox" checked={useIdentity} onChange={(e) => toggleIdentity(e.target.checked)} />
               Identity <ColorPips colors={identity} size={13} />
             </label>
           )}
           {fmt.searchKey && (
             <label className={`chip ${useLegal ? 'chip-on' : ''}`}>
-              <input type="checkbox" checked={useLegal} onChange={(e) => setUseLegal(e.target.checked)} />
+              <input type="checkbox" checked={useLegal} onChange={(e) => toggleLegal(e.target.checked)} />
               Legal in {fmt.name.replace(' (EDH)', '')}
             </label>
           )}

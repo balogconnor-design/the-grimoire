@@ -205,6 +205,10 @@ export interface Settings {
   lastCollectionRefresh?: number;
   /** Opt-in: fetch public EDHREC data (salt scores, commander suggestions). Off by default. */
   edhrec?: boolean;
+  /** Opt-in: use Scryfall oracle tags (◆ ramp, removal…) on cards. Off by default. */
+  scryfallTags?: boolean;
+  /** Scryfall tag labels hidden one by one (kept while the tags are off). */
+  hiddenScryfallTags?: string[];
   /** Existing lots were written into the transaction ledger as "bought" rows. */
   ledgerBackfilled?: boolean;
 }
@@ -246,6 +250,8 @@ export async function replaceSettings(next: Partial<Settings>) {
 }
 
 const subscribeSettings = (l: () => void) => { settingsListeners.add(l); return () => settingsListeners.delete(l); };
+/** Call `l` whenever the settings change (including when they are first loaded). Returns an unsubscribe. */
+export const onSettingsChange = (l: () => void) => { settingsListeners.add(l); return () => { settingsListeners.delete(l); }; };
 
 export function useSettings(): Settings {
   return useSyncExternalStore(subscribeSettings, () => settings);

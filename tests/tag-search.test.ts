@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { liftScryfallTags } from '../src/lib/query';
-import { scryfallOtagFor } from '../src/lib/scryfallTags';
+import { scryfallOtagFor, setScryfallTagVisibilityForTests } from '../src/lib/scryfallTags';
 import { appendResults } from '../src/lib/search';
 import { card } from './helpers';
 
 const lift = (q: string) => liftScryfallTags(q, scryfallOtagFor);
+
+// Scryfall tags are opt-in; these tests are about how they work once turned on.
+beforeEach(() => setScryfallTagVisibilityForTests({ scryfallTags: true }));
 
 describe('Scryfall tags in the main search', () => {
   it('sends #tag, tag: and stag: for Scryfall tags to Scryfall as otag:', () => {

@@ -17,7 +17,8 @@ import { AddToCollectionModal, ItemModal, WatchModal } from './CollectionModals'
 import { TagModal, type TagContext } from './TagModal';
 import { PLBadge } from './Money';
 import { Tag, TagList } from './TagEditor';
-import { useScryfallTags } from '../lib/scryfallTags';
+import { useScryfallTags, useScryfallTagVisibility } from '../lib/scryfallTags';
+import { ManageScryfallTags } from './ScryfallTagSettings';
 import { deckmatesByTag, mainGroup } from '../lib/deckTags';
 import { setMainTag } from '../lib/actions';
 import { pinCard, useCanPin } from '../lib/viewPanel';
@@ -105,6 +106,7 @@ function CardModalBody({ card: initial, deckId, entryUid, onClose, onNavigate, s
   // Tags: this deck's card tags, global tags, then automatic Scryfall tags.
   const globalTags = useGlobalTags();
   const stags = useScryfallTags();
+  const stagsOn = useScryfallTagVisibility().on;
   const tagSrc = { global: globalTags, scryfall: stags };
   const entry = (entryUid ? deck?.entries.find((e) => e.uid === entryUid) : undefined) ?? inDeck[0];
   const cardTagsHere = entry?.tags ?? [];
@@ -228,7 +230,10 @@ function CardModalBody({ card: initial, deckId, entryUid, onClose, onNavigate, s
           <div className="card-tags-panel">
             <div className="section-head">
               <h3>Tags</h3>
-              <button className="btn btn-sm" onClick={() => setSub('tag')}>🏷 Edit your tags</button>
+              <span className="card-tags-tools">
+                <ManageScryfallTags />
+                <button className="btn btn-sm" onClick={() => setSub('tag')}>🏷 Edit your tags</button>
+              </span>
             </div>
             {allTags.length ? (
               <TagList
@@ -236,7 +241,7 @@ function CardModalBody({ card: initial, deckId, entryUid, onClose, onNavigate, s
                 max={99}
               />
             ) : (
-              <div className="muted small">No tags yet. Scryfall tags (◆) are added automatically once they've downloaded.</div>
+              <div className="muted small">{stagsOn ? 'No tags yet.' : 'No tags yet. Turn on Scryfall oracle tags (◆) to tag ramp, removal and more automatically.'}</div>
             )}
             {deck && allTags.length > 0 && (
               <div className="deckmates">

@@ -20,7 +20,7 @@ import { useGlobalTags, usePool } from '../lib/hooks';
 import { planAllocation, releaseAllocation } from '../lib/ownership';
 import { collectionT, useSettings } from '../lib/store';
 import { navigate } from '../lib/router';
-import { useScryfallTags, useScryfallTagStatus } from '../lib/scryfallTags';
+import { isScryfallTagLabel, SCRYFALL_TAGS, useAllScryfallTags, useScryfallTags, useScryfallTagStatus, useScryfallTagVisibility } from '../lib/scryfallTags';
 import { atLeast, oddsGroups, SEEN_MAX, SEEN_MIN, turnHint, type OddsGroup } from '../lib/drawOdds';
 
 interface Props {
@@ -636,9 +636,21 @@ const bracketRange = (floor: BracketNumber) => (floor === 1 ? '1–2' : `${floor
 const bracketRangeName = (floor: BracketNumber) =>
   floor === 1 ? 'Exhibition or Core' : floor === 4 ? 'Optimized or cEDH' : `${bracketName(floor)} or higher`;
 
+/**
+ * Deck-list filter for a bracket group: the Scryfall tag while it is shown, else the cards by name
+ * (a turned-off or hidden tag matches nothing in the deck list).
+ */
+const bracketTagQuery = (otag: string, cards: string[]) => {
+  const label = SCRYFALL_TAGS.find((t) => t.otag === otag)?.label ?? otag;
+  if (isScryfallTagLabel(label) || !cards.length) return `stag:${otag}`;
+  return cards.length === 1 ? `!"${cards[0]}"` : `(${cards.map((n) => `!"${n}"`).join(' or ')})`;
+};
+
 /** Lowest Commander bracket the cards allow, the cards behind it, and an optional target bracket. */
 function BracketSection({ deck, filter, setFilter, onView }: ChartProps & ViewProps) {
-  const stags = useScryfallTags();
+  // Every Scryfall tag, even ones turned off or hidden: the estimate is about what the cards do.
+  useScryfallTagVisibility(); // re-render the filter links when tags are shown or hidden
+  const stags = useAllScryfallTags();
   const stagStatus = useScryfallTagStatus();
   const { saved } = useCombos(deck.id);
   const est = useMemo(() => estimateBracket(deck, stags, currentCombos(deck, saved)), [deck, stags, saved]);
@@ -649,9 +661,9 @@ function BracketSection({ deck, filter, setFilter, onView }: ChartProps & ViewPr
 
   const groups: { label: string; query: string; cards: string[]; note?: string; info?: boolean }[] = [
     { label: 'Game Changers', query: 'is:gamechanger', cards: est.gameChangers, note: `${est.gameChangers.length}/${BRACKET_GC_LIMIT} for Bracket 3` },
-    { label: 'Mass land denial', query: 'stag:mass-land-denial', cards: est.massLandDenial, note: 'Bracket 4+' },
-    { label: 'Extra turns', query: 'stag:extra-turn', cards: est.extraTurns, note: 'none in Bracket 1' },
-    { label: 'Land destruction', query: 'stag:land-removal', cards: est.landDestruction, note: 'no bracket rule', info: true },
+    { label: 'Mass land denial', query: bracketTagQuery('mass-land-denial', est.massLandDenial), cards: est.massLandDenial, note: 'Bracket 4+' },
+    { label: 'Extra turns', query: bracketTagQuery('extra-turn', est.extraTurns), cards: est.extraTurns, note: 'none in Bracket 1' },
+    { label: 'Land destruction', query: bracketTagQuery('land-removal', est.landDestruction), cards: est.landDestruction, note: 'no bracket rule', info: true },
   ];
 
   const headline = (

@@ -5,7 +5,7 @@ import { ToastProvider } from './components/Toast';
 import { loadAll } from './lib/store';
 import { loadSymbology } from './lib/scryfall';
 import { autoRefreshCollection, backfillLedger } from './lib/collection';
-import { loadScryfallTags } from './lib/scryfallTags';
+import { watchScryfallTagSettings } from './lib/scryfallTags';
 import './styles.css';
 
 // Load every store, then refresh collection + deck prices (at most once a day) to build price history.
@@ -13,8 +13,8 @@ void loadAll().then(async () => {
   await backfillLedger();
   await autoRefreshCollection();
 });
-// Scryfall tags: saved lists first, then a background download of any list that is missing or a week old.
-void loadScryfallTags();
+// Scryfall tags (opt-in): the bundled data loads the first time they are turned on.
+watchScryfallTagSettings();
 // Symbols used to be cached for a year without re-checking; drop that cache so a bad copy can't stick.
 if (typeof caches !== 'undefined') void caches.delete('scryfall-symbols').catch(() => undefined);
 void loadSymbology();
