@@ -897,6 +897,7 @@ button.alert-row:hover { background: var(--panel-2); }
 .inv-card-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .inv-name { font-weight: 600; max-width: 280px; }
 .inv-sub { display: flex; flex-wrap: wrap; gap: 3px; align-items: center; }
+.group-by { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-small); white-space: nowrap; }
 .row-actions { display: flex; gap: 4px; align-items: center; justify-content: flex-end; white-space: nowrap; }
 
 .buy-head { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-start; margin-bottom: 14px; }

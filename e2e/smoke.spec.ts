@@ -411,7 +411,7 @@ test('#tag search and the tag browser find tagged cards', async ({ page, isMobil
 
   // The tag browser on the main page lists the tag and opens into its cards.
   await page.goto('/');
-  await page.getByRole('button', { name: /All tags/ }).click();
+  await page.getByRole('button', { name: '🏷 Tags', exact: true }).click();
   const pick = page.locator('.tag-pick', { hasText: 'ramp' });
   await expect(pick).toContainText('1');
   await pick.click();
@@ -459,7 +459,7 @@ test('global tags follow a card into searches and every deck', async ({ page, is
     await expect(page.locator('.results-meta')).toContainText('1 of your cards');
     await expect(page.locator('.result-card')).toContainText('Sol Ring');
   }
-  await page.getByRole('button', { name: /All tags/ }).click();
+  await page.getByRole('button', { name: '🏷 Tags', exact: true }).click();
   await expect(page.locator('.tag-pick.tag-global', { hasText: 'staple' })).toContainText('1');
 
   // In any deck, the card carries its global tags.

@@ -835,10 +835,12 @@ function Watchlist() {
                     </td>
                     <td className="num"><Trend pct={trendPct(snaps, w.card, w.finish, 7)} /></td>
                     <td><Sparkline points={priceSeries(snaps, w.card.id, w.finish).slice(-30).map((p) => p.price)} /></td>
-                    <td className="row-actions">
-                      <button className="btn btn-sm" onClick={() => setBought({ id: w.id, card: w.card, qty: w.qty })}>🛒 Bought</button>
-                      <button className="icon-btn sm" title="Edit" onClick={() => setEditing({ id: w.id })}>✎</button>
-                      <button className="icon-btn sm danger" title="Remove" onClick={() => watchT.remove(w.id)}>🗑</button>
+                    <td>
+                      <span className="row-actions">
+                        <button className="btn btn-sm" onClick={() => setBought({ id: w.id, card: w.card, qty: w.qty })}>🛒 Bought</button>
+                        <button className="icon-btn sm" title="Edit" onClick={() => setEditing({ id: w.id })}>✎</button>
+                        <button className="icon-btn sm danger" title="Remove" onClick={() => watchT.remove(w.id)}>🗑</button>
+                      </span>
                     </td>
                   </tr>
                 );

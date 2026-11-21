@@ -164,7 +164,7 @@ export function SearchPanel({ deck, board = 'main' }: { deck: Deck; board?: Boar
             ⚙ Advanced{advCount > 0 && <span className="adv-count">{advCount}</span>}
           </button>
           <SavedSearches query={query} onApply={apply} />
-          <button type="button" className={`chip ${showTags ? 'chip-on' : ''}`} onClick={() => setShowTags((v) => !v)} aria-pressed={showTags}>🏷 All tags</button>
+          <button type="button" className={`chip ${showTags ? 'chip-on' : ''}`} onClick={() => setShowTags((v) => !v)} aria-pressed={showTags}>🏷 Tags</button>
           <button
             type="button" className={`chip ${favOnly ? 'chip-gold' : ''}`} aria-pressed={favOnly} title="Only favorite cards (owned or not)"
             onClick={() => { const on = !favOnly; setFavOnly(on); if (on || userQuery || results.length) void run(undefined, undefined, on); }}
