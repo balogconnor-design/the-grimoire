@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import type { Deck, DeckFilter, TypeCategory } from '../types';
+import { Fragment, useMemo, useState } from 'react';
+import type { Deck, DeckEntry, DeckFilter, TypeCategory } from '../types';
 import { getFormat } from '../lib/formats';
 import {
   averageMV, boardCount, boardEntries, boardPrice, cardPrice, COLOR_NAMES, computeColorStats, computeCurve,
@@ -10,6 +10,8 @@ import { refreshPrices, setTargetBracket } from '../lib/actions';
 import { BRACKET_GC_LIMIT, BRACKETS, bracketName, estimateBracket, type BracketNumber } from '../lib/bracket';
 import { ManaSymbol } from './Mana';
 import { EdhrecPanel } from './EdhrecPanel';
+import { CardLink } from './CardLink';
+import { CardModal } from './CardModal';
 import { useToast } from './Toast';
 import { useGlobalTags, usePool } from '../lib/hooks';
 import { planAllocation, releaseAllocation } from '../lib/ownership';
@@ -31,6 +33,8 @@ export function DeckDetails({ deck, validation, filter, setFilter }: Props) {
   const mainCount = boardCount(deck, 'main');
   const toast = useToast();
   const [refreshing, setRefreshing] = useState(false);
+  // Card window for cards named in the panels below (mana producers, bracket flags).
+  const [viewing, setViewing] = useState<DeckEntry | null>(null);
 
   const pct = Math.min(100, (mainCount / fmt.deckSize) * 100);
   const over = fmt.exact && mainCount > fmt.deckSize;
@@ -97,7 +101,7 @@ export function DeckDetails({ deck, validation, filter, setFilter }: Props) {
         </ul>
       </div>
 
-      {fmt.hasCommander && <BracketSection deck={deck} filter={filter} setFilter={setFilter} />}
+      {fmt.hasCommander && <BracketSection deck={deck} filter={filter} setFilter={setFilter} onView={setViewing} />}
       {fmt.hasCommander && <EdhrecPanel deck={deck} />}
 
       {/* Price */}
@@ -127,9 +131,10 @@ export function DeckDetails({ deck, validation, filter, setFilter }: Props) {
       <ManaCurve deck={deck} filter={filter} setFilter={setFilter} />
       <ColorSplit deck={deck} filter={filter} setFilter={setFilter} />
       <ManaBaseCheck deck={deck} filter={filter} setFilter={setFilter} />
-      <ManaProducers deck={deck} filter={filter} setFilter={setFilter} />
+      <ManaProducers deck={deck} filter={filter} setFilter={setFilter} onView={setViewing} />
       <TypeBreakdown deck={deck} filter={filter} setFilter={setFilter} />
       <DrawOdds deck={deck} filter={filter} setFilter={setFilter} />
+      {viewing && <CardModal card={viewing.card} deckId={deck.id} entryUid={viewing.uid} onClose={() => setViewing(null)} />}
     </aside>
   );
 }
@@ -182,6 +187,8 @@ function CollectionSection({ deck }: { deck: Deck }) {
 }
 
 type ChartProps = Omit<Props, 'validation'>;
+/** Panels that name cards open them in the card window through this. */
+type ViewProps = { onView: (e: DeckEntry) => void };
 
 function ManaCurve({ deck, filter, setFilter }: ChartProps) {
   const main = boardEntries(deck, 'main');
@@ -420,7 +427,7 @@ function ManaText({ text, size = 13 }: { text: string; size?: number }) {
 
 const PRODUCER_KIND_LABEL: Record<'all' | ProducerKind, string> = { all: 'All', rock: 'Rocks', dork: 'Dorks', other: 'Other' };
 
-function ManaProducers({ deck, filter, setFilter }: ChartProps) {
+function ManaProducers({ deck, filter, setFilter, onView }: ChartProps & ViewProps) {
   const main = boardEntries(deck, 'main');
   const sum = computeManaProducers(main);
   const mb = computeManaBase(main);
@@ -470,7 +477,7 @@ function ManaProducers({ deck, filter, setFilter }: ChartProps) {
               {sum.producers.map((p) => (
                 <tr key={p.entry.uid}>
                   <td>
-                    <div className="producer-name">{p.entry.qty > 1 && <span className="muted">{p.entry.qty}× </span>}{p.entry.card.name}</div>
+                    <div className="producer-name">{p.entry.qty > 1 && <span className="muted">{p.entry.qty}× </span>}<CardLink card={p.entry.card} name={p.entry.card.name} onOpen={() => onView(p.entry)} /></div>
                     {p.filter && (
                       <div className="muted tiny-label producer-note">
                         Filters <ManaText text={p.filter.from} size={12} /> → <ManaText text={p.filter.into} size={12} />
@@ -650,10 +657,11 @@ const bracketRangeName = (floor: BracketNumber) =>
   floor === 1 ? 'Exhibition or Core' : floor === 4 ? 'Optimized or cEDH' : `${bracketName(floor)} or higher`;
 
 /** Lowest Commander bracket the cards allow, the cards behind it, and an optional target bracket. */
-function BracketSection({ deck, filter, setFilter }: ChartProps) {
+function BracketSection({ deck, filter, setFilter, onView }: ChartProps & ViewProps) {
   const stags = useScryfallTags();
   const stagStatus = useScryfallTagStatus();
   const est = useMemo(() => estimateBracket(deck, stags), [deck, stags]);
+  const mainByName = useMemo(() => new Map(deck.entries.filter((e) => e.board === 'main').map((e) => [e.card.name, e])), [deck.entries]);
   const target = deck.targetBracket;
   const over = target != null && est.floor > target;
   const overReasons = target != null ? est.reasons.filter((r) => r.bracket > target) : [];
@@ -705,7 +713,17 @@ function BracketSection({ deck, filter, setFilter }: ChartProps) {
               <b>{g.label}</b> {g.cards.length}
             </button>
             {g.note && <span className="muted tiny"> · {g.note}</span>}
-            <div className="small bracket-cards">{g.cards.join(' · ')}</div>
+            <div className="small bracket-cards">
+              {g.cards.map((n, i) => {
+                const entry = mainByName.get(n);
+                return (
+                  <Fragment key={n}>
+                    {i > 0 && ' · '}
+                    {entry ? <CardLink card={entry.card} name={n} onOpen={() => onView(entry)} /> : n}
+                  </Fragment>
+                );
+              })}
+            </div>
           </div>
         );
       })}

@@ -1,3 +1,4 @@
+import { HoverArtLayer } from './components/HoverArt';
 import { useEffect, useState } from 'react';
 import { Library } from './pages/Library';
 import { DeckPage } from './pages/DeckPage';
@@ -75,6 +76,7 @@ export function App() {
         </button>
       </header>
       <DataSafety />
+      <HoverArtLayer />
       <main>
         {deckMatch ? <DeckPage key={deckMatch[1]} id={deckMatch[1]} /> : collMatch ? <CollectionPage tab={collTab} /> : helpMatch ? <HelpPage /> : <Library />}
       </main>
