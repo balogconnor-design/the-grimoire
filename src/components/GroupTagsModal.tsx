@@ -37,7 +37,6 @@ export function GroupTagsModal({ deck, src, selected, defaults, onApply, onClose
   return (
     <Modal onClose={onClose} title="Group by tags">
       <div className="group-tags-modal">
-        <h2 className="modal-title">Group by tags</h2>
         <p className="muted small help">
           Tick the tags that should become sections in the deck list. Each card is listed under the first ticked tag it has
           (Scryfall’s tags in their usual order, then yours); cards with none of them go under <b>Other</b>, and lands stay

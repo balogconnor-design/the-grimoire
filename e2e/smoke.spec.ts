@@ -161,10 +161,13 @@ test('bracket estimate shows the bracket and keeps a target bracket', async ({ p
   await result.hover();
   await result.getByRole('button', { name: 'Add Sol Ring to main deck' }).click();
   const panel = page.locator('.detail-section', { has: page.getByRole('heading', { name: 'Bracket estimate' }) });
-  await expect(panel.locator('.bracket-badge')).toHaveText('Bracket 1–2');
+  await expect(panel.locator('.bracket-badge')).toHaveText('Bracket 1–2'); // shown while folded
+  await expect(panel.getByRole('button', { name: '2', exact: true })).toHaveCount(0);
+  await panel.getByRole('button', { name: 'Bracket estimate' }).click();
   await panel.getByRole('button', { name: '2', exact: true }).click();
   await expect(panel).toContainText('Cards fit Bracket 2 (Core)');
   await page.reload();
+  // The section stays open after a reload (your choice is remembered) and so does the target.
   await expect(panel.getByRole('button', { name: '2', exact: true })).toHaveAttribute('aria-pressed', 'true');
   expect(errors).toEqual([]);
 });
@@ -188,7 +191,8 @@ test('EDHREC stays off until turned on, then shows salt scores', async ({ page, 
   await result.getByRole('button', { name: 'Add Sol Ring to main deck' }).click();
 
   const panel = page.locator('.edhrec-panel');
-  await expect(panel).toContainText('Off until you turn it on');
+  await expect(panel.getByRole('button', { name: 'Turn on EDHREC' })).toBeVisible();
+  await expect(panel.locator('.edhrec-salty')).toHaveCount(0);
   expect(edhrec).toEqual([]); // nothing is fetched while it's off
   await panel.getByRole('button', { name: 'Turn on EDHREC' }).click();
   await expect(panel.locator('.edhrec-salty')).toContainText('Sol Ring');
@@ -271,6 +275,8 @@ test('cards in Deck Details open, and hover art waits then stays on screen', asy
 
   // Mana producers: the card name is a card link.
   const producers = page.locator('.detail-section', { has: page.getByRole('heading', { name: 'Mana producers' }) });
+  await expect(producers.getByRole('button', { name: 'Rocks 1' })).toBeVisible(); // pills show while folded
+  await producers.getByRole('button', { name: 'Mana producers' }).click();
   const link = producers.locator('.card-link', { hasText: 'Sol Ring' });
   await link.scrollIntoViewIfNeeded();
   await expect(link).toHaveAttribute('draggable', 'true');
@@ -365,7 +371,7 @@ test('combo check: nothing sent until asked, then combos, one card away, and the
   await page.locator('.deck-groups').getByTitle('Set as commander').click();
 
   const panel = page.locator('.combos-panel');
-  await expect(panel).toContainText('sends the deck’s card names');
+  await expect(panel.locator('.combo')).toHaveCount(0); // folded: just the heading and the button
   expect(sent).toEqual([]);
   await panel.getByRole('button', { name: 'Check combos' }).click();
   await expect(panel.locator('.combo').first()).toContainText('Ruthless');
@@ -382,6 +388,7 @@ test('combo check: nothing sent until asked, then combos, one card away, and the
   // The bracket estimate now counts the Ruthless combo.
   const bracket = page.locator('.detail-section', { has: page.getByRole('heading', { name: 'Bracket estimate' }) });
   await expect(bracket.locator('.bracket-badge')).toHaveText('Bracket 4+');
+  await bracket.getByRole('button', { name: 'Bracket estimate' }).click();
   await expect(bracket).toContainText('Commander Spellbook rates Ruthless');
 
   // Adding the missing card moves it out of "one card away".

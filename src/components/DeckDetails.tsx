@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, type ReactNode } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import type { Deck, DeckEntry, DeckFilter, TypeCategory } from '../types';
 import { getFormat } from '../lib/formats';
 import {
@@ -13,6 +13,7 @@ import { EdhrecPanel } from './EdhrecPanel';
 import { CombosPanel } from './CombosPanel';
 import { COMBO_TAG_LABEL, currentCombos, useCombos } from '../lib/combos';
 import { CardLink } from './CardLink';
+import { Collapsible } from './Collapsible';
 import { CardModal } from './CardModal';
 import { useToast } from './Toast';
 import { useGlobalTags, usePool } from '../lib/hooks';
@@ -63,8 +64,8 @@ export function DeckDetails({ deck, validation, filter, setFilter }: Props) {
         </span>
       </div>
 
-      <Collapsible id="requirements" title={`${fmt.name} requirements`} titleHint={fmt.description}
-        summary={`${validation.requirements.filter((r) => r.ok).length}/${validation.requirements.length} met`}>
+      <Collapsible title={`${fmt.name} requirements`} titleHint={fmt.description} auto={!validation.legal}
+        closedMeta={`${validation.requirements.filter((r) => r.ok).length}/${validation.requirements.length} met`}>
         <ul className="requirements">
           {validation.requirements.map((r) => (
             <li key={r.label} className={r.ok ? 'req-ok' : 'req-bad'}>
@@ -82,7 +83,7 @@ export function DeckDetails({ deck, validation, filter, setFilter }: Props) {
       {fmt.hasCommander && <CombosPanel deck={deck} />}
       {fmt.hasCommander && <EdhrecPanel deck={deck} />}
 
-      <Collapsible id="price" title="Price" summary={formatUSD(boardPrice(deck, 'main'))}
+      <Collapsible id="price" title="Price" defaultOpen={false} closedMeta={<b className="meta-strong">{formatUSD(boardPrice(deck, 'main'))}</b>}
         right={<button className="link-btn small" onClick={doRefresh} disabled={refreshing}>{refreshing ? 'Refreshing…' : '↻ Refresh'}</button>}>
         <div className="price-total">{formatUSD(boardPrice(deck, 'main'))}</div>
         <div className="muted small">
@@ -135,7 +136,7 @@ function CollectionSection({ deck }: { deck: Deck }) {
   };
 
   return (
-    <Collapsible id="collection" title="Collection" summary={`${cov.covered}/${cov.totalNeed} owned`}
+    <Collapsible id="collection" title="Collection" closedMeta={`${cov.covered}/${cov.totalNeed} owned`}
       right={<button className="link-btn small" onClick={() => navigate('/collection/buy')}>Buy list →</button>}>
       <div className="own-headline">
         <span className={`own-dot ${cov.complete ? 'full' : cov.covered ? 'part' : 'none'}`} aria-hidden />
@@ -170,11 +171,7 @@ function ManaCurve({ deck, filter, setFilter }: ChartProps) {
   const nonland = curve.reduce((a, b) => a + b, 0);
 
   return (
-    <div className="detail-section">
-      <div className="section-head">
-        <h3>Mana curve</h3>
-        <span className="muted small">Avg MV {avg.toFixed(2)} · {nonland} nonland</span>
-      </div>
+    <Collapsible id="curve" title="Mana curve" meta={<>Avg MV {avg.toFixed(2)} · {nonland} nonland</>}>
       <div className="curve" role="group" aria-label="Mana curve — click a bar to filter the deck list">
         {curve.map((n, mv) => {
           const active = filter.cmc === mv;
@@ -206,7 +203,7 @@ function ManaCurve({ deck, filter, setFilter }: ChartProps) {
           );
         })}
       </div>
-    </div>
+    </Collapsible>
   );
 }
 
@@ -225,20 +222,25 @@ function ColorSplit({ deck, filter, setFilter }: ChartProps) {
   const stats = computeColorStats(boardEntries(deck, 'main'));
   const totalPips = stats.reduce((n, s) => n + s.pips, 0);
   const shown = stats.filter((s) => s.pips > 0 || s.sources > 0 || s.mdfcSources > 0 || s.cards > 0);
+  const bar = totalPips > 0 && (
+    <div className="color-stack" aria-hidden>
+      {stats.filter((s) => s.pips > 0).map((s) => (
+        <div key={s.color} className="color-stack-seg" style={{ flexGrow: s.pips, background: MTG_COLOR_VAR[s.color] }} title={`${COLOR_NAMES[s.color]} ${s.pipPct.toFixed(1)}%`} />
+      ))}
+    </div>
+  );
+  const closed = totalPips > 0 && (
+    <>
+      {bar}
+      <div className="color-pcts small">
+        {stats.filter((s) => s.pips > 0).map((s) => <span key={s.color} className="color-cell"><ManaSymbol symbol={s.color} size={14} /> {s.pipPct.toFixed(0)}%</span>)}
+      </div>
+    </>
+  );
 
   return (
-    <div className="detail-section">
-      <div className="section-head">
-        <h3>Color split</h3>
-        <span className="muted small">{totalPips} mana symbols</span>
-      </div>
-      {totalPips > 0 && (
-        <div className="color-stack" aria-hidden>
-          {stats.filter((s) => s.pips > 0).map((s) => (
-            <div key={s.color} className="color-stack-seg" style={{ flexGrow: s.pips, background: MTG_COLOR_VAR[s.color] }} title={`${COLOR_NAMES[s.color]} ${s.pipPct.toFixed(1)}%`} />
-          ))}
-        </div>
-      )}
+    <Collapsible id="colors" title="Color split" meta={<>{totalPips} mana symbols</>} closedBody={closed || undefined}>
+      {bar}
       {shown.length === 0 ? (
         <div className="muted small">Add cards to see the color split.</div>
       ) : (
@@ -274,7 +276,7 @@ function ColorSplit({ deck, filter, setFilter }: ChartProps) {
         </table>
       )}
       <div className="muted tiny">Hybrid symbols count toward each of their colors. Click a row to filter.</div>
-    </div>
+    </Collapsible>
   );
 }
 
@@ -289,6 +291,31 @@ function ManaBaseCheck({ deck, filter, setFilter }: ChartProps) {
   const plural = (n: number) => `${n} land${n === 1 ? '' : 's'}`;
   const fromName = (c: string) => (c === 'other' ? 'utility/colorless' : COLOR_NAMES[c]);
 
+  const compare = (
+    <div className="mb-compare" aria-hidden>
+      <span className="mb-compare-label muted tiny">Symbols</span>
+      <div className="color-stack">
+        {rows.map((r) => <div key={r.color} className="color-stack-seg" style={{ flexGrow: r.pipPct, background: MTG_COLOR_VAR[r.color] }} title={`${COLOR_NAMES[r.color]} ${r.pipPct.toFixed(1)}% of symbols`} />)}
+      </div>
+      <span className="mb-compare-label muted tiny">Lands</span>
+      <div className="color-stack">
+        {rows.map((r) => <div key={r.color} className="color-stack-seg" style={{ flexGrow: r.sourcePct, background: MTG_COLOR_VAR[r.color] }} title={`${COLOR_NAMES[r.color]} ${r.sourcePct.toFixed(1)}% of sources`} />)}
+      </div>
+    </div>
+  );
+  const closedMb = rows.length > 0 && lands > 0 && (
+    <>
+      {compare}
+      <div className="color-pcts small">
+        {rows.map((r) => (
+          <span key={r.color} className="color-cell" title={`${COLOR_NAMES[r.color]}: ${r.pipPct.toFixed(0)}% of symbols, ${r.sourcePct.toFixed(0)}% of land sources`}>
+            <ManaSymbol symbol={r.color} size={14} /> {r.pipPct.toFixed(0)}% / <span className={`mb-pct ${r.status}`}>{r.sourcePct.toFixed(0)}%</span>
+          </span>
+        ))}
+      </div>
+    </>
+  );
+
   let verdict: { tone: 'ok' | 'warn' | 'bad'; text: string };
   if (worst) {
     const name = COLOR_NAMES[worst.color];
@@ -302,11 +329,8 @@ function ManaBaseCheck({ deck, filter, setFilter }: ChartProps) {
   }
 
   return (
-    <div className="detail-section">
-      <div className="section-head">
-        <h3>Mana base check</h3>
-        <span className="muted small">{lands} land{lands === 1 ? '' : 's'}{mdfcLands > 0 && ` · ${mdfcLands} MDFC`}</span>
-      </div>
+    <Collapsible id="manabase" title="Mana base check" defaultOpen={false} closedBody={closedMb || undefined}
+      meta={<>{lands} land{lands === 1 ? '' : 's'}{mdfcLands > 0 && ` · ${mdfcLands} MDFC`}</>}>
       {rows.length === 0 || lands === 0 ? (
         <div className="muted small">Add nonland spells and lands to compare sources against symbols.</div>
       ) : (
@@ -331,16 +355,7 @@ function ManaBaseCheck({ deck, filter, setFilter }: ChartProps) {
             </div>
           )}
 
-          <div className="mb-compare" aria-hidden>
-            <span className="mb-compare-label muted tiny">Symbols</span>
-            <div className="color-stack">
-              {rows.map((r) => <div key={r.color} className="color-stack-seg" style={{ flexGrow: r.pipPct, background: MTG_COLOR_VAR[r.color] }} title={`${COLOR_NAMES[r.color]} ${r.pipPct.toFixed(1)}% of symbols`} />)}
-            </div>
-            <span className="mb-compare-label muted tiny">Lands</span>
-            <div className="color-stack">
-              {rows.map((r) => <div key={r.color} className="color-stack-seg" style={{ flexGrow: r.sourcePct, background: MTG_COLOR_VAR[r.color] }} title={`${COLOR_NAMES[r.color]} ${r.sourcePct.toFixed(1)}% of sources`} />)}
-            </div>
-          </div>
+          {compare}
 
           <table className="color-table mb-table">
             <thead>
@@ -376,7 +391,7 @@ function ManaBaseCheck({ deck, filter, setFilter }: ChartProps) {
           {offColorLands > 0 && <div className="muted small">{offColorLands} land{offColorLands === 1 ? '' : 's'} make none of your spell colors.</div>}
         </>
       )}
-    </div>
+    </Collapsible>
   );
 }
 
@@ -400,30 +415,28 @@ function ManaProducers({ deck, filter, setFilter, onView }: ChartProps & ViewPro
   const fixingColors = (needed.length ? needed : ['W', 'U', 'B', 'R', 'G']).filter((c) => sum.fixing[c] > 0);
   const signed = (n: number | null) => (n == null ? 'X' : `${n >= 0 ? '+' : '−'}${Math.abs(n)}`);
   const kinds = (['all', 'rock', 'dork', 'other'] as const).filter((k) => k === 'all' || sum.byKind[k] > 0);
+  const pills = (
+    <div className="producer-kinds">
+      {kinds.map((k) => {
+        const active = filter.producer === k;
+        return (
+          <button key={k} className={`chip ${active ? 'chip-on' : ''}`} aria-pressed={active}
+            onClick={() => setFilter({ ...filter, producer: active ? undefined : k })}>
+            {PRODUCER_KIND_LABEL[k]} {k === 'all' ? sum.count : sum.byKind[k]}
+          </button>
+        );
+      })}
+    </div>
+  );
 
   return (
-    <div className="detail-section">
-      <div className="section-head">
-        <h3>Mana producers</h3>
-        <span className="muted small">
-          {sum.count} card{sum.count === 1 ? '' : 's'}{sum.count > 0 && ` · ${signed(sum.netTotal)} net${sum.variable ? ' + X' : ''}`}
-        </span>
-      </div>
+    <Collapsible id="producers" title="Mana producers" defaultOpen={false} closedBody={sum.count > 0 ? pills : undefined}
+      meta={<>{sum.count} card{sum.count === 1 ? '' : 's'}{sum.count > 0 && ` · ${signed(sum.netTotal)} net${sum.variable ? ' + X' : ''}`}</>}>
       {sum.count === 0 ? (
         <div className="muted small">No mana rocks or dorks in the main deck.</div>
       ) : (
         <>
-          <div className="producer-kinds">
-            {kinds.map((k) => {
-              const active = filter.producer === k;
-              return (
-                <button key={k} className={`chip ${active ? 'chip-on' : ''}`} aria-pressed={active}
-                  onClick={() => setFilter({ ...filter, producer: active ? undefined : k })}>
-                  {PRODUCER_KIND_LABEL[k]} {k === 'all' ? sum.count : sum.byKind[k]}
-                </button>
-              );
-            })}
-          </div>
+          {pills}
           <div className="muted small">
             {mb.lands} land{mb.lands === 1 ? '' : 's'}{mb.mdfcLands > 0 && ` + ${mb.mdfcLands} MDFC`} + {sum.count} producer{sum.count === 1 ? '' : 's'}
             {' · '}avg MV {sum.avgMV.toFixed(1)}
@@ -473,7 +486,7 @@ function ManaProducers({ deck, filter, setFilter, onView }: ChartProps & ViewPro
         Nonland permanents with a repeatable mana ability. Gross = mana the ability adds, net = gross minus its activation cost; X = variable.
         {' '}Not counted in the mana base check. Rituals, Treasure makers and land-search ramp aren’t included.
       </div>
-    </div>
+    </Collapsible>
   );
 }
 
@@ -571,11 +584,7 @@ function DrawOdds({ deck, filter, setFilter }: ChartProps) {
   };
 
   return (
-    <div className="detail-section">
-      <div className="section-head">
-        <h3>Draw odds</h3>
-        <span className="muted small">{g.library} in library · {seen} cards seen</span>
-      </div>
+    <Collapsible id="odds" title="Draw odds" meta={<>{g.library} in library · {seen} cards seen</>}>
       {g.library === 0 ? (
         <div className="muted small">Add cards to see the odds of drawing them.</div>
       ) : (
@@ -619,7 +628,7 @@ function DrawOdds({ deck, filter, setFilter }: ChartProps) {
         {' '}Colour rows are the chance of a land that makes that colour; dual lands count for each colour, so the colours overlap and don’t add up to the Land row.
         {' '}{commanderEntry(deck) ? 'The commander isn’t in the library. ' : ''}Mulligans and extra draws aren’t counted. Click a row to filter the deck list.
       </div>
-    </div>
+    </Collapsible>
   );
 }
 
@@ -645,16 +654,17 @@ function BracketSection({ deck, filter, setFilter, onView }: ChartProps & ViewPr
     { label: 'Land destruction', query: 'stag:land-removal', cards: est.landDestruction, note: 'no bracket rule', info: true },
   ];
 
+  const headline = (
+    <div className="bracket-headline">
+      <span className={`bracket-badge ${over ? 'bad' : ''}`}>Bracket {bracketRange(est.floor)}</span>
+      <span className="bracket-name">{bracketRangeName(est.floor)}</span>
+      {over && <span className="bracket-over">over target ({target})</span>}
+    </div>
+  );
+
   return (
-    <div className="detail-section">
-      <div className="section-head">
-        <h3>Bracket estimate</h3>
-        <span className="muted small">Commander Brackets (beta)</span>
-      </div>
-      <div className="bracket-headline">
-        <span className={`bracket-badge ${over ? 'bad' : ''}`}>Bracket {bracketRange(est.floor)}</span>
-        <span className="muted small">{bracketRangeName(est.floor)}</span>
-      </div>
+    <Collapsible id="bracket" title="Bracket estimate" defaultOpen={false} meta="Commander Brackets (beta)" closedBody={headline}>
+      {headline}
 
       <div className="bracket-target small" role="group" aria-label="Target bracket">
         <span className="muted">Target:</span>
@@ -729,38 +739,7 @@ function BracketSection({ deck, filter, setFilter, onView }: ChartProps & ViewPr
         {' '}Rules as of Wizards’ February 9, 2026 update. Game Changer flags come from Scryfall (↻ Refresh prices updates them); extra turns and land denial use Scryfall tags.
         {' '}{saved ? 'Combos come from your last Commander Spellbook check (Combos panel).' : 'Combos count once you run Check combos in the Combos panel.'}
       </div>
-    </div>
+    </Collapsible>
   );
 }
 
-const COLLAPSED_KEY = 'grimoire.metricsCollapsed';
-const readCollapsed = (): Set<string> => {
-  try { return new Set(JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? '[]') as string[]); } catch { return new Set(); }
-};
-
-/** A Metrics section that folds away to its heading (and a one-line summary). Remembered in this browser. */
-function Collapsible({ id, title, titleHint, summary, right, children }: {
-  id: string; title: string; titleHint?: string; summary?: ReactNode; right?: ReactNode; children: ReactNode;
-}) {
-  const [open, setOpen] = useState(() => !readCollapsed().has(id));
-  const toggle = () => {
-    const next = !open;
-    setOpen(next);
-    const set = readCollapsed();
-    if (next) set.delete(id); else set.add(id);
-    try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...set])); } catch { /* storage unavailable: only this session remembers */ }
-  };
-  return (
-    <div className={`detail-section collapsible ${open ? 'open' : 'closed'}`}>
-      <div className="section-head">
-        <button className="collapse-head" onClick={toggle} aria-expanded={open} title={titleHint}>
-          <span className="collapse-caret" aria-hidden>{open ? '▾' : '▸'}</span>
-          <h3>{title}</h3>
-        </button>
-        {!open && summary != null && <span className="muted small collapse-summary">{summary}</span>}
-        {open && right}
-      </div>
-      {open && children}
-    </div>
-  );
-}

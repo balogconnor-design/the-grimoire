@@ -8,6 +8,7 @@ import {
 import { getNamed } from '../lib/scryfall';
 import { CardLink } from './CardLink';
 import { CardModal } from './CardModal';
+import { Collapsible, SubCollapsible } from './Collapsible';
 import { useToast } from './Toast';
 
 const ALMOST_SHOWN = 8;
@@ -32,6 +33,8 @@ export function CombosPanel({ deck }: { deck: Deck }) {
   const almost = (saved?.result.almost ?? []).filter((c) => !entryByName.has(c.missing[0]));
   const shownAlmost = allAlmost ? almost : almost.slice(0, ALMOST_SHOWN);
   const changed = !!saved && saved.signature !== deckSignature(deck);
+  const [opened, setOpened] = useState(0); // bumped to open the section after a check
+  const check = () => { setOpened((n) => n + 1); void checkCombos(deck); };
 
   // Cards that aren't in the deck are looked up on Scryfall so they open, drag and show art too.
   const lookupKey = [...new Set(shownAlmost.flatMap((c) => c.cards).filter((n) => !entryByName.has(n)))].join('\n');
@@ -87,11 +90,11 @@ export function CombosPanel({ deck }: { deck: Deck }) {
   );
 
   return (
-    <div className="detail-section combos-panel">
-      <div className="section-head">
-        <h3>Combos</h3>
-        {saved && <span className="muted small">{included.length} in deck</span>}
-      </div>
+    <Collapsible id="combos" title="Combos" defaultOpen={false} className="combos-panel" openSignal={opened}
+      closedMeta={saved ? `${included.length} in deck · ${almost.length} one card away` : undefined}
+      closedBody={!saved && combosAvailable() ? (
+        <button className="btn btn-sm" disabled={state === 'checking'} onClick={check}>{state === 'checking' ? 'Checking…' : 'Check combos'}</button>
+      ) : undefined}>
       {!combosAvailable() ? (
         <div className="muted small">Combo checks work on the website, the-grimoire.app.</div>
       ) : (
@@ -104,25 +107,23 @@ export function CombosPanel({ deck }: { deck: Deck }) {
           )}
           {saved && (
             <>
-              <div className="panel-block">
-                <div className="panel-subhead"><span className="panel-subhead-title">In this deck</span></div>
+              <SubCollapsible id="combos-in" title="In this deck" meta={included.length}>
                 {included.length === 0 ? <div className="muted small">No combos found.</div> : <ul className="combo-list">{included.map((c) => comboRow(c))}</ul>}
-              </div>
+              </SubCollapsible>
               {almost.length > 0 && (
-                <div className="panel-block">
-                  <div className="panel-subhead"><span className="panel-subhead-title">One card away</span><span className="muted small">most played first</span></div>
+                <SubCollapsible id="combos-almost" title="One card away" meta={`${almost.length} · most played first`}>
                   <ul className="combo-list">{shownAlmost.map((c) => comboRow(c, true))}</ul>
                   {almost.length > ALMOST_SHOWN && (
                     <button className="link-btn small" onClick={() => setAllAlmost(!allAlmost)}>{allAlmost ? 'Show fewer' : `Show all ${almost.length}`}</button>
                   )}
-                </div>
+                </SubCollapsible>
               )}
             </>
           )}
           {changed && <div className="mb-verdict warn small">The deck has changed since this check.</div>}
           {state === 'error' && <div className="mb-verdict bad small">{error}</div>}
           <div className="combo-check">
-            <button className="btn btn-sm" disabled={state === 'checking'} onClick={() => void checkCombos(deck)}>
+            <button className="btn btn-sm" disabled={state === 'checking'} onClick={check}>
               {state === 'checking' ? 'Checking…' : saved ? 'Check again' : 'Check combos'}
             </button>
             {saved && <span className="muted tiny">Checked {new Date(saved.checkedAt).toLocaleString()}</span>}
@@ -134,6 +135,6 @@ export function CombosPanel({ deck }: { deck: Deck }) {
         </>
       )}
       {viewing && <CardModal card={viewing.card} deckId={deck.id} entryUid={viewing.entryUid} onClose={() => setViewing(null)} />}
-    </div>
+    </Collapsible>
   );
 }

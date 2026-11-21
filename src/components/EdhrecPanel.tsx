@@ -10,6 +10,7 @@ import {
 } from '../lib/edhrec';
 import { CardLink } from './CardLink';
 import { CardModal } from './CardModal';
+import { Collapsible } from './Collapsible';
 import { hoverArtProps } from './HoverArt';
 import { useToast } from './Toast';
 
@@ -32,19 +33,32 @@ export function EdhrecPanel({ deck }: { deck: Deck }) {
   const settings = useSettings();
   const on = !!settings.edhrec;
   const [viewing, setViewing] = useState<Viewing>(null);
+  const [opened, setOpened] = useState(0); // bumped to open the section when EDHREC is turned on
+  const turnOn = () => { setSettings({ edhrec: true }); setOpened((n) => n + 1); };
+  const salt = useSalt();
+  useEffect(() => { if (on) void ensureSalt(); }, [on]);
+  const saltTotal = useMemo(() => {
+    let n = 0;
+    const seen = new Set<string>();
+    for (const e of deck.entries) {
+      if (e.board !== 'main' || seen.has(e.card.name)) continue;
+      seen.add(e.card.name);
+      n += salt.get(e.card.name) ?? salt.get(e.card.name.split(' // ')[0]) ?? 0;
+    }
+    return n;
+  }, [deck.entries, salt]);
 
   return (
-    <div className="detail-section edhrec-panel">
-      <div className="section-head">
-        <h3>EDHREC</h3>
-        {on && <button className="link-btn small" onClick={() => setSettings({ edhrec: false })}>Turn off</button>}
-      </div>
+    <Collapsible id="edhrec" title="EDHREC" defaultOpen={false} className="edhrec-panel" openSignal={opened}
+      closedMeta={on && salt.size > 0 ? `Salt total ${saltTotal.toFixed(1)}` : undefined}
+      closedBody={on ? undefined : <button className="btn btn-sm" onClick={turnOn}>Turn on EDHREC</button>}
+      right={on ? <button className="link-btn small" onClick={() => setSettings({ edhrec: false })}>Turn off</button> : undefined}>
       {on ? <EdhrecData deck={deck} onView={setViewing} /> : (
         <>
           <p className="muted small">
             Salt scores and the cards most often played with your commander, from EDHREC. Off until you turn it on.
           </p>
-          <button className="btn btn-sm" onClick={() => setSettings({ edhrec: true })}>Turn on EDHREC</button>
+          <button className="btn btn-sm" onClick={turnOn}>Turn on EDHREC</button>
           <div className="muted tiny">
             Downloads public data from json.edhrec.com: the salt list (about 2 MB, once a week) and your commander’s page (once a day).
             {' '}Only the commander’s name is sent, never your deck.
@@ -52,7 +66,7 @@ export function EdhrecPanel({ deck }: { deck: Deck }) {
         </>
       )}
       {viewing && <CardModal card={viewing.card} deckId={deck.id} entryUid={viewing.entryUid} onClose={() => setViewing(null)} />}
-    </div>
+    </Collapsible>
   );
 }
 
