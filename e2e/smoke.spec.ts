@@ -736,6 +736,12 @@ test('deck list: list dividers, grid and table views, color identity grouping an
   // Group by color identity: Red, then Colorless.
   await page.getByLabel('Group cards by').selectOption('identity');
   await expect(list.locator('.group-name')).toHaveText(['Red', 'Colorless']);
+  // None: one list with no group headings, sorted by name.
+  await page.getByLabel('Group cards by').selectOption('none');
+  await page.getByLabel('Sort cards by').selectOption('name');
+  await expect(list.locator('.group-head')).toHaveCount(0);
+  await expect(list.locator('.entry-name')).toHaveText([/Lightning Bolt/, /Sol Ring/]);
+  await page.getByLabel('Sort cards by').selectOption('mv');
   await page.getByLabel('Group cards by').selectOption('mv');
 
   // Grid: full pictures, opens the card window.
