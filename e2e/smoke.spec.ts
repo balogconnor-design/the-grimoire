@@ -766,6 +766,13 @@ test('deck list: list dividers, grid and table views, color identity grouping an
   // List: back to rows with dividers.
   await page.locator('.col-deck').getByRole('radio', { name: 'List' }).click();
   await expect(page.locator('.col-deck .entries .entry')).toHaveCount(2);
+
+  // Table rows have their own −/+/remove buttons, which don't open the card window.
+  await page.locator('.col-deck').getByRole('radio', { name: 'Table' }).click();
+  await page.locator('.col-deck .deck-table').getByRole('button', { name: 'Remove Lightning Bolt', exact: true }).click();
+  await expect(page.locator('.modal')).toHaveCount(0);
+  await expect(page.locator('.col-deck .deck-table tbody tr')).toHaveCount(1);
+  await expect(page.locator('.col-deck .deck-table')).not.toContainText('Lightning Bolt');
   expect(errors).toEqual([]);
 });
 

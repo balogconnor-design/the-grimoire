@@ -610,6 +610,8 @@ code { font-family: 'Cascadia Code', Consolas, ui-monospace, monospace; font-siz
 @container (max-width: 620px) { .deck-table th:nth-child(4), .deck-table td:nth-child(4) { display: none; } }
 .deck-table th:nth-child(6), .deck-table td:nth-child(6) { width: 70px; }
 .deck-table th:nth-child(7), .deck-table td:nth-child(7) { width: 40px; text-align: center; }
+.deck-table th:nth-child(8), .deck-table td:nth-child(8) { width: 92px; }
+.deck-table-act { white-space: nowrap; text-align: right; }
 .deck-table td { vertical-align: middle; }
 /* Resizable columns: drag the right edge of a header. */
 .deck-table th { position: relative; }

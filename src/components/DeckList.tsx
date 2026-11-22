@@ -53,6 +53,7 @@ const saveSetting = (k: string, v: string) => { try { localStorage.setItem(k, v)
 const TABLE_COLS: { key: string; label: string; num?: boolean; title?: string }[] = [
   { key: 'qty', label: 'Qty', num: true }, { key: 'card', label: 'Card' }, { key: 'cost', label: 'Cost' }, { key: 'type', label: 'Type' },
   { key: 'tags', label: 'Tags' }, { key: 'price', label: 'Price', num: true }, { key: 'own', label: 'Own', title: 'Owned' },
+  { key: 'act', label: '', title: 'Change quantity or remove' },
 ];
 const COL_KEY = 'grimoire.deckTableCols';
 const COL_MIN = 32;
@@ -358,6 +359,11 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
               </td>
               <td className="num">{formatUSD(price != null ? price * e.qty : null)}</td>
               <td>{ownMark(ownState, ownTitle)}</td>
+              <td className="deck-table-act" onClick={(ev) => ev.stopPropagation()}>
+                <button className="icon-btn sm" onClick={() => setQty(deck.id, e.uid, e.qty - 1)} aria-label={`Remove one ${e.card.name}`} title="Remove one">−</button>
+                <button className="icon-btn sm" onClick={() => setQty(deck.id, e.uid, e.qty + 1)} disabled={isCmd} aria-label={`Add one ${e.card.name}`} title="Add one">+</button>
+                <button className="icon-btn sm danger" onClick={() => removeEntry(deck.id, e.uid)} aria-label={`Remove ${e.card.name}`} title="Remove">🗑</button>
+              </td>
             </tr>
           );
         })}
