@@ -37,7 +37,7 @@ interface Props {
 
 const BOARD_LABEL: Record<Board, string> = { main: 'Main', side: 'Sideboard', maybe: 'Maybeboard' };
 
-type GroupBy = 'type' | 'tag' | 'mv' | 'identity' | 'color';
+type GroupBy = 'type' | 'tag' | 'mv' | 'identity' | 'color' | 'none';
 const GROUP_BY_KEY = 'grimoire.deckGroupBy';
 type DeckView = 'list' | 'grid' | 'table';
 const VIEW_KEY = 'grimoire.deckView';
@@ -70,7 +70,7 @@ const GRID_HOVER_BELOW = 170;
 function readGroupBy(): GroupBy {
   try {
     const v = localStorage.getItem(GROUP_BY_KEY);
-    return v === 'tag' || v === 'mv' || v === 'identity' || v === 'color' ? v : 'type';
+    return v === 'tag' || v === 'mv' || v === 'identity' || v === 'color' || v === 'none' ? v : 'type';
   } catch {
     return 'type';
   }
@@ -140,6 +140,12 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
   const chooseTags = (tags: string[] | null) => { saveGroupTags(deck.id, tags); setCustomTags(tags); };
   const groups = useMemo((): { type: string; entries: DeckEntry[]; scryfall?: boolean }[] => {
     const sorter = entrySorter(sortBy);
+    // No grouping: one list, the commander first.
+    if (groupBy === 'none') {
+      if (!entries.length) return [];
+      const cmdFirst = (e: DeckEntry) => (e.uid === cmd?.uid ? 0 : 1);
+      return [{ type: 'All cards', entries: [...entries].sort((a, b) => cmdFirst(a) - cmdFirst(b) || sorter(a, b)) }];
+    }
     return grouped().map((g) => ({ ...g, entries: [...g.entries].sort(sorter) }));
   }, [entries, deck, groupBy, tagSrc, sortBy]); // eslint-disable-line react-hooks/exhaustive-deps
   function grouped(): { type: string; entries: DeckEntry[]; scryfall?: boolean }[] {
@@ -424,6 +430,7 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
             <option value="mv">Mana value</option>
             <option value="identity">Color identity</option>
             <option value="color">Color</option>
+            <option value="none">None</option>
           </select>
           {groupBy === 'tag' && (
             <button type="button" className="icon-btn sm group-tags-btn" title="Choose which tags become sections" aria-label="Choose tags to group by" onClick={() => setPickingTags(true)}>⚙</button>
@@ -533,7 +540,7 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
                 setDropGroup(null);
               }}
             >
-              <button
+              {groupBy !== 'none' && <button
                 className="group-head"
                 onClick={() => setCollapsed((s) => { const n = new Set(s); if (n.has(g.type)) n.delete(g.type); else n.add(g.type); return n; })}
                 aria-expanded={!isCollapsed}
@@ -545,7 +552,7 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
                 </span>
                 <span className="group-count">{count}</span>
                 <span className="group-price">{formatUSD(price)}</span>
-              </button>
+              </button>}
               {!isCollapsed && view === 'grid' && renderGrid(g.entries)}
               {!isCollapsed && view === 'table' && renderTable(g.entries)}
               {!isCollapsed && view === 'list' && (
