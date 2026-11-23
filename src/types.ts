@@ -100,6 +100,8 @@ export interface DeckEntry {
   tags?: string[];
   /** Tag this card is listed under when the deck list is grouped by tag (one of its tags; chosen by dragging). */
   mainTag?: string;
+  /** Leave the copies you already own out of the deck's price (main deck and sideboard only). */
+  skipOwnedPrice?: boolean;
 }
 
 export interface Deck {

@@ -2,11 +2,11 @@ import { Fragment, useMemo, useState } from 'react';
 import type { Deck, DeckEntry, DeckFilter, TypeCategory } from '../types';
 import { getFormat } from '../lib/formats';
 import {
-  averageMV, boardEntries, boardPrice, cardPrice, COLOR_NAMES, computeColorStats, computeCurve,
+  averageMV, boardEntries, boardPrice, entryPrice, COLOR_NAMES, computeColorStats, computeCurve,
   commanderEntry, computeManaBase, computeManaProducers, computeTypes, formatUSD, MANA_BASE_TOLERANCE, type ManaBaseStatus, type ProducerKind,
   type Validation,
 } from '../lib/rules';
-import { refreshPrices, setTargetBracket } from '../lib/actions';
+import { refreshPrices, setSkipOwnedPrice, setTargetBracket } from '../lib/actions';
 import { BRACKET_GC_LIMIT, BRACKETS, bracketName, estimateBracket, type BracketNumber } from '../lib/bracket';
 import { ManaSymbol } from './Mana';
 import { EdhrecPanel } from './EdhrecPanel';
@@ -16,8 +16,8 @@ import { CardLink } from './CardLink';
 import { Collapsible } from './Collapsible';
 import { CardModal } from './CardModal';
 import { useToast } from './Toast';
-import { useGlobalTags, usePool } from '../lib/hooks';
-import { planAllocation, releaseAllocation } from '../lib/ownership';
+import { useGlobalTags, usePool, usePriceSkips } from '../lib/hooks';
+import { ownedPriceSkips, planAllocation, releaseAllocation } from '../lib/ownership';
 import { collectionT, useSettings } from '../lib/store';
 import { navigate } from '../lib/router';
 import { isScryfallTagLabel, SCRYFALL_TAGS, useAllScryfallTags, useScryfallTags, useScryfallTagStatus, useScryfallTagVisibility } from '../lib/scryfallTags';
@@ -38,10 +38,22 @@ export function DeckDetails({ deck, validation, filter, setFilter }: Props) {
   // Card window for cards named in the panels below (mana producers, bracket flags).
   const [viewing, setViewing] = useState<DeckEntry | null>(null);
 
+  const skips = usePriceSkips(deck);
   const topCards = useMemo(
-    () => [...main].map((e) => ({ e, total: (cardPrice(e.card) ?? 0) * e.qty })).sort((a, b) => b.total - a.total).slice(0, 10),
-    [main],
+    () => [...main].map((e) => ({ e, total: entryPrice(e, skips) ?? 0 })).sort((a, b) => b.total - a.total).slice(0, 10),
+    [main, skips],
   );
+  // Owned copies that could be left out of the price (as if every card were marked), and those that are.
+  const pool = usePool();
+  const coverage = pool.byDeck.get(deck.id);
+  const ownable = useMemo(
+    () => ownedPriceSkips({ ...deck, entries: deck.entries.map((e) => ({ ...e, skipOwnedPrice: true })) }, coverage),
+    [deck, coverage],
+  );
+  const ownedValue = (m: ReadonlyMap<string, number>) => deck.entries.reduce((n, e) => n + (m.has(e.uid) ? (entryPrice(e) ?? 0) - (entryPrice(e, m) ?? 0) : 0), 0);
+  const ownableValue = ownedValue(ownable);
+  const skippedValue = ownedValue(skips);
+  const allSkipped = [...ownable.keys()].every((uid) => deck.entries.find((e) => e.uid === uid)?.skipOwnedPrice);
 
   const doRefresh = async () => {
     setRefreshing(true);
@@ -83,12 +95,22 @@ export function DeckDetails({ deck, validation, filter, setFilter }: Props) {
       {fmt.hasCommander && <CombosPanel deck={deck} />}
       {fmt.hasCommander && <EdhrecPanel deck={deck} />}
 
-      <Collapsible title="Price" defaultOpen={false} closedMeta={<b className="meta-strong">{formatUSD(boardPrice(deck, 'main'))}</b>}
+      <Collapsible title="Price" defaultOpen={false} closedMeta={<b className="meta-strong">{formatUSD(boardPrice(deck, 'main', skips))}</b>}
         right={<button className="link-btn small" onClick={doRefresh} disabled={refreshing}>{refreshing ? 'Refreshing…' : '↻ Refresh'}</button>}>
-        <div className="price-total">{formatUSD(boardPrice(deck, 'main'))}</div>
+        <div className="price-total">{formatUSD(boardPrice(deck, 'main', skips))}</div>
         <div className="muted small">
-          Main deck (TCGplayer market) · Sideboard {formatUSD(boardPrice(deck, 'side'))} · Maybe {formatUSD(boardPrice(deck, 'maybe'))}
+          Main deck (TCGplayer market) · Sideboard {formatUSD(boardPrice(deck, 'side', skips))} · Maybe {formatUSD(boardPrice(deck, 'maybe'))}
         </div>
+        {ownable.size > 0 && (
+          <div className="owned-price small">
+            <span className="muted">
+              {skippedValue > 0 ? <>Leaving out {formatUSD(skippedValue)} of cards you own</> : <>You own {formatUSD(ownableValue)} of these cards</>}
+            </span>
+            {allSkipped
+              ? <button className="link-btn small" onClick={() => setSkipOwnedPrice(deck.id, [...ownable.keys()], false)}>Count owned cards</button>
+              : <button className="link-btn small" onClick={() => setSkipOwnedPrice(deck.id, [...ownable.keys()], true)}>Leave out all owned cards</button>}
+          </div>
+        )}
         {deck.pricesUpdatedAt && (
           <div className="muted tiny">Updated {new Date(deck.pricesUpdatedAt).toLocaleString()}</div>
         )}

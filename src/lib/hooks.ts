@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import type { Card, CollectionItem, Deck, DeckEntry, Finish } from '../types';
 import type { Subject } from './query';
 import { collectionT, decksT, globalTagsT, useSettings } from './store';
-import { computePool, nameKey, ownedByName, type PoolResult } from './ownership';
+import { computePool, nameKey, ownedByName, ownedPriceSkips, type PoolResult } from './ownership';
 import { useScryfallTags } from './scryfallTags';
 
 export function usePool(): PoolResult {
@@ -10,6 +10,13 @@ export function usePool(): PoolResult {
   const items = collectionT.useAll();
   const { ignoreBasics } = useSettings();
   return useMemo(() => computePool(decks, items, ignoreBasics), [decks, items, ignoreBasics]);
+}
+
+/** Owned copies left out of this deck's price (entries marked skipOwnedPrice). */
+export function usePriceSkips(deck: Deck | undefined): Map<string, number> {
+  const pool = usePool();
+  const coverage = deck ? pool.byDeck.get(deck.id) : undefined;
+  return useMemo(() => (deck ? ownedPriceSkips(deck, coverage) : new Map<string, number>()), [deck, coverage]);
 }
 
 export function useOwnedByName(): Map<string, number> {

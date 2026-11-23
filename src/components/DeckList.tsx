@@ -3,13 +3,13 @@ import { useEffect, useMemo, useState, type DragEvent, type PointerEvent as Reac
 import type { Board, Card, Deck, DeckEntry, DeckFilter, TypeCategory } from '../types';
 import { getFormat } from '../lib/formats';
 import {
-  boardCount, boardEntries, boardPrice, canBeCommander, cardImage, cardPrice, COLOR_NAMES, commanderEntry,
+  boardCount, boardEntries, boardPrice, canBeCommander, cardImage, cardPrice, COLOR_NAMES, commanderEntry, entryPrice,
   entryCategory, formatUSD, frontTypeLine, manaCost, matchesFilter, sortEntries, TYPE_ORDER, type Validation,
 } from '../lib/rules';
-import { addCard, clearCommander, moveEntry, removeEntry, setCommander, setMainTag, setQty, toggleEntryFavorite } from '../lib/actions';
+import { addCard, clearCommander, moveEntry, removeEntry, setCommander, setMainTag, setQty, setSkipOwnedPrice, toggleEntryFavorite } from '../lib/actions';
 import { looksLikeQuery, parseQuery } from '../lib/query';
 import { useGlobalTags, usePool, useSubjects } from '../lib/hooks';
-import { nameKey } from '../lib/ownership';
+import { nameKey, ownedPriceSkips, type CardNeed } from '../lib/ownership';
 import { CardModal } from './CardModal';
 import { ColorPips, ManaCost, ManaSymbol } from './Mana';
 import { BasicLandAdder } from './BasicLandAdder';
@@ -20,7 +20,7 @@ import { FavStar, TagList, SCOPE_META, type TagScope } from './TagEditor';
 import { useToast } from './Toast';
 import { hideArt, hoverArt, hoverArtProps } from './HoverArt';
 import { pinOnRightClick } from '../lib/viewPanel';
-import { ENTRY_DRAG, isCardDrag, readCardDrag } from '../lib/dnd';
+import { ENTRY_DRAG, isCardDrag, isEntryDrag, readCardDrag } from '../lib/dnd';
 import { ManageScryfallTags } from './ScryfallTagSettings';
 import { useScryfallTags, useScryfallTagStatus } from '../lib/scryfallTags';
 import { defaultGroupTags, entryTags, groupByManaValue, groupByTag, mainGroup, OTHER_GROUP } from '../lib/deckTags';
@@ -91,6 +91,8 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
   const cmd = commanderEntry(deck);
   const pool = usePool();
   const coverage = pool.byDeck.get(deck.id);
+  // Owned copies of cards marked "don't count" are left out of the prices.
+  const skips = useMemo(() => ownedPriceSkips(deck, coverage), [deck, coverage]);
   const subjects = useSubjects();
   const globalTags = useGlobalTags();
   const stags = useScryfallTags();
@@ -201,6 +203,29 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
   const hasFilter = filter.cmc != null || !!filter.type || !!filter.color || !!filter.producer || !!filter.text || favOnly;
   const shown = entries.reduce((n, e) => n + e.qty, 0);
 
+  // A deck row dropped on another board's tab moves there (main ⇄ sideboard ⇄ maybeboard). Not the commander.
+  const canMoveTo = (tab: Board) => !!dragging && dragging.board !== tab;
+  const onTabDragOver = (e: DragEvent, tab: Board) => {
+    e.stopPropagation();
+    if (!isEntryDrag(e.dataTransfer)) { onDragOver(e, tab); return; }
+    if (!canMoveTo(tab)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (dragTab !== tab) setDragTab(tab);
+  };
+  const onTabDrop = (e: DragEvent, tab: Board) => {
+    if (!isEntryDrag(e.dataTransfer)) { onDrop(e, tab); return; }
+    e.preventDefault();
+    e.stopPropagation();
+    setDragTab(null);
+    const moving = dragging;
+    setDragUid(null);
+    setDropGroup(null);
+    if (!moving || moving.board === tab) return;
+    moveEntry(deck.id, moving.uid, tab);
+    toast(`Moved ${moving.card.name} to ${BOARD_LABEL[tab]}`);
+  };
+
   // Drop a search result on the list to add it to the board shown, or on a board tab to add it there.
   const onDragOver = (e: DragEvent, tab?: Board) => {
     if (!isCardDrag(e.dataTransfer)) return;
@@ -231,7 +256,27 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
     const ownTitle = !own ? '' : own.missing === 0
       ? `Owned — ${own.manual ? `${own.manual} committed to this deck` : 'covered from your shared pool'}`
       : `${own.need - own.missing}/${own.need} available for this deck (shared pool) — ${own.missing} missing`;
-    return { problems: validation.entryProblems[e.uid], isCmd: e.uid === cmd?.uid, price: cardPrice(e.card), ownState, ownTitle };
+    return { problems: validation.entryProblems[e.uid], isCmd: e.uid === cmd?.uid, ownState, ownTitle, own };
+  };
+  /** The row's price: copies you own are left out when the card is marked so (shown with a mark). */
+  const priceText = (e: DeckEntry, className: string) => {
+    const each = cardPrice(e.card);
+    const skipped = skips.get(e.uid) ?? 0;
+    const title = skipped
+      ? `${skipped} owned cop${skipped === 1 ? 'y' : 'ies'} not counted in the deck price${each != null ? ` (${formatUSD(each)} each)` : ''}`
+      : each != null && e.qty > 1 ? `${formatUSD(each)} each` : undefined;
+    return <span className={`${className} ${skipped ? 'price-skipped' : ''}`} title={title}>{formatUSD(entryPrice(e, skips))}</span>;
+  };
+  /** Toggle: leave the copies you own out of the deck price. Only for cards you own (some of). */
+  const ownPriceBtn = (e: DeckEntry, own: CardNeed | undefined, cls = 'icon-btn sm') => {
+    if (!own || own.missing >= own.need) return null;
+    const on = !!e.skipOwnedPrice;
+    return (
+      <button type="button" className={`${cls} own-price-btn ${on ? 'on' : ''}`} aria-pressed={on}
+        title={on ? 'Owned copies are left out of the deck price — click to count them again' : 'You own this card — leave it out of the deck price'}
+        aria-label={on ? `Count ${e.card.name} in the deck price` : `Leave ${e.card.name} out of the deck price`}
+        onClick={(ev) => { ev.stopPropagation(); setSkipOwnedPrice(deck.id, [e.uid], !on); }}>$</button>
+    );
   };
   const ownMark = (state: string, title: string) => state === 'skip' ? null : (
     <span className={`own-mark ${state}`} title={title} aria-label={title}>{state === 'full' ? '✓' : state === 'part' ? '◐' : '○'}</span>
@@ -258,17 +303,18 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
     if (isCmd) return undefined;
     const regroup = groupBy === 'tag' && entryTags(e, tagSrc).all.length > 1;
     const toCmd = isCmdCandidate(e);
-    if (regroup && toCmd) return 'Drag onto another of its tags to list it there, or onto the commander slot';
-    if (regroup) return 'Drag onto another of its tags to list it there, or onto the view panel to pin it';
-    if (toCmd) return `Drag onto the ${fmt.id === 'oathbreaker' ? 'Oathbreaker' : 'commander'} slot to make it your ${fmt.id === 'oathbreaker' ? 'Oathbreaker' : 'commander'}`;
-    return undefined;
+    const boards = 'onto a board tab to move it';
+    if (regroup && toCmd) return `Drag onto another of its tags to list it there, onto the commander slot, or ${boards}`;
+    if (regroup) return `Drag onto another of its tags to list it there, onto the view panel to pin it, or ${boards}`;
+    if (toCmd) return `Drag onto the ${fmt.id === 'oathbreaker' ? 'Oathbreaker' : 'commander'} slot to make it your ${fmt.id === 'oathbreaker' ? 'Oathbreaker' : 'commander'}, or ${boards}`;
+    return `Drag ${boards} (Main, Sideboard, Maybeboard)`;
   };
 
   /** Grid: full card pictures, several per row. The picture shows on hover only when tiles are small. */
   const renderGrid = (list: DeckEntry[]) => (
     <div className="entry-grid">
       {list.map((e) => {
-        const { problems, isCmd, price, ownState, ownTitle } = rowInfo(e);
+        const { problems, isCmd, ownState, ownTitle, own } = rowInfo(e);
         const img = cardImage(e.card, 'normal');
         return (
           <div key={e.uid} className={`grid-tile ${problems ? 'has-problem' : ''} ${dragUid === e.uid ? 'dragging' : ''}`}
@@ -289,7 +335,8 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
             <div className="grid-actions">
               <button className="mini-btn" onClick={() => setQty(deck.id, e.uid, e.qty - 1)} aria-label={`Remove one ${e.card.name}`} title="Remove one">−</button>
               <button className="mini-btn" onClick={() => setQty(deck.id, e.uid, e.qty + 1)} disabled={isCmd} aria-label={`Add one ${e.card.name}`} title="Add one">+</button>
-              <span className="grid-price">{formatUSD(price != null ? price * e.qty : null)}</span>
+              {ownPriceBtn(e, own, 'mini-btn')}
+              {priceText(e, 'grid-price')}
             </div>
           </div>
         );
@@ -340,7 +387,7 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
       </thead>
       <tbody>
         {list.map((e) => {
-          const { problems, isCmd, price, ownState, ownTitle } = rowInfo(e);
+          const { problems, isCmd, ownState, ownTitle, own } = rowInfo(e);
           return (
             <tr key={e.uid} className={`clickable ${problems ? 'has-problem' : ''}`} {...hoverArtProps(e.card)} {...regroupDrag(e, isCmd)}
               onContextMenu={pinOnRightClick(e.card, e.uid, hideArt)} onClick={() => { hideArt(); setOpen(e); }}>
@@ -357,11 +404,12 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
               <td onClick={(ev) => ev.stopPropagation()}>
                 <TagList groups={[{ scope: 'global', tags: globalTags.get(e.card.name) ?? [] }, { scope: 'card', tags: e.tags ?? [] }, { scope: 'scryfall', tags: entryTags(e, tagSrc).scryfall }]} max={3} onTagClick={onTagClick} />
               </td>
-              <td className="num">{formatUSD(price != null ? price * e.qty : null)}</td>
+              <td className="num">{priceText(e, '')}</td>
               <td>{ownMark(ownState, ownTitle)}</td>
               <td className="deck-table-act" onClick={(ev) => ev.stopPropagation()}>
                 <button className="icon-btn sm" onClick={() => setQty(deck.id, e.uid, e.qty - 1)} aria-label={`Remove one ${e.card.name}`} title="Remove one">−</button>
                 <button className="icon-btn sm" onClick={() => setQty(deck.id, e.uid, e.qty + 1)} disabled={isCmd} aria-label={`Add one ${e.card.name}`} title="Add one">+</button>
+                {ownPriceBtn(e, own)}
                 <button className="icon-btn sm danger" onClick={() => removeEntry(deck.id, e.uid)} aria-label={`Remove ${e.card.name}`} title="Remove">🗑</button>
               </td>
             </tr>
@@ -413,13 +461,15 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
       <div className="board-tabs" role="tablist">
         {(['main', 'side', 'maybe'] as Board[]).map((b) => (
           <button
-            key={b} role="tab" aria-selected={board === b} className={`tab ${board === b ? 'active' : ''} ${dragTab === b ? 'drop-hover' : ''}`} onClick={() => setBoard(b)}
-            onDragOver={(e) => { e.stopPropagation(); onDragOver(e, b); }} onDrop={(e) => onDrop(e, b)}
+            key={b} role="tab" aria-selected={board === b} onClick={() => setBoard(b)}
+            className={`tab ${board === b ? 'active' : ''} ${dragTab === b ? 'drop-hover' : ''} ${canMoveTo(b) ? 'move-drop-ok' : ''}`}
+            onDragOver={(e) => onTabDragOver(e, b)} onDrop={(e) => onTabDrop(e, b)}
+            onDragLeave={(e) => { if (dragging && dragTab === b && !e.currentTarget.contains(e.relatedTarget as Node | null)) setDragTab(null); }}
           >
             {BOARD_LABEL[b]} <span className="tab-count">{boardCount(deck, b)}</span>
           </button>
         ))}
-        <span className="board-price">{formatUSD(boardPrice(deck, board))}</span>
+        <span className="board-price">{formatUSD(boardPrice(deck, board, skips))}</span>
       </div>
 
       <div className="list-toolbar">
@@ -522,7 +572,7 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
         )}
         {groups.map((g) => {
           const count = g.entries.reduce((n, e) => n + e.qty, 0);
-          const price = g.entries.reduce((n, e) => n + (cardPrice(e.card) ?? 0) * e.qty, 0);
+          const price = g.entries.reduce((n, e) => n + (entryPrice(e, skips) ?? 0), 0);
           const isCollapsed = collapsed.has(g.type);
           const droppable = canDropOn(g.type);
           const isTagGroup = groupBy === 'tag' && !['Commander', 'Lands', 'Untagged', OTHER_GROUP].includes(g.type);
@@ -566,7 +616,6 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
                   {g.entries.map((e) => {
                     const problems = validation.entryProblems[e.uid];
                     const isCmd = e.uid === cmd?.uid;
-                    const p = cardPrice(e.card);
                     const own = board === 'maybe' ? undefined : coverage?.needs.get(nameKey(e.card));
                     const ownState = !own ? 'skip' : own.missing === 0 ? 'full' : own.missing < own.need ? 'part' : 'none';
                     const ownTitle = !own ? '' : own.missing === 0
@@ -601,11 +650,10 @@ export function DeckList({ deck, validation, filter, setFilter, board, setBoard 
                           <TagList groups={[{ scope: 'global', tags: globalTags.get(e.card.name) ?? [] }, { scope: 'card', tags: e.tags ?? [] }, { scope: 'scryfall', tags: entryTags(e, tagSrc).scryfall }]} max={3} onTagClick={onTagClick} />
                         </div>
                         <ManaCost cost={manaCost(e.card)} size={14} />
-                        <span className="entry-price" title={p != null && e.qty > 1 ? `${formatUSD(p)} each` : undefined}>
-                          {formatUSD(p != null ? p * e.qty : null)}
-                        </span>
+                        {priceText(e, 'entry-price')}
                         <div className="entry-actions">
                           <FavStar on={!!e.favorite} onToggle={() => toggleEntryFavorite(deck.id, e.uid)} />
+                          {ownPriceBtn(e, own)}
                           <button className="icon-btn sm" title="Tag (card tags for this deck)" aria-label={`Tag ${e.card.name}`} onClick={() => { hideArt(); setTagging(e); }}>🏷</button>
                           {own && own.missing > 0 && (
                             <button

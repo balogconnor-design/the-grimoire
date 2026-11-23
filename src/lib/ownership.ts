@@ -47,6 +47,27 @@ export function deckNeeds(deck: Deck, ignoreBasics: boolean): Map<string, { card
   return m;
 }
 
+/**
+ * Copies left out of the deck price, by entry uid: entries marked skipOwnedPrice drop the copies
+ * your collection covers for this deck (shared pool), so the price shows what is left to buy.
+ */
+export function ownedPriceSkips(deck: Deck, coverage?: DeckCoverage): Map<string, number> {
+  const skips = new Map<string, number>();
+  if (!coverage) return skips;
+  const left = new Map<string, number>();
+  for (const e of deck.entries) {
+    if (!e.skipOwnedPrice || e.board === 'maybe') continue;
+    const k = nameKey(e.card);
+    const need = coverage.needs.get(k);
+    if (!need) continue;
+    const avail = left.get(k) ?? need.need - need.missing;
+    const n = Math.min(e.qty, avail);
+    if (n > 0) skips.set(e.uid, n);
+    left.set(k, avail - n);
+  }
+  return skips;
+}
+
 export function ownedByName(items: CollectionItem[]): Map<string, number> {
   const m = new Map<string, number>();
   for (const i of items) m.set(nameKey(i.card), (m.get(nameKey(i.card)) ?? 0) + i.qty);
