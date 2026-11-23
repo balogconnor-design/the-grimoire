@@ -939,7 +939,9 @@ test('every collection tab renders', async ({ page }) => {
 test('no sideways scrolling on the main screens', async ({ page }) => {
   await open(page);
   await createDeck(page, 'Width Check');
-  for (const path of ['/', '/#/collection', '/#/collection/inventory', '/#/collection/transactions']) {
+  const deckPath = new URL(page.url()).hash ? `/${new URL(page.url()).hash}` : '/';
+  // The deck page too: its header buttons once ran off the side of phone screens.
+  for (const path of ['/', deckPath, '/#/collection', '/#/collection/inventory', '/#/collection/transactions']) {
     await page.goto(path);
     await expect(page.locator('.topbar')).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
