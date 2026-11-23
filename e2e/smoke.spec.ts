@@ -128,6 +128,75 @@ test('deck search adds to the board shown, by + button and by drag and drop', as
   await result.locator('.result-art').dragTo(tab('Maybeboard'));
   await expect(tab('Maybeboard').locator('.tab-count')).toHaveText('1');
   await expect(tab('Maybeboard')).toHaveAttribute('aria-selected', 'true');
+
+  // Deck rows drag onto another board's tab to move there (same card merges into one row).
+  await page.locator('.deck-groups .entry').first().dragTo(tab('Main'));
+  await expect(tab('Maybeboard').locator('.tab-count')).toHaveText('0');
+  await expect(tab('Main').locator('.tab-count')).toHaveText('2');
+  await tab('Main').click();
+  await page.locator('.deck-groups .entry').first().dragTo(tab('Sideboard'));
+  await expect(tab('Main').locator('.tab-count')).toHaveText('0');
+  await expect(tab('Sideboard').locator('.tab-count')).toHaveText('3');
+  expect(errors).toEqual([]);
+});
+
+test('owned cards can be left out of the deck price', async ({ page, isMobile }) => {
+  const errors = watchErrors(page);
+  await open(page);
+  await createDeck(page, 'Price Test');
+  if (isMobile) await page.locator('.mobile-tabs .tab', { hasText: 'Search' }).click();
+  const search = page.locator('.search-panel');
+  await search.locator('.search-input').fill('sol ring');
+  await search.locator('.search-input').press('Enter');
+  const result = search.locator('.result-card').first();
+  await expect(result).toContainText('Sol Ring');
+  await result.getByRole('button', { name: /Add Sol Ring to main/i }).click();
+  if (isMobile) await page.locator('.mobile-tabs .tab', { hasText: 'Deck' }).click();
+  const boardPrice = page.locator('.board-price');
+  const before = await boardPrice.textContent();
+  expect(before).not.toBe('$0.00');
+  const row = page.locator('.deck-groups .entry', { hasText: 'Sol Ring' });
+  // Not owned yet: no $ button. Mark it owned, then leave it out of the price.
+  await expect(row.getByRole('button', { name: 'Leave Sol Ring out of the deck price' })).toHaveCount(0);
+  await row.hover();
+  await row.getByRole('button', { name: 'Mark Sol Ring owned' }).click();
+  await page.locator('.modal').getByRole('button', { name: /Add to collection/ }).click();
+  await expect(page.locator('.modal')).toHaveCount(0);
+  await row.hover();
+  await row.getByRole('button', { name: 'Leave Sol Ring out of the deck price' }).click();
+  await expect(boardPrice).toHaveText('$0.00');
+  await expect(row.locator('.price-skipped')).toBeVisible();
+  await row.getByRole('button', { name: 'Count Sol Ring in the deck price' }).click();
+  await expect(boardPrice).toHaveText(before!);
+  expect(errors).toEqual([]);
+});
+
+test('the back button closes the card window instead of leaving the deck', async ({ page, isMobile }) => {
+  const errors = watchErrors(page);
+  await open(page);
+  await createDeck(page, 'Back Test');
+  const deckUrl = page.url();
+  if (isMobile) await page.locator('.mobile-tabs .tab', { hasText: 'Search' }).click();
+  const search = page.locator('.search-panel');
+  await search.locator('.search-input').fill('sol ring');
+  await search.locator('.search-input').press('Enter');
+  const result = search.locator('.result-card').first();
+  await expect(result).toContainText('Sol Ring');
+  await result.locator('.result-img-btn').click();
+  await expect(page.locator('.modal')).toContainText('Sol Ring');
+  await page.goBack();
+  await expect(page.locator('.modal')).toHaveCount(0);
+  expect(page.url()).toBe(deckUrl);
+  if (isMobile) await expect(page.locator('.mobile-tabs .tab.active')).toHaveText('Search');
+  await expect(result).toBeVisible();
+
+  // Closing with ✕ gives the history step back: the next Back leaves the deck as usual.
+  await result.locator('.result-img-btn').click();
+  await expect(page.locator('.modal')).toBeVisible();
+  await page.locator('.modal-close').click();
+  await expect(page.locator('.modal')).toHaveCount(0);
+  await page.goBack();
+  await expect(page).not.toHaveURL(/#\/deck\//);
   expect(errors).toEqual([]);
 });
 

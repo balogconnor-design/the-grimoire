@@ -162,8 +162,17 @@ export function entryCategory(deck: Deck, e: DeckEntry): TypeCategory {
   return e.uid === commanderEntry(deck)?.uid ? 'Commander' : typeCategory(e.card);
 }
 
-export function boardPrice(deck: Deck, board: Board) {
-  return boardEntries(deck, board).reduce((sum, e) => sum + (cardPrice(e.card) ?? 0) * e.qty, 0);
+/** Copies of each entry (by uid) left out of the price because you own them (see ownedPriceSkips). */
+export type PriceSkips = ReadonlyMap<string, number>;
+
+/** What an entry adds to the price: every copy, less any owned copies it leaves out. */
+export function entryPrice(e: DeckEntry, skips?: PriceSkips): number | null {
+  const p = cardPrice(e.card);
+  return p == null ? null : p * Math.max(0, e.qty - (skips?.get(e.uid) ?? 0));
+}
+
+export function boardPrice(deck: Deck, board: Board, skips?: PriceSkips) {
+  return boardEntries(deck, board).reduce((sum, e) => sum + (entryPrice(e, skips) ?? 0), 0);
 }
 
 // ---------- Validation ----------

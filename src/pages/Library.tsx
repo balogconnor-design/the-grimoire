@@ -18,7 +18,7 @@ import { GlobalSearch } from '../components/GlobalSearch';
 import { FavStar, Tag, TagList } from '../components/TagEditor';
 import { navigate } from '../lib/router';
 import { useAllDeckTags, usePool } from '../lib/hooks';
-import type { DeckCoverage } from '../lib/ownership';
+import { ownedPriceSkips, type DeckCoverage } from '../lib/ownership';
 
 type StatusFilter = 'all' | 'in-progress' | 'finished';
 const BOARD_LABEL = { main: 'Main', side: 'Sideboard', maybe: 'Maybe' } as const;
@@ -187,7 +187,7 @@ function DeckTile({ deck, matches, coverage, snaps, onTagClick }: { deck: Deck; 
         <div className="tile-stats">
           <span className="tile-count">{count}/{fmt.deckSize}</span>
           <span className="tile-price">
-            <span className="price">{formatUSD(boardPrice(deck, 'main'))}</span>
+            <span className="price">{formatUSD(boardPrice(deck, 'main', ownedPriceSkips(deck, coverage)))}</span>
             <DeltaBadge diff={trend?.diff} pct={trend?.pct} />
           </span>
         </div>

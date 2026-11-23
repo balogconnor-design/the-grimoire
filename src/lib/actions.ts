@@ -57,6 +57,7 @@ export function moveEntry(deckId: string, entryUid: string, board: Board) {
       target.qty += e.qty;
       if (e.tags?.length) target.tags = [...new Set([...(target.tags ?? []), ...e.tags])];
       target.favorite = target.favorite || e.favorite;
+      if (e.skipOwnedPrice) target.skipOwnedPrice = true;
       d.entries = d.entries.filter((x) => x.uid !== e.uid);
     } else {
       e.board = board;
@@ -104,6 +105,18 @@ export function toggleEntryFavorite(deckId: string, entryUid: string) {
   updateDeck(deckId, (d) => {
     const e = d.entries.find((x) => x.uid === entryUid);
     if (e) e.favorite = !e.favorite;
+  });
+}
+
+/** Leave owned copies of these entries out of the deck price (or count them again). */
+export function setSkipOwnedPrice(deckId: string, entryUids: string[], on: boolean) {
+  const uids = new Set(entryUids);
+  updateDeck(deckId, (d) => {
+    for (const e of d.entries) {
+      if (!uids.has(e.uid)) continue;
+      if (on) e.skipOwnedPrice = true;
+      else delete e.skipOwnedPrice;
+    }
   });
 }
 

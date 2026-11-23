@@ -7,7 +7,7 @@ import { useDeck, updateDeck, deleteDeck } from '../lib/store';
 import { FORMATS, getFormat } from '../lib/formats';
 import { boardCount, boardPrice, commanderEntry, formatUSD, validateDeck } from '../lib/rules';
 import { refreshPrices, setDeckTags, toggleDeckFavorite } from '../lib/actions';
-import { useAllDeckTags } from '../lib/hooks';
+import { useAllDeckTags, usePriceSkips } from '../lib/hooks';
 import { FavStar, TagEditor } from '../components/TagEditor';
 import { SearchPanel, type SearchMode } from '../components/SearchPanel';
 import { DeckList } from '../components/DeckList';
@@ -56,6 +56,7 @@ export function DeckPage({ id }: { id: string }) {
   useWheelHandoff(searchColRef, !!deck);
   const validation = useMemo(() => (deck ? validateDeck(deck) : null), [deck]);
   const allDeckTags = useAllDeckTags();
+  const priceSkips = usePriceSkips(deck);
   // Result of a main-menu import that created this deck (only shown when cards were missing).
   const [imported, setImported] = useState(() => peekPendingImport(id));
   const closeImported = () => { clearPendingImport(id); setImported(undefined); };
@@ -122,7 +123,7 @@ export function DeckPage({ id }: { id: string }) {
           <span className={`header-count ${fmt.exact && count === fmt.deckSize ? 'done' : ''} ${fmt.exact && count > fmt.deckSize ? 'over' : ''}`}>
             {count}/{fmt.deckSize}
           </span>
-          <span className="header-price">{formatUSD(boardPrice(deck, 'main'))}</span>
+          <span className="header-price" title={priceSkips.size ? 'Leaves out cards you own that are marked “don’t count”' : undefined}>{formatUSD(boardPrice(deck, 'main', priceSkips))}</span>
           <span className={`legal-dot ${validation.legal ? 'ok' : 'bad'}`} title={validation.legal ? 'Deck is legal' : 'Deck has issues — see Metrics'} />
         </div>
         <div className="header-actions">
