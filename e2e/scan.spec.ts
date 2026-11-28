@@ -102,7 +102,7 @@ test('scan a photo: reads the cards, a printing is read or picked, then they go 
 
   await page.getByRole('button', { name: 'Add 3 cards to collection' }).click();
   await expect(page.getByText('Added 3 cards to your collection')).toBeVisible();
-  await page.goto('/#/collection/inventory');
+  await page.locator('.coll-tabs').getByRole('button', { name: 'Inventory' }).click();
   await expect(page.locator('main')).toContainText('Sol Ring');
   await expect(page.locator('main')).toContainText('Lightning Bolt');
   expect(errors).toEqual([]);
