@@ -150,6 +150,37 @@ export async function getNamed(name: string, set?: string): Promise<Card> {
   return trimCard(await request(`/cards/named?${params}`));
 }
 
+// ---------- Card name catalog (for the photo scanner) ----------
+
+const NAMES_CACHE = 'grimoire-card-names-v1';
+const NAMES_URL = `${API}/catalog/card-names`;
+const NAMES_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+let namesPromise: Promise<string[]> | null = null;
+
+/**
+ * Every card name Scryfall knows (about 35,000, ~1 MB). Kept in the browser's Cache Storage for a week
+ * so scanning doesn't download it every time; an older copy is used when Scryfall can't be reached.
+ */
+export function getCardNames(): Promise<string[]> {
+  if (namesPromise) return namesPromise;
+  namesPromise = (async () => {
+    const store = typeof caches !== 'undefined' ? await caches.open(NAMES_CACHE).catch(() => null) : null;
+    const cached = await store?.match(NAMES_URL).catch(() => undefined);
+    const at = Number(cached?.headers.get('x-saved-at') ?? 0);
+    if (cached && Date.now() - at < NAMES_TTL_MS) return ((await cached.json()) as { data: string[] }).data;
+    try {
+      const body = await request<{ data: string[] }>('/catalog/card-names');
+      await store?.put(NAMES_URL, new Response(JSON.stringify({ data: body.data }), { headers: { 'x-saved-at': String(Date.now()) } })).catch(() => undefined);
+      return body.data;
+    } catch (e) {
+      if (cached) return ((await cached.json()) as { data: string[] }).data;
+      throw e;
+    }
+  })();
+  namesPromise.catch(() => { namesPromise = null; });
+  return namesPromise;
+}
+
 export async function autocomplete(q: string): Promise<string[]> {
   if (q.trim().length < 2) return [];
   const res = await request<{ data: string[] }>(`/cards/autocomplete?q=${encodeURIComponent(q)}`);

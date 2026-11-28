@@ -158,7 +158,7 @@ function Overview({ onAdd, showInInventory }: { onAdd: () => void; showInInvento
     return (
       <div className="empty-hero">
         <h2>Start your collection</h2>
-        <p className="muted">Add cards by searching Scryfall, pasting a list, or straight from a deck. Track exact printings, what you paid, and what they're worth now.</p>
+        <p className="muted">Add cards by searching Scryfall, pasting a list, scanning photos, or straight from a deck. Track exact printings, what you paid, and what they're worth now.</p>
         <button className="btn btn-primary btn-lg" onClick={onAdd}>+ Add cards</button>
       </div>
     );
