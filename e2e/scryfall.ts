@@ -21,6 +21,8 @@ export async function mockScryfall(page: Page) {
     if (url.pathname === '/cards/collection') return json(200, { object: 'list', data: [SOL_RING], not_found: [] });
     if (url.pathname === '/sets') return json(200, { object: 'list', data: [{ code: 'c21', name: 'Commander 2021', set_type: 'commander', released_at: '2021-04-23' }] });
     if (url.pathname === '/symbology') return json(200, { object: 'list', data: [] });
+    // The photo scanner's name catalog: a few names, so the scan test can tell a match from a near miss.
+    if (url.pathname === '/catalog/card-names') return json(200, { object: 'catalog', data: ['Sol Ring', 'Sol Talisman', 'Lightning Bolt', 'Arcane Signet', 'Flash'] });
     return json(404, { object: 'error', status: 404, details: 'Not mocked in e2e tests' });
   });
   await page.route('https://cards.scryfall.io/**', (route) => route.fulfill({ status: 200, contentType: 'image/png', body: PNG }));

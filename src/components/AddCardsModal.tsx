@@ -1,16 +1,18 @@
 import { useState, type FormEvent } from 'react';
-import type { Card, Condition, Finish } from '../types';
+import type { Card } from '../types';
 import { Modal } from './Modal';
 import { ItemForm, draftFor, type ItemDraft } from './ItemForm';
 import { useToast } from './Toast';
+import { applyDefaults, DefaultsRow, type Defaults } from './BulkDefaults';
+import { ScanAdd } from './ScanAdd';
 import { searchCards } from '../lib/scryfall';
-import { addItems, CONDITIONS, defaultFinish, finishPrice, printBadges, resolveCardList, SOURCES, today, type NewItemInput } from '../lib/collection';
+import { addItems, defaultFinish, finishPrice, printBadges, resolveCardList, today, type NewItemInput } from '../lib/collection';
 import { cardImage, formatUSD, isBasicLand } from '../lib/rules';
 import { decksT } from '../lib/store';
 import { usePool } from '../lib/hooks';
 import { nameKey } from '../lib/ownership';
 
-type Tab = 'search' | 'paste' | 'deck';
+type Tab = 'search' | 'paste' | 'scan' | 'deck';
 
 export function AddCardsModal({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<Tab>('search');
@@ -19,10 +21,12 @@ export function AddCardsModal({ onClose }: { onClose: () => void }) {
       <div className="board-tabs">
         <button className={`tab ${tab === 'search' ? 'active' : ''}`} onClick={() => setTab('search')}>Scryfall search</button>
         <button className={`tab ${tab === 'paste' ? 'active' : ''}`} onClick={() => setTab('paste')}>Paste a list</button>
+        <button className={`tab ${tab === 'scan' ? 'active' : ''}`} onClick={() => setTab('scan')}>Scan photos</button>
         <button className={`tab ${tab === 'deck' ? 'active' : ''}`} onClick={() => setTab('deck')}>From a deck</button>
       </div>
       {tab === 'search' && <SearchAdd />}
       {tab === 'paste' && <PasteAdd onDone={onClose} />}
+      {tab === 'scan' && <ScanAdd onDone={onClose} />}
       {tab === 'deck' && <DeckAdd onDone={onClose} />}
     </Modal>
   );
@@ -100,41 +104,6 @@ function SearchAdd() {
     </div>
   );
 }
-
-// ---------- Shared defaults for bulk adds ----------
-
-interface Defaults {
-  condition?: Condition;
-  source?: string;
-  acquiredAt?: string;
-  useMarket: boolean;
-}
-
-function DefaultsRow({ value, onChange }: { value: Defaults; onChange: (d: Defaults) => void }) {
-  return (
-    <div className="if-grid defaults-row">
-      <label className="if-field"><span className="label">Condition</span>
-        <select className="input" value={value.condition ?? ''} onChange={(e) => onChange({ ...value, condition: (e.target.value || undefined) as Condition | undefined })}>
-          <option value="">Not set</option>
-          {CONDITIONS.map((c) => <option key={c.id} value={c.id}>{c.id}</option>)}
-        </select>
-      </label>
-      <label className="if-field"><span className="label">Source</span>
-        <input className="input" list="source-list" value={value.source ?? ''} onChange={(e) => onChange({ ...value, source: e.target.value || undefined })} placeholder="Not set" />
-        <datalist id="source-list">{SOURCES.map((s) => <option key={s} value={s} />)}</datalist>
-      </label>
-      <label className="if-field"><span className="label">Acquired</span>
-        <input className="input" type="date" value={value.acquiredAt ?? ''} onChange={(e) => onChange({ ...value, acquiredAt: e.target.value || undefined })} />
-      </label>
-      <label className="radio"><input type="checkbox" checked={value.useMarket} onChange={(e) => onChange({ ...value, useMarket: e.target.checked })} /> Record today's market price as the price paid</label>
-    </div>
-  );
-}
-
-const applyDefaults = (card: Card, finish: Finish, qty: number, d: Defaults): NewItemInput => ({
-  card, finish, qty, condition: d.condition, source: d.source, acquiredAt: d.acquiredAt,
-  purchasePrice: d.useMarket ? finishPrice(card, finish) ?? undefined : undefined,
-});
 
 // ---------- Paste ----------
 

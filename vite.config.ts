@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { defineConfig, type Connect, type Plugin } from 'vite';
 import { handleCombos } from './shared/spellbook';
 import react from '@vitejs/plugin-react';
@@ -48,6 +49,40 @@ function combosApi(): Plugin {
   };
 }
 
+/**
+ * The photo scanner's OCR engine (Tesseract.js) runs from the app's own files under /tesseract/, never a
+ * CDN (the CSP only allows our own scripts). Served from node_modules by the dev and preview servers,
+ * copied into dist by the build. Only the LSTM engine builds are needed (OEM.LSTM_ONLY in src/lib/scan/ocr.ts);
+ * the worker picks one by the browser's WebAssembly SIMD support.
+ */
+const TESSERACT_FILES: Record<string, string> = {
+  'tesseract/worker.min.js': 'node_modules/tesseract.js/dist/worker.min.js',
+  'tesseract/core/tesseract-core-lstm.wasm.js': 'node_modules/tesseract.js-core/tesseract-core-lstm.wasm.js',
+  'tesseract/core/tesseract-core-simd-lstm.wasm.js': 'node_modules/tesseract.js-core/tesseract-core-simd-lstm.wasm.js',
+  'tesseract/core/tesseract-core-relaxedsimd-lstm.wasm.js': 'node_modules/tesseract.js-core/tesseract-core-relaxedsimd-lstm.wasm.js',
+  'tesseract/lang/eng.traineddata.gz': 'node_modules/@tesseract.js-data/eng/4.0.0_best_int/eng.traineddata.gz',
+};
+
+function tesseractAssets(): Plugin {
+  const serve: Connect.NextHandleFunction = (rawReq, rawRes, next) => {
+    const req = rawReq as unknown as NodeReq;
+    const res = rawRes as unknown as Omit<NodeRes, 'end'> & { end(body: Uint8Array): void };
+    const path = (req.url ?? '').split('?')[0].replace(/^\//, '');
+    const from = TESSERACT_FILES[path];
+    if (!from) return next();
+    res.setHeader('Content-Type', path.endsWith('.js') ? 'text/javascript' : 'application/octet-stream');
+    res.end(readFileSync(from));
+  };
+  return {
+    name: 'grimoire-tesseract-assets',
+    configureServer: (server) => { server.middlewares.use(serve); },
+    configurePreviewServer: (server) => { server.middlewares.use(serve); },
+    generateBundle() {
+      for (const [fileName, from] of Object.entries(TESSERACT_FILES)) this.emitFile({ type: 'asset', fileName, source: readFileSync(from) });
+    },
+  };
+}
+
 // Cloudflare Pages sets CF_PAGES_BRANCH during its builds. Branch previews (anything but main) get an
 // on-page developer console (Eruda) for debugging on phones without a computer attached.
 // Production and local builds never include it.
@@ -59,6 +94,7 @@ export default defineConfig({
   plugins: [
     react(),
     combosApi(),
+    tesseractAssets(),
     // Installable web app + offline support. The service worker is only built for production
     // (npm run build); the dev server never registers one.
     VitePWA({
@@ -84,7 +120,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,png,svg,ico}'], // the plugin adds manifest.webmanifest itself
-        globIgnores: ['404.html'], // Cloudflare's not-found page, never needed offline
+        // 404.html: Cloudflare's not-found page, never needed offline. tesseract/: the scanner's ~7 MB
+        // OCR engine, fetched only when someone scans (then cached by the rule below).
+        globIgnores: ['404.html', 'tesseract/**'],
         navigateFallback: 'index.html',
         navigateFallbackDenylist: [/^\/api\//], // the combo proxy is a server route, never the app shell
         cleanupOutdatedCaches: true,
@@ -92,6 +130,17 @@ export default defineConfig({
         // and sized normally (opaque no-cors responses count as megabytes each against storage).
         // The Scryfall API itself is never cached, so search results and prices are always live.
         runtimeCaching: [
+          {
+            // The OCR engine and its English data. Cache-first: the files only change with a new
+            // Tesseract.js version, and then the cache name changes too.
+            urlPattern: ({ url, sameOrigin }) => sameOrigin && url.pathname.startsWith('/tesseract/'),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: `tesseract-${pkg.dependencies['tesseract.js'].replace(/[^\w.]/g, '')}`,
+              cacheableResponse: { statuses: [200] },
+              expiration: { maxEntries: 10, purgeOnQuotaError: true },
+            },
+          },
           {
             urlPattern: /^https:\/\/cards\.scryfall\.io\//,
             handler: 'CacheFirst',

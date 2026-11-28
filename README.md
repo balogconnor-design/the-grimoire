@@ -33,7 +33,9 @@ On Windows you can also double-click `Start The Grimoire.bat`, which installs de
   desktop Chromium, Firefox and WebKit (Safari's engine) plus Android and iPhone emulation. They cover loading, saving a deck,
   card search, every collection tab, no sideways scrolling, backup → restore into a fresh browser, and working offline
   (Chromium only, the one engine Playwright can run service workers in). Scryfall is mocked with a saved card
-  (`e2e/fixtures/sol-ring.json`), so no network is needed.
+  (`e2e/fixtures/sol-ring.json`), so no network is needed. The photo scanner test (`e2e/scan.spec.ts`) runs the real OCR
+  engine on cards drawn in a canvas, under the Content-Security-Policy from `public/_headers` (added to every response,
+  since `vite preview` sends none), in all five browsers.
 - **GitHub Actions** (`.github/workflows/ci.yml`) runs typecheck, unit tests, build and smoke tests on every pull request and
   push to `main`. A failed run uploads the Playwright report. It uses about 5 of the 2,000 free monthly minutes per run.
 - **Debug console on previews:** Cloudflare branch previews (not `main`, not local builds) include Eruda, an on-page console
@@ -59,7 +61,7 @@ calls Scryfall directly and saves everything in that browser, as in the other ve
 - **Build settings:** build command `npm run build:web` (a failing test blocks the deploy), output directory `dist`, Node version
   from `.node-version`.
 - **Headers:** `public/_headers` sets the security headers (the Content-Security-Policy allows only `api.scryfall.com` and
-  `*.scryfall.io`, for both images and the service worker's fetches, so a new outside source must be added there or it will be blocked). Built files are not given long cache lifetimes (see the comment in the file). `public/404.html` is the not-found page; having it also stops Pages from answering missing files with `index.html`. The portable
+  `*.scryfall.io`, for both images and the service worker's fetches, so a new outside source must be added there or it will be blocked). `script-src` includes `'wasm-unsafe-eval'` so the photo scanner's OCR engine can compile its WebAssembly; it allows no JavaScript `eval`. The engine's files are the app's own (`/tesseract/`, copied from `node_modules` by `vite.config.ts`), never a CDN. Built files are not given long cache lifetimes (see the comment in the file). `public/404.html` is the not-found page; having it also stops Pages from answering missing files with `index.html`. The portable
   build leaves this file out. To test it locally, run `npx wrangler pages dev dist` after a build.
 - **The address must never change.** Like the portable port, saved data is tied to `https://the-grimoire.app`; moving to another
   address (including switching to `www.` or letting the domain lapse) leaves every user's data behind unless they back up and
@@ -135,7 +137,20 @@ drive, replace the `.exe` and `app\` and keep `data\`.
 ### Collection
 - **Favorites tab:** every favorite card, whether you own a copy or not, with a filter box (name or search syntax such as `t:creature`, `#ramp`, `is:owned`).
 - **Inventory:** every lot with its printing, finish, condition, quantity, purchase price, source, tags and notes. Search, filter and act on many lots at once.
-- **Add cards:** from a Scryfall search, a pasted list (which keeps set and collector number), or a saved deck.
+- **Add cards:** from a Scryfall search, a pasted list (which keeps set and collector number), photos, or a saved deck.
+- **Scan photos:** take or choose photos of one card or a few laid out flat (upright, English cards). The app reads them on
+  the device (Tesseract OCR running in the browser; the photos never leave it) and finds each card by its title and by the
+  set line at the bottom ("MH3 • EN" with the collector number above it), so a card whose title bar won't read is still
+  found. Each photo is read at two sizes, then the title bar and collector strip of each card are read again up close.
+  Every result is a best guess shown for review next to the crop from your photo: the printing is marked **read from
+  card** (set and number read), **set matches** (check the variant), **you already own** (the printing with the most
+  copies in your collection) or **guessed** (Scryfall's default). Cards to check come first; confirmed ones fold away.
+  Per card: quantity, finish (non-foil by default, foil-only printings set automatically, **All foil** for a foil page),
+  **Change printing** (every printing with art, set, number and price; picking one offers to use that set for the other
+  guessed cards, since binders are usually sorted by set), **Wrong card?** (type the name, matched offline against every
+  card name) and remove. A doubtful name shows what was read and the likely cards to pick from. Condition, source, date
+  and price paid apply to all of them, as for a pasted list. The first scan downloads the reader (about 7 MB, then kept
+  for offline use) and Scryfall's list of card names (cached for a week).
 - **Overview:** collection value over time, top gainers and losers, big price moves, price alerts, and how much of each deck you own.
 - **Deck coverage:** decks match your collection by card name, so any printing you own counts. Copies are shared across decks, and you can reserve copies for one deck.
 - **Buy list:** the cards your decks still need, with a cheapest-printing finder, plus your watchlist and "buy more" cards.
@@ -199,6 +214,8 @@ drive, replace the `.exe` and `app\` and keep `data\`.
 | `src/lib/ownership.ts` | Matching decks against the collection, shared copy pool, buy list |
 | `src/lib/query.ts`, `search.ts` | Local search syntax and mixed Scryfall + local queries |
 | `src/lib/advanced.ts`, `src/components/AdvancedSearch.tsx` | Advanced search form shared by the main and deck searches, and the query it builds |
+| `src/lib/scan/`, `src/components/ScanAdd.tsx` | Photo scanner: OCR in a web worker (`ocr.ts`, Tesseract.js served from `/tesseract/`, with a stall watchdog), fuzzy matching against Scryfall's card-name catalog (`names.ts`), finding cards by title and set line (`detect.ts`), Scryfall lookup and printing certainty (`scan.ts`), and the photo picker / review / printing picker screens |
+| `src/components/BulkDefaults.tsx` | Condition / source / date / price-paid row shared by the bulk add tabs |
 | `src/lib/viewPanel.ts`, `src/components/ViewPanel.tsx` | Deck page view panel: right-click to show, pin several cards (Card / Grid / List / Details views, sorting, remove), collapse and hide, drag and drop to pin |
 | `src/lib/store.ts` | IndexedDB persistence, multi-store transactions (`transact`), save-error reporting, React hooks |
 | `src/lib/backup.ts` | Exports (share sheet on phones, download elsewhere), full backup, validated all-or-nothing restore, backup migrations |

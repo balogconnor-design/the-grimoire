@@ -5,8 +5,10 @@
 # connect-src also lists *.scryfall.io because the service worker fetches card images and symbols to cache them.
 # Cloudflare Web Analytics (cookie-free visit counts, switched on in the Pages dashboard) injects a script from
 # static.cloudflareinsights.com that reports to cloudflareinsights.com.
+# 'wasm-unsafe-eval' lets the photo scanner's OCR engine (our own /tesseract/ files) compile WebAssembly;
+# it does not allow eval() or new Function() for JavaScript.
 /*
-  Content-Security-Policy: default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.scryfall.io; connect-src 'self' https://api.scryfall.com https://*.scryfall.io https://json.edhrec.com https://cloudflareinsights.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.scryfall.io; connect-src 'self' https://api.scryfall.com https://*.scryfall.io https://json.edhrec.com https://cloudflareinsights.com; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
